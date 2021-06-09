@@ -37,8 +37,9 @@ __FBSDID("$FreeBSD$");
  * hardware objects used in network-oriented packet processing applications.
  */
 
-#include <sys/kernel.h>
+#include <sys/param.h>
 #include <sys/bus.h>
+#include <sys/kernel.h>
 #include <sys/rman.h>
 
 #include <machine/bus.h>
