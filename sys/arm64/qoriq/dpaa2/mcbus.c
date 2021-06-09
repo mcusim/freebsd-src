@@ -38,9 +38,10 @@ __FBSDID("$FreeBSD$");
  */
 
 #include <sys/param.h>
-#include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/bus.h>
 #include <sys/rman.h>
+#include <sys/module.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -78,7 +79,6 @@ static int
 mcbus_attach(device_t dev)
 {
 	struct mcbus_softc *sc;
-	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
