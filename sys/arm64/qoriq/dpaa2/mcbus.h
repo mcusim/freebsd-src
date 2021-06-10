@@ -29,23 +29,29 @@
 #ifndef	_DPAA2_MCBUS_H
 #define	_DPAA2_MCBUS_H
 
-/* Memory resource IDs */
-#define MC_PORTAL_MEM_RID	0
-#define MC_REGS_MEM_RID		1 /* optional */
+#define	BIT(x)			(1 << (x))
 
-/* Control registers */
+/*
+ * Control registers.
+ */
+
 #define MC_REG_GCR1		0x00u
+#define GCR1_P1_STOP		BIT(31)
+
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
 
 struct mcbus_softc {
 	device_t	 dev;
-	phandle_t	node; /* OFW node */
+	device_t	 rcdev; /* Root DPRC device */
+	phandle_t	 node;
+	struct resource *res[2];
+};
 
-	int		 portal_rid;
-	struct resource *portal_res;
-	int		 regs_rid;
-	struct resource	*regs_res;
+struct dprc_softc {
+	device_t	 dev;
+	device_t	 pdev;
+	int		 unit;
 };
 
 #endif /* _DPAA2_MCBUS_H */
