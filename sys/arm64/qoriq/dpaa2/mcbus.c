@@ -57,11 +57,18 @@ static int mcbus_attach(device_t dev);
 static int mcbus_detach(device_t dev);
 
 /* Macros to read/write registers */
-#define	mcbus_reg_r4(_sc, _r)		bus_read_4((_sc)->regs_res, (_r))
-#define	mcbus_reg_w4(_sc, _r, _v)	bus_write_4((_sc)->regs_res, (_r), (_v))
+#define	mcbus_reg_r4(_sc, _r)		bus_read_4((_sc)->res[1], (_r))
+#define	mcbus_reg_w4(_sc, _r, _v)	bus_write_4((_sc)->res[1], (_r), (_v))
 
-/* Device interface */
+static struct resource_spec mcbus_spec[] = {
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE },		/* MC portal */
+	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_OPTIONAL },	/* MC control regs */
+	RESOURCE_SPEC_END
+};
 
+/*
+ * Device interface.
+ */
 static int
 mcbus_probe(device_t dev)
 {
@@ -79,39 +86,37 @@ static int
 mcbus_attach(device_t dev)
 {
 	struct mcbus_softc *sc;
+	uint32_t val;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	sc->node = ofw_bus_get_node(dev);
 
-	/* Allocate memory resource for control registers */
-	sc->regs_rid = MC_REGS_MEM_RID;
-	sc->regs_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
-	    &sc->regs_rid, RF_ACTIVE);
-	if (sc->regs_res) {
-		/* ...clear P1_STOP bit to run MC processor... */
-	}
-
-	/* Allocate memory resource for command portal */
-	sc->portal_rid = MC_PORTAL_MEM_RID;
-	sc->portal_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
-	    &sc->portal_rid, RF_ACTIVE);
-	if (sc->portal_res == NULL) {
-		device_printf(sc->dev, "failed to allocate memory resource "
-		    "for command portal\n");
-		mcbus_detach(dev);
+	error = bus_alloc_resources(dev, mcbus_spec, sc->res);
+	if (error) {
+		device_printf(dev, "failed to allocate resources\n");
 		return (ENXIO);
 	}
 
-	/*
-	 * Don't forget to add root DPRC as a child device:
-	 *
-	 *	device_add_child(dev, "dprc", 0);
-	 *
-	 */
+	/* Reset P1_STOP bit to resume MC processor. */
+	if (sc->res[1]) {
+		val = mcbus_reg_r4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
+		mcbus_reg_w4(sc, MC_REG_GCR1, val);
+	}
 
-	/* bus_generic_probe(dev); */
-	/* bus_generic_attach(dev); */
+	/*
+	 * Add a root resource container as the only child of the bus. All of
+	 * the direct descendant containers will be attached to the root one
+	 * instead of the MC bus device.
+	 */
+	sc->rcdev = device_add_child(dev, "dprc", 0);
+	if (sc->rcdev == NULL) {
+		mcbus_detach(dev);
+		return (ENXIO);
+	}
+	bus_generic_probe(dev);
+	bus_generic_attach(dev);
 
 	return (0);
 }
@@ -119,6 +124,11 @@ mcbus_attach(device_t dev)
 static int
 mcbus_detach(device_t dev)
 {
+	struct mcbus_softc *sc;
+
+	sc = device_get_softc(dev);
+	bus_release_resources(dev, mcbus_spec, sc->res);
+
 	return (0);
 }
 
@@ -127,9 +137,6 @@ static device_method_t mcbus_methods[] = {
 	DEVMETHOD(device_probe,		mcbus_probe),
 	DEVMETHOD(device_attach,	mcbus_attach),
 	DEVMETHOD(device_detach,	mcbus_detach),
-	/* DEVMETHOD(device_shutdown,	mcbus_shutdown), */
-	/* DEVMETHOD(device_suspend,	mcbus_suspend), */
-	/* DEVMETHOD(device_resume,	mcbus_resume), */
 	DEVMETHOD_END
 };
 
