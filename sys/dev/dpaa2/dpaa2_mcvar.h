@@ -26,14 +26,12 @@
  * SUCH DAMAGE.
  */
 
-#ifndef	_DPAA2_MCBUS_H
-#define	_DPAA2_MCBUS_H
+#ifndef	_DPAA2_MCVAR_H
+#define	_DPAA2_MCVAR_H
+
+#define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
 
 #define	BIT(x)			(1 << (x))
-
-/*
- * Control registers.
- */
 
 #define MC_REG_GCR1		0x00u
 #define GCR1_P1_STOP		BIT(31)
@@ -41,17 +39,47 @@
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
 
-struct mcbus_softc {
-	device_t	 dev;
-	device_t	 rcdev; /* Root DPRC device */
-	phandle_t	 node;
-	struct resource *res[2];
+/*
+ * Helper object to send commands to MC portal.
+ *
+ * @dev: DPMCP device associated with this helper object (optional).
+ * @portal: Unmapped MC portal resource.
+ * @mportal: Mapped MC portal resource.
+ * @mutex: Lock to send MC portal commands.
+ *
+ * NOTE: The same object can be shared between MC, DPRC and DPMCP.
+ */
+typedef struct dpaa2_mcp {
+	device_t		 dev;
+	struct resource		*portal;
+	struct resource_map	*mportal;
+	struct mtx		 mutex;
+} dpaa2_mcp_t;
+
+/*
+ * Software contexts.
+ */
+
+/*
+ * Software context for the DPAA2 Management Complex driver.
+ *
+ * @dev: Device associated with this software context.
+ * @node: OFW node associated with this device (optional).
+ * @res: Unmapped MC command portal and MC control registers.
+ * @map: Mapped MC command portal and MC control registers.
+ * @mcp: Helper object to send commands to the root MC portal.
+ */
+struct dpaa2_mc_softc {
+	device_t		 dev;
+	phandle_t		 node;
+	struct resource 	*res[2];
+	struct resource_map	*map[2];
+	dpaa2_mcp_t		*mcp;
 };
 
-struct dprc_softc {
-	device_t	 dev;
-	device_t	 pdev;
-	int		 unit;
+struct dpaa2_rc_softc {
+	device_t	dev;
+	int		unit;
 };
 
-#endif /* _DPAA2_MCBUS_H */
+#endif /* _DPAA2_MCVAR_H */
