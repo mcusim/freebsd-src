@@ -30,7 +30,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * The NXP DPAA2 Resource Container (DPRC) Driver.
+ * The DPAA2 Resource Container (DPRC) Driver.
  *
  * DPRC holds all the resources and object information that a software context
  * (kernel, virtual machine, etc.) can access or use.
@@ -48,31 +48,30 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include "mcbus.h"
+#include "dpaa2_mcvar.h"
 
 /* Device interface */
-static int dprc_probe(device_t dev);
-static int dprc_attach(device_t dev);
-static int dprc_detach(device_t dev);
+static int dpaa2_rc_probe(device_t dev);
+static int dpaa2_rc_attach(device_t dev);
+static int dpaa2_rc_detach(device_t dev);
 
 /*
  * Device interface.
  */
 static int
-dprc_probe(device_t dev)
+dpaa2_rc_probe(device_t dev)
 {
 	device_set_desc(dev, "NXP DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
 }
 
 static int
-dprc_attach(device_t dev)
+dpaa2_rc_attach(device_t dev)
 {
-	struct dprc_softc *sc;
+	struct dpaa2_rc_softc *sc;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	sc->pdev = device_get_parent(dev);
 	sc->unit = device_get_unit(dev);
 
 	if (sc->unit == 0) {
@@ -84,25 +83,25 @@ dprc_attach(device_t dev)
 }
 
 static int
-dprc_detach(device_t dev)
+dpaa2_rc_detach(device_t dev)
 {
 	return (0);
 }
 
-static device_method_t dprc_methods[] = {
+static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
-	DEVMETHOD(device_probe,		dprc_probe),
-	DEVMETHOD(device_attach,	dprc_attach),
-	DEVMETHOD(device_detach,	dprc_detach),
+	DEVMETHOD(device_probe,		dpaa2_rc_probe),
+	DEVMETHOD(device_attach,	dpaa2_rc_attach),
+	DEVMETHOD(device_detach,	dpaa2_rc_detach),
 	DEVMETHOD_END
 };
 
-static driver_t dprc_driver = {
-	"dprc",
-	dprc_methods,
-	sizeof(struct dprc_softc),
+static driver_t dpaa2_rc_driver = {
+	"dpaa2_rc",
+	dpaa2_rc_methods,
+	sizeof(struct dpaa2_rc_softc),
 };
 
-static devclass_t dprc_devclass;
+static devclass_t dpaa2_rc_devclass;
 
-DRIVER_MODULE(dprc, mcbus, dprc_driver, dprc_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_rc, dpaa2_mc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);

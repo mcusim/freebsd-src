@@ -544,8 +544,8 @@ arm64/qoriq/clk/ls1046a_clkgen.c		optional clk SOC_NXP_LS
 arm64/qoriq/clk/lx2160a_clkgen.c		optional clk SOC_NXP_LS
 arm64/qoriq/clk/qoriq_clk_pll.c			optional clk SOC_NXP_LS
 arm64/qoriq/clk/qoriq_clkgen.c			optional clk SOC_NXP_LS
-arm64/qoriq/dpaa2/mcbus.c			optional mcbus SOC_NXP_LS
-arm64/qoriq/dpaa2/dprc.c			optional dprc SOC_NXP_LS
+dev/dpaa2/dpaa2_mc.c				optional dpaa2_mc SOC_NXP_LS
+dev/dpaa2/dpaa2_rc.c				optional dpaa2_rc SOC_NXP_LS
 dev/ahci/ahci_fsl_fdt.c				optional SOC_NXP_LS ahci fdt
 dev/flash/flexspi/flex_spi.c    		optional clk flex_spi SOC_NXP_LS fdt
 
