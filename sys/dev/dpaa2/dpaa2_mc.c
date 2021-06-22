@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/module.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -154,7 +155,7 @@ dpaa2_mc_attach(device_t dev)
 	}
 	mcp->dev = NULL; /* No DPMCP device created yet. */
 	mcp->portal = sc->res[0];
-	mcp->mportal = sc->map[0];
+	mcp->mportal = &sc->map[0];
 	mtx_init(&mcp->mutex, device_get_nameunit(dev),
 	    "root MC portal lock", MTX_DEF);
 	sc->mcp = mcp;
