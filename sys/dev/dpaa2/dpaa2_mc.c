@@ -146,7 +146,7 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Populate root MCP helper object. */
+	/* Populate MCP helper object. */
 	mcp = malloc(sizeof(dpaa2_mcp_t), M_DPMC, M_WAITOK | M_ZERO);
 	if (!mcp) {
 		device_printf(dev, "Failed to allocate memory for dpaa2_mcp\n");

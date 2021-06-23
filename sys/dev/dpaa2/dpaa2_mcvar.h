@@ -45,7 +45,8 @@
  * @dev: DPMCP device associated with this helper object (optional).
  * @portal: Unmapped MC portal resource.
  * @mportal: Mapped MC portal resource.
- * @mutex: Lock to send MC portal commands.
+ * @mutex: Lock to send MC portal commands and wait for the result (in polling
+ *         mode).
  *
  * NOTE: The same object can be shared between MC, DPRC and DPMCP.
  */
@@ -61,7 +62,7 @@ typedef struct dpaa2_mcp {
  */
 
 /*
- * Software context for the DPAA2 Management Complex driver.
+ * Software context for the DPAA2 Management Complex (MC) driver.
  *
  * @dev: Device associated with this software context.
  * @node: OFW node associated with this device (optional).
