@@ -125,7 +125,6 @@ dpaa2_mc_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	sc->node = ofw_bus_get_node(dev);
 	sc->mcp = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);

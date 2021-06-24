@@ -72,7 +72,6 @@ typedef struct dpaa2_mcp {
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
-	phandle_t		 node;
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
 	dpaa2_mcp_t		*mcp;
