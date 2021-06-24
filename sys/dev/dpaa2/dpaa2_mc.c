@@ -50,10 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#ifdef DEV_ACPI
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
-#endif
 
 #ifdef FDT
 #include <dev/ofw/ofw_bus.h>
@@ -65,9 +63,7 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_DPMC, "dpmc_memory", "DPAA2 Management Complex driver memory");
 
 /* Device interface */
-#ifdef DEV_ACPI
 static int dpaa2_mc_acpi_probe(device_t dev);
-#endif
 #ifdef FDT
 static int dpaa2_mc_fdt_probe(device_t dev);
 #endif
@@ -88,10 +84,11 @@ static struct resource_spec dpaa2_mc_spec[] = {
  * Device interface.
  */
 
-#ifdef DEV_ACPI
 static int
 dpaa2_mc_acpi_probe(device_t dev)
 {
+	device_printf(dev, "Probed from ACPI probe\n");
+
 	static char *dpaa2_mc_ids[] = { "NXP0008", NULL };
 	int rv;
 
@@ -103,12 +100,13 @@ dpaa2_mc_acpi_probe(device_t dev)
 
 	return (rv);
 }
-#endif
 
 #ifdef FDT
 static int
 dpaa2_mc_fdt_probe(device_t dev)
 {
+	device_printf(dev, "Probed from FDT probe\n");
+
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 
@@ -224,7 +222,6 @@ dpaa2_mc_detach(device_t dev)
 	return (0);
 }
 
-#ifdef DEV_ACPI
 static devclass_t dpaa2_mc_acpi_devclass;
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
@@ -240,7 +237,6 @@ static driver_t dpaa2_mc_acpi_driver = {
 };
 DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_devclass,
     NULL, NULL);
-#endif
 
 #ifdef FDT
 static devclass_t dpaa2_mc_fdt_devclass;
