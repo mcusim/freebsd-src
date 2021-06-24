@@ -45,6 +45,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 
+#include <vm/vm.h>
+
 #include <machine/bus.h>
 #include <machine/resource.h>
 
@@ -63,7 +65,12 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_DPMC, "dpmc_memory", "DPAA2 Management Complex driver memory");
 
 /* Device interface */
-static int dpaa2_mc_probe(device_t dev);
+#ifdef DEV_ACPI
+static int dpaa2_mc_acpi_probe(device_t dev);
+#endif
+#ifdef FDT
+static int dpaa2_mc_fdt_probe(device_t dev);
+#endif
 static int dpaa2_mc_attach(device_t dev);
 static int dpaa2_mc_detach(device_t dev);
 
