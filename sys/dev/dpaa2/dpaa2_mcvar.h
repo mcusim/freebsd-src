@@ -61,6 +61,8 @@ typedef struct dpaa2_mcp {
  * Software contexts.
  */
 
+DECLARE_CLASS(dpaa2_mc_driver);
+
 /*
  * Software context for the DPAA2 Management Complex (MC) driver.
  *
@@ -81,5 +83,8 @@ struct dpaa2_rc_softc {
 	device_t	dev;
 	int		unit;
 };
+
+int dpaa2_mc_attach(device_t dev);
+int dpaa2_mc_detach(device_t dev);
 
 #endif /* _DPAA2_MCVAR_H */
