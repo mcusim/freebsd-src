@@ -55,34 +55,19 @@ __FBSDID("$FreeBSD$");
 static int
 dpaa2_mc_acpi_probe(device_t dev)
 {
-	static char *dpaa2_mc_ids[] = { "NXP0008", NULL };
+	/* static char *dpaa2_mc_ids[] = { "NXP0008", NULL }; */
+	static char *dpaa2_mc_ids[] = { "INT0800", NULL };
 	int rc;
 
 	/* --- FOR DEBUG ONLY --- */
-	ACPI_DEVICE_INFO *pdev_info = NULL;
 	ACPI_DEVICE_INFO *dev_info = NULL;
-	ACPI_HANDLE pdev_h, dev_h;
+	ACPI_HANDLE dev_h;
 	char cbuf[128];
 
-	device_printf(dev, "Probed from ACPI probe\n");
-
-	pdev_h = acpi_get_handle(device_get_parent(dev));
 	dev_h = acpi_get_handle(dev);
 
-	if (pdev_h)
-		AcpiGetObjectInfo(pdev_h, &pdev_info);
 	if (dev_h)
 		AcpiGetObjectInfo(dev_h, &dev_info);
-
-	if (pdev_h && pdev_info) {
-		snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
-		    (pdev_info->Valid & ACPI_VALID_HID) ?
-		    pdev_info->HardwareId.String : "Unknown",
-		    (pdev_info->Valid & ACPI_VALID_UID) ?
-		    strtoul(pdev_info->UniqueId.String, NULL, 10) : 0UL);
-		device_printf(dev, "Parent: %s\n", cbuf);
-		AcpiOsFree(pdev_info);
-	}
 
 	if (dev_h && dev_info) {
 		snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
