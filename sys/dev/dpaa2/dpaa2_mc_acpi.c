@@ -59,38 +59,40 @@ dpaa2_mc_acpi_probe(device_t dev)
 	int rc;
 
 	/* --- FOR DEBUG ONLY --- */
-	ACPI_DEVICE_INFO *pdev_info, *dev_info;
+	ACPI_DEVICE_INFO *pdev_info = NULL;
+	ACPI_DEVICE_INFO *dev_info = NULL;
 	ACPI_HANDLE pdev_h, dev_h;
 	char cbuf[128];
 
 	device_printf(dev, "Probed from ACPI probe\n");
 
-	if ((pdev_h = acpi_get_handle(device_get_parent(dev))) == NULL)
-		return (ENXIO);
-	if ((dev_h = acpi_get_handle(dev)) == NULL)
-		return (ENXIO);
+	pdev_h = acpi_get_handle(device_get_parent(dev));
+	dev_h = acpi_get_handle(dev);
 
-	if (ACPI_FAILURE(AcpiGetObjectInfo(pdev_h, &pdev_info)))
-		return (ENXIO);
-	if (ACPI_FAILURE(AcpiGetObjectInfo(dev_h, &dev_info)))
-		return (ENXIO);
+	if (pdev_h)
+		AcpiGetObjectInfo(pdev_h, &pdev_info);
+	if (dev_h)
+		AcpiGetObjectInfo(dev_h, &dev_info);
 
-	snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
-	    (pdev_info->Valid & ACPI_VALID_HID) ?
-	    pdev_info->HardwareId.String : "Unknown",
-	    (pdev_info->Valid & ACPI_VALID_UID) ?
-	    strtoul(pdev_info->UniqueId.String, NULL, 10) : 0UL);
-	device_printf(dev, "Parent: %s\n", cbuf);
+	if (pdev_h && pdev_info) {
+		snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
+		    (pdev_info->Valid & ACPI_VALID_HID) ?
+		    pdev_info->HardwareId.String : "Unknown",
+		    (pdev_info->Valid & ACPI_VALID_UID) ?
+		    strtoul(pdev_info->UniqueId.String, NULL, 10) : 0UL);
+		device_printf(dev, "Parent: %s\n", cbuf);
+		AcpiOsFree(pdev_info);
+	}
 
-	snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
-	    (dev_info->Valid & ACPI_VALID_HID) ?
-	    dev_info->HardwareId.String : "Unknown",
-	    (dev_info->Valid & ACPI_VALID_UID) ?
-	    strtoul(dev_info->UniqueId.String, NULL, 10) : 0UL);
-	device_printf(dev, "Device: %s\n", cbuf);
-
-	AcpiOsFree(pdev_info);
-	AcpiOsFree(dev_info);
+	if (dev_h && dev_info) {
+		snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
+		    (dev_info->Valid & ACPI_VALID_HID) ?
+		    dev_info->HardwareId.String : "Unknown",
+		    (dev_info->Valid & ACPI_VALID_UID) ?
+		    strtoul(dev_info->UniqueId.String, NULL, 10) : 0UL);
+		device_printf(dev, "Device: %s\n", cbuf);
+		AcpiOsFree(dev_info);
+	}
 	/* --- FOR DEBUG ONLY --- */
 
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t) __func__);
