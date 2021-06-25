@@ -50,25 +50,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#include <contrib/dev/acpica/include/acpi.h>
-#include <dev/acpica/acpivar.h>
-
-#ifdef FDT
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-#endif
-
 #include "dpaa2_mcvar.h"
 
 MALLOC_DEFINE(M_DPMC, "dpmc_memory", "DPAA2 Management Complex driver memory");
-
-/* Device interface */
-static int dpaa2_mc_acpi_probe(device_t dev);
-#ifdef FDT
-static int dpaa2_mc_fdt_probe(device_t dev);
-#endif
-static int dpaa2_mc_attach(device_t dev);
-static int dpaa2_mc_detach(device_t dev);
 
 /* Macros to read/write MC registers */
 #define	mc_reg_r4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
@@ -80,45 +64,7 @@ static struct resource_spec dpaa2_mc_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-/*
- * Device interface.
- */
-
-static int
-dpaa2_mc_acpi_probe(device_t dev)
-{
-	device_printf(dev, "Probed from ACPI probe\n");
-
-	static char *dpaa2_mc_ids[] = { "NXP0008", NULL };
-	int rv;
-
-	ACPI_FUNCTION_TRACE((char *)(uintptr_t) __func__);
-
-	rv = ACPI_ID_PROBE(device_get_parent(dev), dev, dpaa2_mc_ids, NULL);
-	if (rv <= 0)
-		device_set_desc(dev, "DPAA2 Management Complex");
-
-	return (rv);
-}
-
-#ifdef FDT
-static int
-dpaa2_mc_fdt_probe(device_t dev)
-{
-	device_printf(dev, "Probed from FDT probe\n");
-
-	if (!ofw_bus_status_okay(dev))
-		return (ENXIO);
-
-	if (!ofw_bus_is_compatible(dev, "fsl,qoriq-mc"))
-		return (ENXIO);
-
-	device_set_desc(dev, "DPAA2 Management Complex");
-	return (BUS_PROBE_DEFAULT);
-}
-#endif
-
-static int
+int
 dpaa2_mc_attach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
@@ -206,7 +152,7 @@ dpaa2_mc_attach(device_t dev)
 	return (0);
 }
 
-static int
+int
 dpaa2_mc_detach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
@@ -222,36 +168,9 @@ dpaa2_mc_detach(device_t dev)
 	return (0);
 }
 
-static devclass_t dpaa2_mc_acpi_devclass;
-static device_method_t dpaa2_mc_acpi_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
-	DEVMETHOD(device_attach,	dpaa2_mc_attach),
-	DEVMETHOD(device_detach,	dpaa2_mc_detach),
+static device_method_t dpaa2_mc_methods[] = {
 	DEVMETHOD_END
 };
-static driver_t dpaa2_mc_acpi_driver = {
-	"dpaa2_mc",
-	dpaa2_mc_acpi_methods,
-	sizeof(struct dpaa2_mc_softc),
-};
-DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_devclass,
-    NULL, NULL);
 
-#ifdef FDT
-static devclass_t dpaa2_mc_fdt_devclass;
-static device_method_t dpaa2_mc_fdt_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		dpaa2_mc_fdt_probe),
-	DEVMETHOD(device_attach,	dpaa2_mc_attach),
-	DEVMETHOD(device_detach,	dpaa2_mc_detach),
-	DEVMETHOD_END
-};
-static driver_t dpaa2_mc_fdt_driver = {
-	"dpaa2_mc",
-	dpaa2_mc_fdt_methods,
-	sizeof(struct dpaa2_mc_softc),
-};
-DRIVER_MODULE(dpaa2_mc, simplebus, dpaa2_mc_fdt_driver, dpaa2_mc_fdt_devclass,
-    NULL, NULL);
-#endif
+DEFINE_CLASS_0(dpaa2_mc, dpaa2_mc_driver, dpaa2_mc_methods,
+    sizeof(struct dpaa2_mc_softc));
