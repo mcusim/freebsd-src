@@ -61,7 +61,7 @@ static int dpaa2_rc_detach(device_t dev);
 static int
 dpaa2_rc_probe(device_t dev)
 {
-	device_set_desc(dev, "NXP DPAA2 Resource Container");
+	device_set_desc(dev, "DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
 }
 
