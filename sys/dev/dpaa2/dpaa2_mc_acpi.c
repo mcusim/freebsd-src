@@ -59,27 +59,6 @@ dpaa2_mc_acpi_probe(device_t dev)
 	static char *dpaa2_mc_ids[] = { "INT0800", NULL };
 	int rc;
 
-	/* --- FOR DEBUG ONLY --- */
-	ACPI_DEVICE_INFO *dev_info = NULL;
-	ACPI_HANDLE dev_h;
-	char cbuf[128];
-
-	dev_h = acpi_get_handle(dev);
-
-	if (dev_h)
-		AcpiGetObjectInfo(dev_h, &dev_info);
-
-	if (dev_h && dev_info) {
-		snprintf(cbuf, sizeof(cbuf), "%s:%02lX",
-		    (dev_info->Valid & ACPI_VALID_HID) ?
-		    dev_info->HardwareId.String : "Unknown",
-		    (dev_info->Valid & ACPI_VALID_UID) ?
-		    strtoul(dev_info->UniqueId.String, NULL, 10) : 0UL);
-		device_printf(dev, "Device: %s\n", cbuf);
-		AcpiOsFree(dev_info);
-	}
-	/* --- FOR DEBUG ONLY --- */
-
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t) __func__);
 
 	rc = ACPI_ID_PROBE(device_get_parent(dev), dev, dpaa2_mc_ids, NULL);

@@ -73,9 +73,10 @@ DECLARE_CLASS(dpaa2_mc_driver);
  * @mcp: Helper object to send commands to the root MC portal.
  */
 struct dpaa2_mc_softc {
-	device_t		 dev;
-	struct resource 	*res[2];
 	struct resource_map	 map[2];
+	struct resource 	*res[2];
+	device_t		 dev;
+	device_t		 rcdev;
 	dpaa2_mcp_t		*mcp;
 };
 

@@ -55,8 +55,6 @@ __FBSDID("$FreeBSD$");
 static int
 dpaa2_mc_fdt_probe(device_t dev)
 {
-	device_printf(dev, "Probed from FDT probe\n");
-
 	if (!ofw_bus_status_okay(dev))
 		return (ENXIO);
 

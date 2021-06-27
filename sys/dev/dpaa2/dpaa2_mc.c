@@ -52,7 +52,8 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcvar.h"
 
-MALLOC_DEFINE(M_DPMC, "dpmc_memory", "DPAA2 Management Complex driver memory");
+MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex driver "
+    "memory");
 
 /* Macros to read/write MC registers */
 #define	mc_reg_r4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
@@ -70,7 +71,6 @@ dpaa2_mc_attach(device_t dev)
 	struct dpaa2_mc_softc *sc;
 	struct resource_map_request req;
 	dpaa2_mcp_t *mcp;
-	device_t rcdev;
 	uint32_t val;
 	int error;
 
@@ -123,7 +123,7 @@ dpaa2_mc_attach(device_t dev)
 	}
 
 	/* Populate MCP helper object. */
-	mcp = malloc(sizeof(dpaa2_mcp_t), M_DPMC, M_WAITOK | M_ZERO);
+	mcp = malloc(sizeof(dpaa2_mcp_t), M_DPAA2_MC, M_WAITOK | M_ZERO);
 	if (!mcp) {
 		device_printf(dev, "Failed to allocate memory for dpaa2_mcp\n");
 		dpaa2_mc_detach(dev);
@@ -141,8 +141,8 @@ dpaa2_mc_attach(device_t dev)
 	 * the direct descendant containers will be attached to the root one
 	 * instead of the MC bus device.
 	 */
-	rcdev = device_add_child(dev, "dpaa2_rc", 0);
-	if (rcdev == NULL) {
+	sc->rcdev = device_add_child(dev, "dpaa2_rc", 0);
+	if (sc->rcdev == NULL) {
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
@@ -156,16 +156,26 @@ int
 dpaa2_mc_detach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
+	int error;
 
+	bus_generic_detach(dev);
 	sc = device_get_softc(dev);
+
+	if (sc->rcdev)
+		device_delete_child(dev, sc->rcdev);
 
 	if (sc->mcp) {
 		mtx_destroy(&sc->mcp->mutex);
-		free(sc->mcp, M_DPMC);
+		free(sc->mcp, M_DPAA2_MC);
 	}
 	bus_release_resources(dev, dpaa2_mc_spec, sc->res);
 
-	return (0);
+	/* Detach the switch device, if present. */
+	error = bus_generic_detach(dev);
+	if (error != 0)
+		return (error);
+
+	return (device_delete_children(dev));
 }
 
 static device_method_t dpaa2_mc_methods[] = {
