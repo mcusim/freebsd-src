@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
+#include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
 static int
