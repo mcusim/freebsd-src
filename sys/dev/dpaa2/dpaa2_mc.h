@@ -26,12 +26,50 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#ifndef	_DPAA2_MC_H
+#define	_DPAA2_MC_H
+
+#define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
+
+#define	BIT(x)			(1 << (x))
+
+/* MC Registers */
+#define MC_REG_GCR1		0x00u
+#define GCR1_P1_STOP		BIT(31)
+#define MC_REG_GSR		0x08u
+#define MC_REG_FAPR		0x28u
 
 /*
- * MC command interface and the DPAA2 Management Complex Portal (DPMCP) driver.
+ * Software context for the DPAA2 Management Complex (MC) driver.
  *
- * DPMCP is an optional object exported by MC to control the MC portal operation
- * mode (polling or interrupt-based).
+ * dev: Device associated with this software context.
+ * rcdev: Child device associated with the root resource container.
+ * res: Unmapped MC command portal and control registers resources.
+ * map: Mapped MC command portal and control registers resources.
  */
+struct dpaa2_mc_softc {
+	device_t		 dev;
+	device_t		 rcdev;
+	struct resource 	*res[2];
+	struct resource_map	 map[2];
+};
+
+/*
+ * Software context for the DPAA2 Resource Container (RC) driver.
+ *
+ * dev: Device associated with this software context.
+ * portal: Helper object to send commands to the MC portal.
+ * unit: Helps to distinguish between root (0) and child DRPCs.
+ */
+struct dpaa2_rc_softc {
+	device_t		 dev;
+	dpaa2_mcp_t		*portal;
+	int			 unit;
+};
+
+DECLARE_CLASS(dpaa2_mc_driver);
+
+int dpaa2_mc_attach(device_t dev);
+int dpaa2_mc_detach(device_t dev);
+
+#endif /* _DPAA2_MC_H */

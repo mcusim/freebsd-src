@@ -30,7 +30,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * The DPAA2 Resource Container (DPRC) Driver.
+ * The DPAA2 Resource Container (DPRC) bus driver.
  *
  * DPRC holds all the resources and object information that a software context
  * (kernel, virtual machine, etc.) can access or use.
@@ -48,7 +48,11 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include "dpaa2_mcvar.h"
+#include "dpaa2_mcp.h"
+#include "dpaa2_mc.h"
+
+MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container driver "
+    "memory");
 
 /* Device interface */
 static int dpaa2_rc_probe(device_t dev);
@@ -61,6 +65,10 @@ static int dpaa2_rc_detach(device_t dev);
 static int
 dpaa2_rc_probe(device_t dev)
 {
+	/*
+	 * Do not perform any checks. DPRC device will be added by a parent DPRC
+	 * or by MC itself.
+	 */
 	device_set_desc(dev, "DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
 }
@@ -68,15 +76,40 @@ dpaa2_rc_probe(device_t dev)
 static int
 dpaa2_rc_attach(device_t dev)
 {
+	device_t pdev;
+	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
+	dpaa2_mcp_t *portal;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+	sc->portal = NULL;
 	sc->unit = device_get_unit(dev);
 
 	if (sc->unit == 0) {
-		/* Do something with root DPRC */
-		/* ... */
+		/* Root DPRC attached directly to the MC bus. */
+		pdev = device_get_parent(dev);
+		mcsc = device_get_softc(pdev);
+
+		/* Prepare helper object to send commands to MC. */
+		portal = malloc(sizeof(dpaa2_mcp_t), M_DPAA2_RC,
+		    M_WAITOK | M_ZERO);
+		if (!portal) {
+			device_printf(dev, "Failed to allocate memory for "
+			    "dpaa2_mcp\n");
+			dpaa2_rc_detach(dev);
+			return (ENXIO);
+		} else {
+			sc->portal = portal;
+		}
+		portal->dev = dev;
+		portal->mcpdev = NULL; /* No DPMCP device created yet. */
+		portal->res = mcsc->res[0];
+		portal->map = &mcsc->map[0];
+		mtx_init(&portal->lock, device_get_nameunit(dev),
+		    "MC portal lock", MTX_DEF);
+	} else {
+		/* Child DPRCs aren't supported yet. */
 	}
 
 	return (0);
@@ -85,6 +118,13 @@ dpaa2_rc_attach(device_t dev)
 static int
 dpaa2_rc_detach(device_t dev)
 {
+	struct dpaa2_rc_softc *sc;
+
+	sc = device_get_softc(dev);
+	if (sc->portal) {
+		mtx_destroy(&sc->portal->lock);
+		free(sc->portal, M_DPAA2_RC);
+	}
 	return (0);
 }
 
@@ -105,3 +145,4 @@ static driver_t dpaa2_rc_driver = {
 static devclass_t dpaa2_rc_devclass;
 
 DRIVER_MODULE(dpaa2_rc, dpaa2_mc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_rc, dpaa2_rc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
