@@ -26,66 +26,59 @@
  * SUCH DAMAGE.
  */
 
-#ifndef	_DPAA2_MCVAR_H
-#define	_DPAA2_MCVAR_H
+#ifndef	_DPAA2_MCP_H
+#define	_DPAA2_MCP_H
 
-#define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
-
-#define	BIT(x)			(1 << (x))
-
-#define MC_REG_GCR1		0x00u
-#define GCR1_P1_STOP		BIT(31)
-
-#define MC_REG_GSR		0x08u
-#define MC_REG_FAPR		0x28u
+#define DPAA2_CMD_PARAMS_N	7
 
 /*
- * Helper object to send commands to MC portal.
+ * Helper object to send commands to the MC portal.
  *
- * @dev: DPMCP device associated with this helper object (optional).
- * @portal: Unmapped MC portal resource.
- * @mportal: Mapped MC portal resource.
- * @mutex: Lock to send MC portal commands and wait for the result (in polling
- *         mode).
+ * dev: Owner device on behalf of which memory was allocated for this object.
+ * mcpdev: DPMCP device associated with this helper object (optional).
+ * res: Unmapped portal I/O memory resource.
+ * map: Mapped portal I/O memory resource.
+ * lock: Lock to send a command to the portal and wait for the result.
  *
  * NOTE: The same object can be shared between MC, DPRC and DPMCP.
  */
 typedef struct dpaa2_mcp {
 	device_t		 dev;
-	struct resource		*portal;
-	struct resource_map	*mportal;
-	struct mtx		 mutex;
+	device_t		 mcpdev;
+	struct resource		*res;
+	struct resource_map	*map;
+	struct mtx		 lock;
 } dpaa2_mcp_t;
 
-/*
- * Software contexts.
- */
+typedef struct dpaa2_cmd {
+	uint64_t	header;
+	uint64_t	params[DPAA2_CMD_PARAMS_N];
+} dpaa2_cmd_t;
 
-DECLARE_CLASS(dpaa2_mc_driver);
+typedef struct dpaa2_cmd_header {
+	uint8_t		srcid;
+	uint8_t		flags_hw;
+	uint8_t		status;
+	uint8_t		flags_sw;
+	uint16_t	token;
+	uint16_t	cmdid;
+} dpaa2_cmd_header_t;
 
-/*
- * Software context for the DPAA2 Management Complex (MC) driver.
- *
- * @dev: Device associated with this software context.
- * @node: OFW node associated with this device (optional).
- * @res: Unmapped MC command portal and MC control registers.
- * @map: Mapped MC command portal and MC control registers.
- * @mcp: Helper object to send commands to the root MC portal.
- */
-struct dpaa2_mc_softc {
-	struct resource_map	 map[2];
-	struct resource 	*res[2];
-	device_t		 dev;
-	device_t		 rcdev;
-	dpaa2_mcp_t		*mcp;
-};
+typedef enum dpaa2_cmd_status {
+	DPAA2_CMD_OK			= 0x0,	/* Set by MC on success */
+	DPAA2_CMD_READY			= 0x1,	/* Ready to be processed */
+	DPAA2_CMD_AUTH_ERR		= 0x3,	/* Illegal object-portal-icid */
+	DPAA2_CMD_NO_PRIVILEGE		= 0x4,	/* No privilege */
+	DPAA2_CMD_DMA_ERR		= 0x5,	/* DMA or I/O error */
+	DPAA2_CMD_CONFIG_ERR		= 0x6,	/* Invalid/conflicting params */
+	DPAA2_CMD_TIMEOUT		= 0x7,	/* Command timed out */
+	DPAA2_CMD_NO_RESOURCE		= 0x8,	/* No DPAA2 resources */
+	DPAA2_CMD_NO_MEMORY		= 0x9,	/* No memory available */
+	DPAA2_CMD_BUSY			= 0xA,	/* Device is busy */
+	DPAA2_CMD_UNSUPPORTED_OP	= 0xB,	/* Unsupported operation */
+	DPAA2_CMD_INVALID_STATE		= 0xC	/* Invalid state */
+} dpaa2_cmd_status_t;
 
-struct dpaa2_rc_softc {
-	device_t	dev;
-	int		unit;
-};
+int dpaa2_mcp_init_command(dpaa2_cmd_t *cmd);
 
-int dpaa2_mc_attach(device_t dev);
-int dpaa2_mc_detach(device_t dev);
-
-#endif /* _DPAA2_MCVAR_H */
+#endif /* _DPAA2_MCP_H */

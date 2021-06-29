@@ -30,7 +30,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * The DPAA2 Management Complex (MC) Bus Driver.
+ * The DPAA2 Management Complex (MC) bus driver.
  *
  * MC is a hardware resource manager which can be found in several NXP
  * SoCs (LX2160A, for example) and provides an access to the specialized
@@ -50,14 +50,12 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#include "dpaa2_mcvar.h"
-
-MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex driver "
-    "memory");
+#include "dpaa2_mcp.h"
+#include "dpaa2_mc.h"
 
 /* Macros to read/write MC registers */
-#define	mc_reg_r4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
-#define	mc_reg_w4(_sc, _r, _v)		bus_write_4(&(_sc)->map[1], (_r), (_v))
+#define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
+#define	mcreg_write_4(_sc, _r, _v)	bus_write_4(&(_sc)->map[1], (_r), (_v))
 
 static struct resource_spec dpaa2_mc_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
@@ -70,13 +68,11 @@ dpaa2_mc_attach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
 	struct resource_map_request req;
-	dpaa2_mcp_t *mcp;
 	uint32_t val;
 	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	sc->mcp = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
 	if (error) {
@@ -96,8 +92,8 @@ dpaa2_mc_attach(device_t dev)
 		}
 
 		/* Reset P1_STOP bit to resume MC processor. */
-		val = mc_reg_r4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
-		mc_reg_w4(sc, MC_REG_GCR1, val);
+		val = mcreg_read_4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
+		mcreg_write_4(sc, MC_REG_GCR1, val);
 
 		/* Might be necessary to configure StreamID for SMMU. */
 		/* ... */
@@ -122,24 +118,10 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Populate MCP helper object. */
-	mcp = malloc(sizeof(dpaa2_mcp_t), M_DPAA2_MC, M_WAITOK | M_ZERO);
-	if (!mcp) {
-		device_printf(dev, "Failed to allocate memory for dpaa2_mcp\n");
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
-	}
-	mcp->dev = NULL; /* No DPMCP device created yet. */
-	mcp->portal = sc->res[0];
-	mcp->mportal = &sc->map[0];
-	mtx_init(&mcp->mutex, device_get_nameunit(dev),
-	    "root MC portal lock", MTX_DEF);
-	sc->mcp = mcp;
-
 	/*
 	 * Add a root resource container as the only child of the bus. All of
 	 * the direct descendant containers will be attached to the root one
-	 * instead of the MC bus device.
+	 * instead of the MC device.
 	 */
 	sc->rcdev = device_add_child(dev, "dpaa2_rc", 0);
 	if (sc->rcdev == NULL) {
@@ -159,18 +141,12 @@ dpaa2_mc_detach(device_t dev)
 	int error;
 
 	bus_generic_detach(dev);
-	sc = device_get_softc(dev);
 
+	sc = device_get_softc(dev);
 	if (sc->rcdev)
 		device_delete_child(dev, sc->rcdev);
-
-	if (sc->mcp) {
-		mtx_destroy(&sc->mcp->mutex);
-		free(sc->mcp, M_DPAA2_MC);
-	}
 	bus_release_resources(dev, dpaa2_mc_spec, sc->res);
 
-	/* Detach the switch device, if present. */
 	error = bus_generic_detach(dev);
 	if (error != 0)
 		return (error);
