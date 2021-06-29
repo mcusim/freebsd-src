@@ -50,7 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
-#include "dpaa2_mcvar.h"
+#include "dpaa2_mc.h"
 
 static int
 dpaa2_mc_fdt_probe(device_t dev)
