@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
 
+#include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
 static int
