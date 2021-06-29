@@ -41,6 +41,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/rman.h>
 #include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
