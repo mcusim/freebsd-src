@@ -56,8 +56,7 @@ __FBSDID("$FreeBSD$");
 static int
 dpaa2_mc_acpi_probe(device_t dev)
 {
-	/* static char *dpaa2_mc_ids[] = { "NXP0008", NULL }; */
-	static char *dpaa2_mc_ids[] = { "INT0800", NULL };
+	static char *dpaa2_mc_ids[] = { "NXP0008", NULL };
 	int rc;
 
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t) __func__);
