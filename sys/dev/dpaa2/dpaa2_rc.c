@@ -75,7 +75,10 @@ dpaa2_rc_attach(device_t dev)
 	device_t pdev;
 	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
-	int rc;
+	dpaa2_cmd_t cmd;
+	uint32_t major, minor, rev;
+	uint32_t cont_id;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -87,17 +90,41 @@ dpaa2_rc_attach(device_t dev)
 		pdev = device_get_parent(dev);
 		mcsc = device_get_softc(pdev);
 
-		/* Prepare helper object to send commands to MC. */
-		rc = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
+		/* Prepare helper portal object to send commands to MC. */
+		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF);
-		if (rc) {
+		if (error) {
 			device_printf(dev, "Failed to allocate dpaa2_mcp\n");
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
 		}
 	} else {
 		/* Child DPRCs aren't supported yet. */
+		return (ENXIO);
 	}
+
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd\n");
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+
+	error = dpaa2_cmd_get_firmware_version(sc->portal, cmd, &major, &minor,
+	    &rev);
+	if (error)
+		device_printf(dev, "Failed to obtain MC firmware version\n");
+	else
+		device_printf(dev, "MC firmware version: %u.%u.%u\n", major,
+		    minor, rev);
+
+	error = dpaa2_cmd_get_container_id(sc->portal, cmd, &cont_id);
+	if (error)
+		device_printf(dev, "Failed to obtain resource container ID\n");
+	else
+		device_printf(dev, "Resource container ID: %u\n", cont_id);
+
+	dpaa2_mcp_free_command(cmd);
 
 	return (0);
 }

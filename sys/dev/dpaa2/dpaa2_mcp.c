@@ -55,6 +55,19 @@ __FBSDID("$FreeBSD$");
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
 
+#define LOCK_PORTAL(portal) do {			\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC)	\
+		mtx_lock_spin(&(portal)->lock);		\
+	else						\
+		mtx_lock(&(portal)->lock);		\
+} while (0)
+#define UNLOCK_PORTAL(portal) do {			\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC)	\
+		mtx_unlock_spin(&(portal)->lock);	\
+	else						\
+		mtx_unlock(&(portal)->lock);		\
+} while (0)
+
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
     "memory");
 
@@ -92,6 +105,9 @@ struct dpaa2_cmd_header {
 	uint16_t		 token;
 	uint16_t		 cmdid;
 };
+
+static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 
 /*
  * Initialization routines.
@@ -193,6 +209,21 @@ int
 dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
+	struct dpaa2_cmd_header *hdr;
+
+	if (!portal || !cmd)
+		return (1);
+
+	/* Prepare command for the MC hardware. */
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
+	hdr->cmdid = 0x8311;
+	hdr->token = 0;
+	hdr->status = DPAA2_CMD_STAT_READY;
+
+	LOCK_PORTAL(portal);
+
+	UNLOCK_PORTAL(portal);
+
 	return (0);
 }
 
@@ -206,6 +237,18 @@ dpaa2_cmd_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 int
 dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
+{
+	return (0);
+}
+
+static void
+send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	return;
+}
+
+static int
+wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
 	return (0);
 }
