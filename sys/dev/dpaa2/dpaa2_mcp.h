@@ -29,56 +29,57 @@
 #ifndef	_DPAA2_MCP_H
 #define	_DPAA2_MCP_H
 
-#define DPAA2_CMD_PARAMS_N	7
+/* Portal flags. */
+#define DPAA2_PORTAL_DEF		0x0u
+#define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
+#define DPAA2_PORTAL_NOWAIT_ALLOC	0x8000u	/* Do not sleep during init */
+
+/* Command flags. */
+#define DPAA2_CMD_DEF			0x0u
+#define DPAA2_CMD_HIGH_PRIO		0x80u	/* High priority command */
+#define DPAA2_CMD_INTR_DIS		0x100u	/* Disable cmd finished intr */
+#define DPAA2_CMD_NOWAIT_ALLOC		0x8000u	/* Do not sleep during init */
+
+/* Command return codes. */
+#define DPAA2_CMD_STAT_OK		0x0	/* Set by MC on success */
+#define DPAA2_CMD_STAT_READY		0x1	/* Ready to be processed */
+#define DPAA2_CMD_STAT_AUTH_ERR		0x3	/* Illegal object-portal-icid */
+#define DPAA2_CMD_STAT_NO_PRIVILEGE	0x4	/* No privilege */
+#define DPAA2_CMD_STAT_DMA_ERR		0x5	/* DMA or I/O error */
+#define DPAA2_CMD_STAT_CONFIG_ERR	0x6	/* Invalid/conflicting params */
+#define DPAA2_CMD_STAT_TIMEOUT		0x7	/* Command timed out */
+#define DPAA2_CMD_STAT_NO_RESOURCE	0x8	/* No DPAA2 resources */
+#define DPAA2_CMD_STAT_NO_MEMORY	0x9	/* No memory available */
+#define DPAA2_CMD_STAT_BUSY		0xA	/* Device is busy */
+#define DPAA2_CMD_STAT_UNSUPPORTED_OP	0xB	/* Unsupported operation */
+#define DPAA2_CMD_STAT_INVALID_STATE	0xC	/* Invalid state */
 
 /*
- * Helper object to send commands to the MC portal.
- *
- * dev: Owner device on behalf of which memory was allocated for this object.
- * mcpdev: DPMCP device associated with this helper object (optional).
- * res: Unmapped portal I/O memory resource.
- * map: Mapped portal I/O memory resource.
- * lock: Lock to send a command to the portal and wait for the result.
- *
- * NOTE: The same object can be shared between MC, DPRC and DPMCP.
+ * Opaque pointers.
  */
-typedef struct dpaa2_mcp {
-	device_t		 dev;
-	device_t		 mcpdev;
-	struct resource		*res;
-	struct resource_map	*map;
-	struct mtx		 lock;
-} dpaa2_mcp_t;
+typedef struct dpaa2_mcp *dpaa2_mcp_t;
+typedef struct dpaa2_cmd *dpaa2_cmd_t;
 
-typedef struct dpaa2_cmd {
-	uint64_t	header;
-	uint64_t	params[DPAA2_CMD_PARAMS_N];
-} dpaa2_cmd_t;
+/*
+ * Management routines.
+ */
 
-typedef struct dpaa2_cmd_header {
-	uint8_t		srcid;
-	uint8_t		flags_hw;
-	uint8_t		status;
-	uint8_t		flags_sw;
-	uint16_t	token;
-	uint16_t	cmdid;
-} dpaa2_cmd_header_t;
+int dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+    struct resource_map *map, const uint16_t flags);
+void dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
 
-typedef enum dpaa2_cmd_status {
-	DPAA2_CMD_OK			= 0x0,	/* Set by MC on success */
-	DPAA2_CMD_READY			= 0x1,	/* Ready to be processed */
-	DPAA2_CMD_AUTH_ERR		= 0x3,	/* Illegal object-portal-icid */
-	DPAA2_CMD_NO_PRIVILEGE		= 0x4,	/* No privilege */
-	DPAA2_CMD_DMA_ERR		= 0x5,	/* DMA or I/O error */
-	DPAA2_CMD_CONFIG_ERR		= 0x6,	/* Invalid/conflicting params */
-	DPAA2_CMD_TIMEOUT		= 0x7,	/* Command timed out */
-	DPAA2_CMD_NO_RESOURCE		= 0x8,	/* No DPAA2 resources */
-	DPAA2_CMD_NO_MEMORY		= 0x9,	/* No memory available */
-	DPAA2_CMD_BUSY			= 0xA,	/* Device is busy */
-	DPAA2_CMD_UNSUPPORTED_OP	= 0xB,	/* Unsupported operation */
-	DPAA2_CMD_INVALID_STATE		= 0xC	/* Invalid state */
-} dpaa2_cmd_status_t;
+int dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
+void dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
 
-int dpaa2_mcp_init_command(dpaa2_cmd_t *cmd);
+/*
+ * Data Path Management (DPMNG) commands.
+ */
+
+int dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint32_t *major, uint32_t *minor, uint32_t *rev);
+int dpaa2_cmd_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint32_t *pvr, uint32_t *svr);
+int dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint32_t *cont_id);
 
 #endif /* _DPAA2_MCP_H */

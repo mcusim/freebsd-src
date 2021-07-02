@@ -35,3 +35,177 @@ __FBSDID("$FreeBSD$");
  * DPMCP is an optional object exported by MC to control the MC portal operation
  * mode (polling or interrupt-based).
  */
+
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/bus.h>
+#include <sys/rman.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
+
+#include <machine/bus.h>
+#include <machine/resource.h>
+
+#include "dpaa2_mcp.h"
+#include "dpaa2_mc.h"
+
+#define DPAA2_CMD_PARAMS_N	7u
+
+#define HW_FLAG_HIGH_PRIO	0x80u
+#define SW_FLAG_INTR_DIS	0x01u
+
+MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
+    "memory");
+
+/*
+ * Helper object to send commands to the MC portal.
+ *
+ * res: Unmapped portal's I/O memory.
+ * map: Mapped portal's I/O memory.
+ * lock: Lock to send a command to the portal and wait for the result.
+ */
+struct dpaa2_mcp {
+	struct resource		*res;
+	struct resource_map	*map;
+	struct mtx		 lock;
+	uint16_t		 flags;
+};
+
+/*
+ * Command object holds data to be written to the MC portal.
+ *
+ * header: Least significant 8 bytes of the MC portal.
+ * params: Parameters to pass together with the command to MC. Might keep
+ *         command execution results.
+ */
+struct dpaa2_cmd {
+	uint64_t		 header;
+	uint64_t		 params[DPAA2_CMD_PARAMS_N];
+};
+
+struct dpaa2_cmd_header {
+	uint8_t			 srcid;
+	uint8_t			 flags_hw;
+	uint8_t			 status;
+	uint8_t			 flags_sw;
+	uint16_t		 token;
+	uint16_t		 cmdid;
+};
+
+/*
+ * Initialization routines.
+ */
+
+int
+dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+    struct resource_map *map, const uint16_t flags);
+{
+	dpaa2_mcp_t p;
+	int mflags = M_WAITOK | M_ZERO;
+
+	if (!portal)
+		return (1);
+	*portal = NULL;
+
+	/* Prepare malloc flags. */
+	if (flags & DPAA2_PORTAL_NOWAIT_ALLOC)
+		mflags = M_NOWAIT | M_ZERO;
+
+	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
+	if (!p) {
+		return (1);
+	}
+
+	p->res = res;
+	p->map = map;
+	p->flags = flags;
+	mtx_init(&p->lock, "dpaa2_mcp", "MC portal lock",
+	    flags & DPAA2_PORTAL_ATOMIC ? MTX_SPIN : MTX_DEF);
+
+	*portal = p;
+
+	return (0);
+}
+
+void
+dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
+{
+	if (portal) {
+		mtx_destroy(portal->lock);
+		free(portal, M_DPAA2_MCP);
+	}
+}
+
+int
+dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
+{
+	dpaa2_cmd_t c;
+	struct dpaa2_cmd_header *hdr;
+	int mflags = M_WAITOK | M_ZERO;
+
+	if (!cmd)
+		return (1);
+	*cmd = NULL;
+
+	/* Prepare malloc flags. */
+	if (flags & DPAA2_CMD_NOWAIT_ALLOC)
+		mflags = M_NOWAIT | M_ZERO;
+
+	c = malloc(sizeof(struct dpaa2_cmd), M_DPAA2_MCP, mflags);
+	if (!c) {
+		return (1);
+	}
+
+	hdr = (struct dpaa2_cmd_header *) &c->header;
+	hdr->srcid = 0;
+	hdr->status = DPAA2_CMD_STAT_OK;
+	hdr->token = 0;
+	hdr->cmdid = 0;
+	hdr->flags_hw = DPAA2_CMD_DEF;
+	hdr->flags_sw = DPAA2_CMD_DEF;
+
+	if (flags & DPAA2_CMD_HIGH_PRIO)
+		hdr->flags_hw |= HW_FLAG_HIGH_PRIO;
+	if (flags & DPAA2_CMD_INTR_DIS)
+		hdr->flags_sw |= SW_FLAG_INTR_DIS;
+
+	for (uint32_t i = 0; i < DPAA2_CMD_PARAMS_N; i++)
+		c->params[i] = 0;
+
+	*cmd = c;
+
+	return (0);
+}
+
+void
+dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
+{
+	if (cmd)
+		free(cmd, M_DPAA2_MCP);
+}
+
+/*
+ * Data Path Management (DPMNG) commands.
+ */
+
+int
+dpaa2_cmd_get_firmware_version(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+    uint32_t *major, uint32_t *minor, uint32_t *rev);
+{
+	return (0);
+}
+
+int
+dpaa2_cmd_get_soc_version(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+    uint32_t *pvr, uint32_t *svr)
+{
+	return (0);
+}
+
+int
+dpaa2_cmd_get_container_id(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+    uint32_t *cont_id)
+{
+	return (0);
+}
