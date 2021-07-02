@@ -132,7 +132,7 @@ void
 dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 {
 	if (portal) {
-		mtx_destroy(portal->lock);
+		mtx_destroy(&portal->lock);
 		free(portal, M_DPAA2_MCP);
 	}
 }
@@ -190,21 +190,21 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
  */
 
 int
-dpaa2_cmd_get_firmware_version(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
 	return (0);
 }
 
 int
-dpaa2_cmd_get_soc_version(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+dpaa2_cmd_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *pvr, uint32_t *svr)
 {
 	return (0);
 }
 
 int
-dpaa2_cmd_get_container_id(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
+dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
 	return (0);
