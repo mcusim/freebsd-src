@@ -99,7 +99,7 @@ struct dpaa2_cmd_header {
 
 int
 dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
-    struct resource_map *map, const uint16_t flags);
+    struct resource_map *map, const uint16_t flags)
 {
 	dpaa2_mcp_t p;
 	int mflags = M_WAITOK | M_ZERO;
@@ -191,7 +191,7 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
 
 int
 dpaa2_cmd_get_firmware_version(dpaa2_mcp_t *portal, dpaa2_cmd_t *cmd,
-    uint32_t *major, uint32_t *minor, uint32_t *rev);
+    uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
 	return (0);
 }
