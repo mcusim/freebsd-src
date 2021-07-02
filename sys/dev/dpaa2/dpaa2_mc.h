@@ -31,11 +31,9 @@
 
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
 
-#define	BIT(x)			(1 << (x))
-
 /* MC Registers */
 #define MC_REG_GCR1		0x00u
-#define GCR1_P1_STOP		BIT(31)
+#define GCR1_P1_STOP		0x80000000
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
 
@@ -63,7 +61,7 @@ struct dpaa2_mc_softc {
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
-	dpaa2_mcp_t		*portal;
+	dpaa2_mcp_t		 portal;
 	int			 unit;
 };
 

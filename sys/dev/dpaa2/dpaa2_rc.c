@@ -47,14 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
-#include <dev/ofw/ofw_bus.h>
-#include <dev/ofw/ofw_bus_subr.h>
-
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
-
-MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container driver "
-    "memory");
 
 /* Device interface */
 static int dpaa2_rc_probe(device_t dev);
@@ -81,7 +75,7 @@ dpaa2_rc_attach(device_t dev)
 	device_t pdev;
 	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
-	dpaa2_mcp_t *portal;
+	int rc;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
@@ -94,22 +88,13 @@ dpaa2_rc_attach(device_t dev)
 		mcsc = device_get_softc(pdev);
 
 		/* Prepare helper object to send commands to MC. */
-		portal = malloc(sizeof(dpaa2_mcp_t), M_DPAA2_RC,
-		    M_WAITOK | M_ZERO);
-		if (!portal) {
-			device_printf(dev, "Failed to allocate memory for "
-			    "dpaa2_mcp\n");
+		rc = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
+		    &mcsc->map[0], DPAA2_PORTAL_DEF);
+		if (rc) {
+			device_printf(dev, "Failed to allocate dpaa2_mcp\n");
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
-		} else {
-			sc->portal = portal;
 		}
-		portal->dev = dev;
-		portal->mcpdev = NULL; /* No DPMCP device created yet. */
-		portal->res = mcsc->res[0];
-		portal->map = &mcsc->map[0];
-		mtx_init(&portal->lock, device_get_nameunit(dev),
-		    "MC portal lock", MTX_DEF);
 	} else {
 		/* Child DPRCs aren't supported yet. */
 	}
@@ -123,10 +108,9 @@ dpaa2_rc_detach(device_t dev)
 	struct dpaa2_rc_softc *sc;
 
 	sc = device_get_softc(dev);
-	if (sc->portal) {
-		mtx_destroy(&sc->portal->lock);
-		free(sc->portal, M_DPAA2_RC);
-	}
+	if (sc->portal)
+		dpaa2_mcp_free_portal(sc->portal);
+
 	return (0);
 }
 
