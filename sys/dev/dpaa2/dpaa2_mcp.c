@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/time.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -51,6 +52,8 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 
 #define DPAA2_CMD_PARAMS_N	7u
+#define DPAA2_CMD_TIMEOUT	100 /* us */
+#define DPAA2_CMD_ATTEMPTS	5000
 
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
@@ -303,5 +306,26 @@ send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 static int
 wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
+	struct dpaa2_cmd_header *hdr;
+	uint64_t val;
+	uint32_t i;
+
+	/* Wait for a command execution result from the MC hardware. */
+	for (i = 1; i <= DPAA2_CMD_ATTEMPTS; i++) {
+		val = bus_read_8(portal->map, 0);
+		hdr = (struct dpaa2_cmd_header *) &val;
+		if (hdr->status != DPAA2_CMD_STAT_READY)
+			break;
+		pause("mcp_pa", SBT_1US * DPAA2_CMD_TIMEOUT);
+	}
+
+	/* Update command results. */
+	cmd->header = val;
+	for (i = 1; i <= DPAA2_CMD_PARAMS; i++)
+		cmd->params[i-1] = bus_read_8(portal->map, sizeof(uint64_t) * i);
+
+	if (i > DPAA2_CMD_ATTEMPTS)
+		return (1);
+
 	return (0);
 }
