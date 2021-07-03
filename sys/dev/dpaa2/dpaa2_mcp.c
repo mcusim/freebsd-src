@@ -321,7 +321,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 
 	/* Update command results. */
 	cmd->header = val;
-	for (i = 1; i <= DPAA2_CMD_PARAMS; i++)
+	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		cmd->params[i-1] = bus_read_8(portal->map, sizeof(uint64_t) * i);
 
 	if (i > DPAA2_CMD_ATTEMPTS)
