@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/systm.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -53,7 +55,7 @@ __FBSDID("$FreeBSD$");
 
 #define DPAA2_CMD_PARAMS_N	7u
 #define DPAA2_CMD_TIMEOUT	100 /* us */
-#define DPAA2_CMD_ATTEMPTS	5000
+#define DPAA2_CMD_ATTEMPTS	5000 /* max 500 ms */
 
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
@@ -316,7 +318,11 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		hdr = (struct dpaa2_cmd_header *) &val;
 		if (hdr->status != DPAA2_CMD_STAT_READY)
 			break;
-		pause("mcp_pa", SBT_1US * DPAA2_CMD_TIMEOUT);
+
+		if (portal->flags & DPAA2_PORTAL_ATOMIC)
+			DELAY(DPAA2_CMD_TIMEOUT);
+		else
+			pause("mcp_pa", SBT_1US * DPAA2_CMD_TIMEOUT);
 	}
 
 	/* Update command results. */
