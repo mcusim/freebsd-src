@@ -289,21 +289,15 @@ dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 static void
 send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
-	const uint32_t mhdr = (cmd->header >> 32) & 0xFFFFFFFFu;
-	const uint32_t lhdr = cmd->header & 0xFFFFFFFFu;
-
 	/* Write command parameters. */
-	bus_write_region_8(portal->map, sizeof(cmd->header), cmd->params,
-	    DPAA2_CMD_PARAMS_N);
+	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++) {
+		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
+	}
 	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
 	    BUS_SPACE_BARRIER_WRITE);
 
-	/* Write command header. */
-	bus_write_4(portal->map, sizeof(uint32_t), mhdr);
-	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
-	    BUS_SPACE_BARRIER_WRITE);
-	/* Trigger execution by writing least significant 4-byte word. */
-	bus_write_4(portal->map, 0, lhdr);
+	/* Write command header to trigger execution. */
+	bus_write_8(portal->map, 0, cmd->header);
 }
 
 static int
