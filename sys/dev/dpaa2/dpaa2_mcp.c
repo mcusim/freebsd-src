@@ -210,9 +210,10 @@ dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
 	struct dpaa2_cmd_header *hdr;
+	int error;
 
 	if (!portal || !cmd)
-		return (1);
+		return (DPAA2_CMD_STAT_ERR);
 
 	/* Prepare command for the MC hardware. */
 	hdr = (struct dpaa2_cmd_header *) &cmd->header;
@@ -222,9 +223,24 @@ dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 
 	LOCK_PORTAL(portal);
 
+	send_command(portal, cmd);
+	error = wait_for_command(portal, cmd);
+	if (error) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_ERR);
+	}
+	if (hdr->status != DPAA2_CMD_STAT_OK) {
+		UNLOCK_PORTAL(portal);
+		return (int)(hdr->status);
+	}
+
+	*major = cmd->params[0] >> 32;
+	*minor = cmd->params[1] & 0xFFFFFFFF;
+	*rev = cmd->params[0] & 0xFFFFFFFF;
+
 	UNLOCK_PORTAL(portal);
 
-	return (0);
+	return (DPAA2_CMD_STAT_OK);
 }
 
 int
@@ -238,13 +254,56 @@ int
 dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
-	return (0);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	/* Prepare command for the MC hardware. */
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
+	hdr->cmdid = 0x8301;
+	hdr->token = 0;
+	hdr->status = DPAA2_CMD_STAT_READY;
+
+	LOCK_PORTAL(portal);
+
+	send_command(portal, cmd);
+	error = wait_for_command(portal, cmd);
+	if (error) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_ERR);
+	}
+	if (hdr->status != DPAA2_CMD_STAT_OK) {
+		UNLOCK_PORTAL(portal);
+		return (int)(hdr->status);
+	}
+
+	*cont_id = cmd->params[0] & 0xFFFFFFFF;
+
+	UNLOCK_PORTAL(portal);
+
+	return (DPAA2_CMD_STAT_OK);
 }
 
 static void
 send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
-	return;
+	const uint32_t mhdr = (cmd->header >> 32) & 0xFFFFFFFFu;
+	const uint32_t lhdr = cmd->header & 0xFFFFFFFFu;
+
+	/* Write command parameters. */
+	bus_write_region_8(portal->map, sizeof(cmd->header), cmd->params,
+	    DPAA2_CMD_PARAMS_N);
+	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
+	    BUS_SPACE_BARRIER_WRITE);
+
+	/* Write command header. */
+	bus_write_4(portal->map, sizeof(uint32_t), mhdr);
+	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
+	    BUS_SPACE_BARRIER_WRITE);
+	/* Trigger execution by writing least significant 4-byte word. */
+	bus_write_4(portal->map, 0, lhdr);
 }
 
 static int

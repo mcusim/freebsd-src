@@ -53,6 +53,7 @@
 #define DPAA2_CMD_STAT_BUSY		0xA	/* Device is busy */
 #define DPAA2_CMD_STAT_UNSUPPORTED_OP	0xB	/* Unsupported operation */
 #define DPAA2_CMD_STAT_INVALID_STATE	0xC	/* Invalid state */
+#define DPAA2_CMD_STAT_ERR		0xFF	/* General error */
 
 /*
  * Opaque pointers.

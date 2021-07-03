@@ -113,14 +113,16 @@ dpaa2_rc_attach(device_t dev)
 	error = dpaa2_cmd_get_firmware_version(sc->portal, cmd, &major, &minor,
 	    &rev);
 	if (error)
-		device_printf(dev, "Failed to obtain MC firmware version\n");
+		device_printf(dev, "Failed to obtain MC firmware version: "
+		    "error=%d\n", error);
 	else
 		device_printf(dev, "MC firmware version: %u.%u.%u\n", major,
 		    minor, rev);
 
 	error = dpaa2_cmd_get_container_id(sc->portal, cmd, &cont_id);
 	if (error)
-		device_printf(dev, "Failed to obtain resource container ID\n");
+		device_printf(dev, "Failed to obtain resource container ID: "
+		    "error=%d\n", error);
 	else
 		device_printf(dev, "Resource container ID: %u\n", cont_id);
 
