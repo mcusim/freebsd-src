@@ -32,7 +32,9 @@
 /* Portal flags. */
 #define DPAA2_PORTAL_DEF		0x0u
 #define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
-#define DPAA2_PORTAL_NOWAIT_ALLOC	0x8000u	/* Do not sleep during init */
+#define DPAA2_PORTAL_NOWAIT_ALLOC	0x2u	/* Do not sleep during init */
+#define DPAA2_PORTAL_LOCKED		0x4000u	/* Wait till portal's unlocked */
+#define DPAA2_PORTAL_DESTROYED		0x8000u /* Terminate any operations */
 
 /* Command flags. */
 #define DPAA2_CMD_DEF			0x0u
