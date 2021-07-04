@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/condvar.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -53,9 +54,11 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
+#define DPAA2_PORTAL_TIMEOUT	10000	/* us */
+
 #define DPAA2_CMD_PARAMS_N	7u
-#define DPAA2_CMD_TIMEOUT	100 /* us */
-#define DPAA2_CMD_ATTEMPTS	5000 /* max 500 ms */
+#define DPAA2_CMD_TIMEOUT	100	/* us */
+#define DPAA2_CMD_ATTEMPTS	5000	/* max 500 ms */
 
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
@@ -82,11 +85,14 @@ MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal 
  * res: Unmapped portal's I/O memory.
  * map: Mapped portal's I/O memory.
  * lock: Lock to send a command to the portal and wait for the result.
+ * cv: Conditional variable helps to wait for a portal's state change.
+ * flags: Current object state.
  */
 struct dpaa2_mcp {
 	struct resource		*res;
 	struct resource_map	*map;
 	struct mtx		 lock;
+	struct cv		 cv;
 	uint16_t		 flags;
 };
 
@@ -117,7 +123,6 @@ static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 /*
  * Initialization routines.
  */
-
 int
 dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
     struct resource_map *map, const uint16_t flags)
@@ -134,15 +139,22 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 		mflags = M_NOWAIT | M_ZERO;
 
 	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
-	if (!p) {
+	if (!p)
 		return (1);
-	}
 
 	p->res = res;
 	p->map = map;
 	p->flags = flags;
-	mtx_init(&p->lock, "dpaa2_mcp", "MC portal lock",
-	    flags & DPAA2_PORTAL_ATOMIC ? MTX_SPIN : MTX_DEF);
+	if (flags & DPAA2_PORTAL_ATOMIC) {
+		/*
+		 * NOTE: Do not initialize cv for atomic portal: it's not
+		 * possible to sleep on it in case of a spin mutex.
+		 */
+		mtx_init(&p->lock, "MC portal spin lock", NULL, MTX_SPIN);
+	} else {
+		mtx_init(&p->lock, "MC portal sleep lock", NULL, MTX_DEF);
+		cv_init(&p->cv, "MC portal cv");
+	}
 
 	*portal = p;
 
@@ -153,8 +165,26 @@ void
 dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 {
 	if (portal) {
-		mtx_destroy(&portal->lock);
-		free(portal, M_DPAA2_MCP);
+		if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+			mtx_destroy(&portal->lock);
+			free(portal, M_DPAA2_MCP);
+		} else {
+			/*
+			 * Signal all threads sleeping on portal's cv that it's
+			 * going to be destroyed.
+			 */
+			LOCK_PORTAL(portal);
+			portal->flags |= DPAA2_PORTAL_DESTROYED;
+			cv_broadcast(&portal->cv);
+			UNLOCK_PORTAL(portal);
+
+			/* Let threads stop using this portal. */
+			DELAY(DPAA2_PORTAL_TIMEOUT);
+
+			mtx_destroy(&portal->lock);
+			cv_destroy(&portal->cv);
+			free(portal, M_DPAA2_MCP);
+		}
 	}
 }
 
@@ -209,7 +239,6 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
 /*
  * Data Path Management (DPMNG) commands.
  */
-
 int
 dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *major, uint32_t *minor, uint32_t *rev)
