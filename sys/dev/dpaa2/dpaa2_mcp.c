@@ -63,17 +63,26 @@ __FBSDID("$FreeBSD$");
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
 
-#define LOCK_PORTAL(portal) do {			\
-	if ((portal)->flags & DPAA2_PORTAL_ATOMIC)	\
-		mtx_lock_spin(&(portal)->lock);		\
-	else						\
-		mtx_lock(&(portal)->lock);		\
+#define LOCK_PORTAL(portal) do {					\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
+		mtx_lock_spin(&(portal)->lock);				\
+	} else {							\
+		mtx_lock(&(portal)->lock);				\
+		while ((portal)->flags & DPAA2_PORTAL_LOCKED)		\
+			cv_wait(&(portal)->cv, &(portal)->lock);	\
+		(portal)->flags |= DPAA2_PORTAL_LOCKED;			\
+		mtx_unlock(&(portal)->lock);				\
+	}								\
 } while (0)
-#define UNLOCK_PORTAL(portal) do {			\
-	if ((portal)->flags & DPAA2_PORTAL_ATOMIC)	\
-		mtx_unlock_spin(&(portal)->lock);	\
-	else						\
-		mtx_unlock(&(portal)->lock);		\
+#define UNLOCK_PORTAL(portal) do {				\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {		\
+		mtx_unlock_spin(&(portal)->lock);		\
+	} else {						\
+		mtx_lock(&(portal)->lock);			\
+		(portal)->flags &= ~DPAA2_PORTAL_LOCKED;	\
+		cv_signal(&(portal)->cv);			\
+		mtx_unlock(&(portal)->lock);			\
+	}							\
 } while (0)
 
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
