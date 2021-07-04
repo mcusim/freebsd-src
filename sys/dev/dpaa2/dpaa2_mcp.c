@@ -57,8 +57,8 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_PORTAL_TIMEOUT	10000	/* us */
 
 #define DPAA2_CMD_PARAMS_N	7u
-#define DPAA2_CMD_TIMEOUT	100	/* us */
-#define DPAA2_CMD_ATTEMPTS	5000	/* max 500 ms */
+#define DPAA2_CMD_TIMEOUT	10	/* ms */
+#define DPAA2_CMD_ATTEMPTS	50	/* max 500 ms */
 
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
@@ -360,7 +360,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		if (portal->flags & DPAA2_PORTAL_ATOMIC)
 			DELAY(DPAA2_CMD_TIMEOUT);
 		else
-			pause("mcp_pa", SBT_1US * DPAA2_CMD_TIMEOUT);
+			pause("mcp_pa", DPAA2_CMD_TIMEOUT);
 	}
 
 	/* Update command results. */
