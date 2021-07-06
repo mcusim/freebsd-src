@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/condvar.h>
+#include <sys/lock.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -54,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-#define DPAA2_PORTAL_TIMEOUT	10000	/* us */
+#define DPAA2_PORTAL_TIMEOUT	100000	/* us */
 
 #define DPAA2_CMD_PARAMS_N	7u
 #define DPAA2_CMD_TIMEOUT	10	/* ms */
@@ -63,13 +64,15 @@ __FBSDID("$FreeBSD$");
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
 
-#define LOCK_PORTAL(portal) do {					\
+#define LOCK_PORTAL(portal, flags) do {					\
 	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
 		mtx_lock_spin(&(portal)->lock);				\
+		(flags) = (portal)->flags;				\
 	} else {							\
 		mtx_lock(&(portal)->lock);				\
 		while ((portal)->flags & DPAA2_PORTAL_LOCKED)		\
 			cv_wait(&(portal)->cv, &(portal)->lock);	\
+		(flags) = (portal)->flags;				\
 		(portal)->flags |= DPAA2_PORTAL_LOCKED;			\
 		mtx_unlock(&(portal)->lock);				\
 	}								\
@@ -94,7 +97,7 @@ MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal 
  * res: Unmapped portal's I/O memory.
  * map: Mapped portal's I/O memory.
  * lock: Lock to send a command to the portal and wait for the result.
- * cv: Conditional variable helps to wait for a portal's state change.
+ * cv: Conditional variable helps to wait for the helper object's state change.
  * flags: Current object state.
  */
 struct dpaa2_mcp {
@@ -108,7 +111,7 @@ struct dpaa2_mcp {
 /*
  * Command object holds data to be written to the MC portal.
  *
- * header: Least significant 8 bytes of the MC portal.
+ * header: 8 least significant bytes of the MC portal.
  * params: Parameters to pass together with the command to MC. Might keep
  *         command execution results.
  */
@@ -117,6 +120,20 @@ struct dpaa2_cmd {
 	uint64_t		 params[DPAA2_CMD_PARAMS_N];
 };
 
+/*
+ * Helper object which allows to access fields of the MC command header.
+ *
+ * srcid: The SoC architected source ID of the submitter. This field is reserved
+ *        and cannot be written by a GPP processor.
+ * flags_hw: Bits from 8 to 15 of the command header. Most of them are reserved
+ *           at the moment.
+ * status: Command ready/status. This field is used as the handshake field
+ *         between MC and the driver. MC reports command completion with
+ *         success/error codes in this field.
+ * flags_sw:
+ * token:
+ * cmdid:
+ */
 struct dpaa2_cmd_header {
 	uint8_t			 srcid;
 	uint8_t			 flags_hw;
@@ -129,9 +146,6 @@ struct dpaa2_cmd_header {
 static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 
-/*
- * Initialization routines.
- */
 int
 dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
     struct resource_map *map, const uint16_t flags)
@@ -173,6 +187,8 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 void
 dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 {
+	uint16_t flags;
+
 	if (portal) {
 		if (portal->flags & DPAA2_PORTAL_ATOMIC) {
 			mtx_destroy(&portal->lock);
@@ -182,9 +198,9 @@ dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 			 * Signal all threads sleeping on portal's cv that it's
 			 * going to be destroyed.
 			 */
-			LOCK_PORTAL(portal);
+			LOCK_PORTAL(portal, flags);
 			portal->flags |= DPAA2_PORTAL_DESTROYED;
-			cv_broadcast(&portal->cv);
+			cv_signal(&portal->cv);
 			UNLOCK_PORTAL(portal);
 
 			/* Let threads stop using this portal. */
@@ -245,14 +261,12 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
 		free(cmd, M_DPAA2_MCP);
 }
 
-/*
- * Data Path Management (DPMNG) commands.
- */
 int
-dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-    uint32_t *major, uint32_t *minor, uint32_t *rev)
+dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t *major,
+    uint32_t *minor, uint32_t *rev)
 {
 	struct dpaa2_cmd_header *hdr;
+	uint16_t flags;
 	int error;
 
 	if (!portal || !cmd)
@@ -264,8 +278,15 @@ dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	hdr->token = 0;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
-	LOCK_PORTAL(portal);
+	LOCK_PORTAL(portal, flags);
 
+	/* Terminate operation if portal is destroyed. */
+	if (flags & DPAA2_PORTAL_DESTROYED) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_INVALID_STATE);
+	}
+
+	/* Send command to MC and wait for the result. */
 	send_command(portal, cmd);
 	error = wait_for_command(portal, cmd);
 	if (error) {
@@ -287,17 +308,56 @@ dpaa2_cmd_get_firmware_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 }
 
 int
-dpaa2_cmd_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *pvr, uint32_t *svr)
 {
-	return (0);
+	struct dpaa2_cmd_header *hdr;
+	uint16_t flags;
+	int error;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	/* Prepare command for the MC hardware. */
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
+	hdr->cmdid = 0x8321;
+	hdr->token = 0;
+	hdr->status = DPAA2_CMD_STAT_READY;
+
+	LOCK_PORTAL(portal, flags);
+
+	/* Terminate operation if portal is destroyed. */
+	if (flags & DPAA2_PORTAL_DESTROYED) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_INVALID_STATE);
+	}
+
+	/* Send command to MC and wait for the result. */
+	send_command(portal, cmd);
+	error = wait_for_command(portal, cmd);
+	if (error) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_ERR);
+	}
+	if (hdr->status != DPAA2_CMD_STAT_OK) {
+		UNLOCK_PORTAL(portal);
+		return (int)(hdr->status);
+	}
+
+	*pvr = cmd->params[0] >> 32;
+	*svr = cmd->params[0] & 0xFFFFFFFF;
+
+	UNLOCK_PORTAL(portal);
+
+	return (DPAA2_CMD_STAT_OK);
 }
 
 int
-dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
 	struct dpaa2_cmd_header *hdr;
+	uint16_t flags;
 	int error;
 
 	if (!portal || !cmd)
@@ -309,8 +369,15 @@ dpaa2_cmd_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	hdr->token = 0;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
-	LOCK_PORTAL(portal);
+	LOCK_PORTAL(portal, flags);
 
+	/* Terminate operation if portal is destroyed. */
+	if (flags & DPAA2_PORTAL_DESTROYED) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_INVALID_STATE);
+	}
+
+	/* Send command to MC and wait for the result. */
 	send_command(portal, cmd);
 	error = wait_for_command(portal, cmd);
 	if (error) {
@@ -333,9 +400,9 @@ static void
 send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
 	/* Write command parameters. */
-	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++) {
+	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
-	}
+
 	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
 	    BUS_SPACE_BARRIER_WRITE);
 
@@ -368,6 +435,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		cmd->params[i-1] = bus_read_8(portal->map, sizeof(uint64_t) * i);
 
+	/* Return an error on expired timeout. */
 	if (i > DPAA2_CMD_ATTEMPTS)
 		return (1);
 
