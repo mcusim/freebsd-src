@@ -66,36 +66,36 @@ typedef struct dpaa2_cmd *dpaa2_cmd_t;
 /*
  * Management routines.
  */
-int dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
-    struct resource_map *map, const uint16_t flags);
-void dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
-int dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
-void dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
-void dpaa2_mcp_update_token(dpaa2_cmd_t cmd, const uint16_t token);
-void dpaa2_mcp_update_flags(dpaa2_cmd_t cmd, const uint16_t flags);
+int	dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+		struct resource_map *map, const uint16_t flags);
+void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
+int	dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
+void	dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
+void	dpaa2_mcp_set_token(dpaa2_cmd_t cmd, const uint16_t token);
+void	dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags);
 
 /*
  * Data Path Management (DPMNG) commands.
  */
-int dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-    uint32_t *major, uint32_t *minor, uint32_t *rev);
-int dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-    uint32_t *pvr, uint32_t *svr);
-int dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-    uint32_t *cont_id);
+int	dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		uint32_t *major, uint32_t *minor, uint32_t *rev);
+int	dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		uint32_t *pvr, uint32_t *svr);
+int	dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		uint32_t *cont_id);
 
 /*
  * Data Path Resource Containter (DPRC) commands.
  */
-int dpaa2_cmd_rc_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t cont_id,
-    uint16_t *token);
-int dpaa2_cmd_rc_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_rc_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t cont_id,
+		uint16_t *token);
+int	dpaa2_cmd_rc_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 
 /*
  * Data Path Network Interface (DPNI) commands.
  */
-int dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
-    uint16_t *token);
-int dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
+		uint16_t *token);
+int	dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 
 #endif /* _DPAA2_MCP_H */
