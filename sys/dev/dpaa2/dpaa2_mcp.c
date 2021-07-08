@@ -119,7 +119,7 @@ struct dpaa2_mcp {
  */
 struct dpaa2_cmd {
 	uint64_t		 header;
-	uint64_t		 params[DPAA2_CMD_PARAMS_N];
+	uint64_t		 params[CMD_PARAMS_N];
 };
 
 /*
@@ -252,7 +252,7 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 	if (flags & DPAA2_CMD_INTR_DIS)
 		hdr->flags_sw |= SW_FLAG_INTR_DIS;
 
-	for (uint32_t i = 0; i < DPAA2_CMD_PARAMS_N; i++)
+	for (uint32_t i = 0; i < CMD_PARAMS_N; i++)
 		c->params[i] = 0;
 
 	*cmd = c;
@@ -547,7 +547,7 @@ static void
 send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
 	/* Write command parameters. */
-	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
+	for (uint32_t i = 1; i <= CMD_PARAMS_N; i++)
 		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
 
 	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
@@ -583,11 +583,11 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 
 	/* Update command results. */
 	cmd->header = val;
-	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
+	for (i = 1; i <= CMD_PARAMS_N; i++)
 		cmd->params[i-1] = bus_read_8(portal->map, i * sizeof(uint64_t));
 
 	/* Return an error on expired timeout. */
-	if (i > DPAA2_CMD_ATTEMPTS)
+	if (i > attempts)
 		return (1);
 
 	return (0);
