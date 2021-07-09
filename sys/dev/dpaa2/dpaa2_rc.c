@@ -76,8 +76,10 @@ dpaa2_rc_attach(device_t dev)
 	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
 	dpaa2_cmd_t cmd;
+	dpaa2_obj_t obj;
 	uint32_t major, minor, rev;
-	uint32_t cont_id;
+	uint32_t cont_id, obj_count;
+	uint16_t rc_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -110,15 +112,58 @@ dpaa2_rc_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	/*
+	 * Print info about MC and DPAA2 objects.
+	 */
+
 	error = dpaa2_cmd_mng_get_version(sc->portal, cmd, &major, &minor, &rev);
-	if (!error)
-		device_printf(dev, "MC firmware version: %u.%u.%u\n", major,
-		    minor, rev);
+	if (error) {
+		device_printf(dev, "Failed to get MC firmware version\n");
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+	device_printf(dev, "MC firmware version: %u.%u.%u\n", major, minor, rev);
 
 	error = dpaa2_cmd_mng_get_container_id(sc->portal, cmd, &cont_id);
-	if (!error)
-		device_printf(dev, "Resource container ID: %u\n", cont_id);
+	if (error) {	
+		device_printf(dev, "Failed to get container ID\n");
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+	device_printf(dev, "Resource container ID: %u\n", cont_id);
 
+	error = dpaa2_cmd_rc_open(sc->portal, cmd, cont_id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open container: ID=%u\n", cont_id);
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+
+	error = dpaa2_cmd_rc_get_obj_count(sc->portal, cmd, &obj_count);
+	if (error) {
+		device_printf(dev, "Failed to count objects in container: "
+		    "ID=%u\n", cont_id);
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+	device_printf(dev, "Objects in container: %u\n", obj_count);
+
+	for (uint32_t i = 0; i < obj_count; i++) {
+		error = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, *obj);
+		if (error) {
+			device_printf(dev, "Failed to get object: ID=%u\n", i);
+			continue;
+		}
+		device_printf(dev, "Object: id=%u, vendor=%u, irqs=%u "
+		    "regions=%u version=%u.%u\n", obj.id, obj.vendor,
+		    obj.irq_count, obj.reg_count, obj.ver_major, obj.ver_minor);
+	}
+
+	dpaa2_cmd_rc_close(sc->portal, cmd);
 	dpaa2_mcp_free_command(cmd);
 
 	return (0);
