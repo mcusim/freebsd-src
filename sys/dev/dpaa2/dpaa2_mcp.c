@@ -542,7 +542,7 @@ dpaa2_cmd_rc_get_obj_count(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		return (int)(hdr->status);
 	}
 
-	*obj_count = (uint32_t) cmd->params[0] >> 32;
+	*obj_count = (uint32_t)(cmd->params[0] >> 32);
 
 	UNLOCK_PORTAL(portal);
 
