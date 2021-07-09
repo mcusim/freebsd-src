@@ -153,7 +153,7 @@ dpaa2_rc_attach(device_t dev)
 	device_printf(dev, "Objects in container: %u\n", obj_count);
 
 	for (uint32_t i = 0; i < obj_count; i++) {
-		error = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, *obj);
+		error = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, &obj);
 		if (error) {
 			device_printf(dev, "Failed to get object: ID=%u\n", i);
 			continue;
