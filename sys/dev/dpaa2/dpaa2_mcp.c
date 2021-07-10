@@ -563,7 +563,7 @@ dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 
 	/* Prepare command for the MC hardware. */
 	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x1591;
+	hdr->cmdid = 0x15A1;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
 	LOCK_PORTAL(portal, flags);
