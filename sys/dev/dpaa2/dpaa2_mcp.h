@@ -71,7 +71,7 @@
  * state: Object state (combination of states).
  * ver_major: Major version of the object.
  * ver_minor: Minor version of the object.
- * flags: Object attribute flags.
+ * flags: Object attributes flags.
  */
 typedef struct {
 	uint32_t		 id;

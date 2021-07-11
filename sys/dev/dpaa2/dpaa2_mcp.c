@@ -164,9 +164,9 @@ struct __packed dpaa2_obj {
 	uint8_t			 label[16];
 };
 
-static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-static int	close_dpaa2_object(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid);
+static void send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 
 /*
  * Management routines.
@@ -322,132 +322,48 @@ int
 dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t *major,
     uint32_t *minor, uint32_t *rev)
 {
-	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !major || !minor || !rev)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8311;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
+	rc = exec_command(portal, cmd, 0x8311);
 	*major = cmd->params[0] >> 32;
 	*minor = cmd->params[1] & 0xFFFFFFFF;
 	*rev = cmd->params[0] & 0xFFFFFFFF;
 
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 int
 dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *pvr, uint32_t *svr)
 {
-	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !pvr || !svr)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8321;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
+	rc = exec_command(portal, cmd, 0x8321);
 	*pvr = cmd->params[0] >> 32;
 	*svr = cmd->params[0] & 0xFFFFFFFF;
 
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 int
 dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
-	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !cont_id)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8301;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
+	rc = exec_command(portal, cmd, 0x8301);
 	*cont_id = cmd->params[0] & 0xFFFFFFFF;
 
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 /*
@@ -459,137 +375,55 @@ dpaa2_cmd_rc_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t cont_id,
     uint16_t *token)
 {
 	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !token)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8051;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Prepare command arguments. */
 	cmd->params[0] = cont_id;
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
+	rc = exec_command(portal, cmd, 0x8051);
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
 	*token = hdr->token;
 
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 int
 dpaa2_cmd_rc_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
-	return (close_dpaa2_object(portal, cmd));
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, 0x8001));
 }
 
 int
 dpaa2_cmd_rc_get_obj_count(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *obj_count)
 {
-	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !obj_count)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x1591;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
+	rc = exec_command(portal, cmd, 0x1591);
 	*obj_count = (uint32_t)(cmd->params[0] >> 32);
 
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 int
 dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t obj_idx, dpaa2_obj_t *obj)
 {
-	struct dpaa2_cmd_header *hdr;
 	struct dpaa2_obj *pobj;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !obj)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x15A1;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Prepare command arguments. */
 	cmd->params[0] = obj_idx;
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
-	UNLOCK_PORTAL(portal);
+	rc = exec_command(portal, cmd, 0x15A1);
 
 	pobj = (struct dpaa2_obj *) &cmd->params[0];
 	obj->id = pobj->id;
@@ -603,7 +437,7 @@ dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	memcpy(obj->type, pobj->type, sizeof(pobj->type));
 	memcpy(obj->label, pobj->label, sizeof(pobj->label));
 
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 /*
@@ -615,27 +449,49 @@ dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
     uint16_t *token)
 {
 	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
+	int rc;
 
 	if (!portal || !cmd || !token)
 		return (DPAA2_CMD_STAT_ERR);
 
+	cmd->params[0] = dpni_id;
+	rc = exec_command(portal, cmd, 0x8011);
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
+	*token = hdr->token;
+
+	return (rc);
+}
+
+int
+dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, 0x8001));
+}
+
+static int
+exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
+{
+	struct dpaa2_cmd_header *hdr;
+	uint16_t flags;
+	int error;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
 	/* Prepare command for the MC hardware. */
 	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8011;
+	hdr->cmdid = cmdid;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
 	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
 	if (flags & DPAA2_PORTAL_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
 		UNLOCK_PORTAL(portal);
 		return (DPAA2_CMD_STAT_INVALID_STATE);
 	}
-
-	/* Prepare command arguments. */
-	cmd->params[0] = dpni_id;
 
 	/* Send command to MC and wait for the result. */
 	send_command(portal, cmd);
@@ -648,18 +504,9 @@ dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
 		UNLOCK_PORTAL(portal);
 		return (int)(hdr->status);
 	}
-
-	*token = hdr->token;
-
 	UNLOCK_PORTAL(portal);
 
 	return (DPAA2_CMD_STAT_OK);
-}
-
-int
-dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
-{
-	return (close_dpaa2_object(portal, cmd));
 }
 
 static void
@@ -710,44 +557,4 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		return (1);
 
 	return (0);
-}
-
-static int
-close_dpaa2_object(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
-{
-	struct dpaa2_cmd_header *hdr;
-	uint16_t flags;
-	int error;
-
-	if (!portal || !cmd)
-		return (DPAA2_CMD_STAT_ERR);
-
-	/* Prepare command for the MC hardware. */
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	hdr->cmdid = 0x8001;
-	hdr->status = DPAA2_CMD_STAT_READY;
-
-	LOCK_PORTAL(portal, flags);
-
-	/* Terminate operation if portal is destroyed. */
-	if (flags & DPAA2_PORTAL_DESTROYED) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_INVALID_STATE);
-	}
-
-	/* Send command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
-	if (error) {
-		UNLOCK_PORTAL(portal);
-		return (DPAA2_CMD_STAT_ERR);
-	}
-	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
-		return (int)(hdr->status);
-	}
-
-	UNLOCK_PORTAL(portal);
-
-	return (DPAA2_CMD_STAT_OK);
 }
