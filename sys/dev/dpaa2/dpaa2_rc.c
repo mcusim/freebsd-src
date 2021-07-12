@@ -158,9 +158,10 @@ dpaa2_rc_attach(device_t dev)
 			device_printf(dev, "Failed to get object: ID=%u\n", i);
 			continue;
 		}
-		device_printf(dev, "Object: id=%u vendor=%u irqs=%u "
-		    "regions=%u version=%u.%u\n", obj.id, obj.vendor,
-		    obj.irq_count, obj.reg_count, obj.ver_major, obj.ver_minor);
+		device_printf(dev, "Object: id=%u vendor=%u irqs=%u regions=%u "
+		    "version=%u.%u type=%s label=%s\n", obj.id, obj.vendor,
+		    obj.irq_count, obj.reg_count, obj.ver_major, obj.ver_minor,
+		    (char *) &obj.type[0], (char *) &obj.label[0]);
 	}
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
