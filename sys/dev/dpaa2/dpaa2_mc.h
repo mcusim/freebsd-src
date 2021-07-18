@@ -67,7 +67,15 @@ struct dpaa2_rc_softc {
 
 DECLARE_CLASS(dpaa2_mc_driver);
 
+/* for device interface */
 int dpaa2_mc_attach(device_t dev);
 int dpaa2_mc_detach(device_t dev);
+
+/* for pseudo-pcib interface */
+int dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
+    int *irqs);
+int dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs);
+int dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
+    uint32_t *data);
 
 #endif /* _DPAA2_MC_H */
