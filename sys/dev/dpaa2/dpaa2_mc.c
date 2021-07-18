@@ -49,6 +49,10 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <machine/intr.h>
+
+#include <contrib/dev/acpica/include/acpi.h>
+#include <dev/acpica/acpivar.h>
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
@@ -62,6 +66,9 @@ static struct resource_spec dpaa2_mc_spec[] = {
 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
 	RESOURCE_SPEC_END
 };
+
+/* Forward declarations. */
+static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 
 int
 dpaa2_mc_attach(device_t dev)
@@ -152,6 +159,58 @@ dpaa2_mc_detach(device_t dev)
 		return (error);
 
 	return (device_delete_children(dev));
+}
+
+int
+dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
+    int *irqs)
+{
+#if defined(INTRNG)
+	return (intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
+	    count, maxcount, irqs));
+#else
+	return (ENXIO);
+#endif
+}
+
+int
+dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
+{
+#if defined(INTRNG)
+	return (intr_release_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
+	    count, irqs));
+#else
+	return (ENXIO);
+#endif
+}
+
+int
+dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
+    uint32_t *data)
+{
+#if defined(INTRNG)
+	return (intr_map_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child), irq,
+	    addr, data));
+#else
+	return (ENXIO);
+#endif
+}
+
+static u_int
+dpaa2_mc_get_xref(device_t mcdev, device_t child)
+{
+	struct dpaa2_mc_softc *sc;
+	uintptr_t rid;
+	u_int xref;
+	int error;
+
+	sc = device_get_softc(mcdev);
+
+	/* NOTE: Use child's ICID (shared by all devices in one DPRC) as rid. */
+	error = acpi_iort_map_named_msi("MCE0", rid, &xref, &devid);
+	if (error != 0)
+		return (ACPI_MSI_XREF);
+	return (xref);
 }
 
 static device_method_t dpaa2_mc_methods[] = {

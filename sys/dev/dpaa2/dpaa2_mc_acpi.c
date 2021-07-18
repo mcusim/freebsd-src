@@ -46,12 +46,16 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <machine/intr.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+
+#include "pcib_if.h"
+#include "acpi_bus_if.h"
 
 static int
 dpaa2_mc_acpi_probe(device_t dev)
@@ -80,11 +84,37 @@ dpaa2_mc_acpi_detach(device_t dev)
 	return (dpaa2_mc_detach(dev));
 }
 
+static int
+dpaa2_mc_acpi_alloc_msi(device_t mcdev, device_t child, int count,
+    int maxcount, int *irqs)
+{
+	return (dpaa2_mc_alloc_msi(mcdev, child, count, maxcount, irqs));
+}
+
+static int
+dpaa2_mc_acpi_release_msi(device_t mcdev, device_t child, int count, int *irqs)
+{
+	return (dpaa2_mc_release_msi(mcdev, child, count, irqs));
+}
+
+static int
+dpaa2_mc_acpi_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
+    uint32_t *data)
+{
+	return (dpaa2_mc_map_msi(mcdev, child, irq, addr, data));
+}
+
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
 	DEVMETHOD(device_attach,	dpaa2_mc_acpi_attach),
 	DEVMETHOD(device_detach,	dpaa2_mc_acpi_detach),
+
+	/* pseudo-pcib interface */
+	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),
+	DEVMETHOD(pcib_release_msi,	dpaa2_mc_acpi_release_msi),
+	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
+
 	DEVMETHOD_END
 };
 

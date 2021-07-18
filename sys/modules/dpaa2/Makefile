@@ -13,11 +13,16 @@ SRCS=	bus_if.h \
 .if ${MACHINE_CPUARCH} == "aarch64" || \
     ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
-SRCS+=	dpaa2_mc_acpi.c opt_acpi.h acpi_if.h
+SRCS+=	dpaa2_mc_acpi.c \
+	opt_acpi.h \
+	acpi_if.h \
+	acpi_bus_if.h \
+	pcib_if.h
 .endif
 
 .if !empty(OPT_FDT)
-SRCS+=	dpaa2_mc_fdt.c ofw_bus_if.h
+SRCS+=	dpaa2_mc_fdt.c \
+	ofw_bus_if.h
 .endif
 
 .include <bsd.kmod.mk>
