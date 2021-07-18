@@ -66,6 +66,9 @@ __FBSDID("$FreeBSD$");
 #define HW_FLAG_HIGH_PRIO	0x80u
 #define SW_FLAG_INTR_DIS	0x01u
 
+#define TYPE_LEN_MAX		16u
+#define LABEL_LEN_MAX		16u
+
 #define LOCK_PORTAL(portal, flags) do {					\
 	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
 		mtx_lock_spin(&(portal)->lock);				\
@@ -136,7 +139,7 @@ struct dpaa2_cmd {
  * token:
  * cmdid:
  */
-struct dpaa2_cmd_header {
+struct __packed dpaa2_cmd_header {
 	uint8_t			 srcid;
 	uint8_t			 flags_hw;
 	uint8_t			 status;
@@ -162,6 +165,17 @@ struct __packed dpaa2_obj {
 	uint16_t		 _reserved2;
 	uint8_t			 type[16];
 	uint8_t			 label[16];
+};
+
+/*
+ * Helper object which allows to access fields of the DPRC attributes response.
+ */
+struct __packed dpaa2_rc_attr {
+	uint32_t		 cont_id;
+	uint16_t		 icid;
+	uint16_t		 _reserved1;
+	uint32_t		 options;
+	uint32_t		 portal_id;
 };
 
 static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid);
@@ -436,6 +450,63 @@ dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	obj->flags = pobj->flags;
 	memcpy(obj->type, pobj->type, sizeof(pobj->type));
 	memcpy(obj->label, pobj->label, sizeof(pobj->label));
+
+	return (rc);
+}
+
+int
+dpaa2_cmd_rc_get_obj_descriptor(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint32_t obj_id, const char *type, dpaa2_obj_t *obj)
+{
+	struct __packed get_obj_desc_arg {
+		uint32_t	obj_id;
+		uint32_t	_reserved1;
+		uint8_t		type[16];
+	} *args;
+	struct dpaa2_obj *pobj;
+	int rc;
+
+	if (!portal || !cmd || !type || !obj)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct get_obj_desc_arg *) &cmd->params[0];
+	args->obj_id = obj_id;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	rc = exec_command(portal, cmd, 0x1621);
+
+	pobj = (struct dpaa2_obj *) &cmd->params[0];
+	obj->id = pobj->id;
+	obj->vendor = pobj->vendor;
+	obj->irq_count = pobj->irq_count;
+	obj->reg_count = pobj->reg_count;
+	obj->state = pobj->state;
+	obj->ver_major = pobj->ver_major;
+	obj->ver_minor = pobj->ver_minor;
+	obj->flags = pobj->flags;
+	memcpy(obj->type, pobj->type, sizeof(pobj->type));
+	memcpy(obj->label, pobj->label, sizeof(pobj->label));
+
+	return (rc);
+}
+
+int
+dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    dpaa2_rc_attr_t *attr)
+{
+	struct dpaa2_rc_attr *pattr;
+	int rc;
+
+	if (!portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	rc = exec_command(portal, cmd, 0x0041);
+
+	pattr = (struct dpaa2_rc_attr *) &cmd->params[0];
+	attr->cont_id = pattr->cont_id;
+	attr->portal_id = pattr->portal_id;
+	attr->options = pattr->options;
+	attr->icid = pattr->icid;
 
 	return (rc);
 }
