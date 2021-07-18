@@ -17,7 +17,8 @@ SRCS+=	dpaa2_mc_acpi.c \
 	opt_acpi.h \
 	acpi_if.h \
 	acpi_bus_if.h \
-	pcib_if.h
+	pcib_if.h \
+	pci_if.h
 .endif
 
 .if !empty(OPT_FDT)
