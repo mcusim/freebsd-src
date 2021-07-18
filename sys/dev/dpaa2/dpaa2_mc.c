@@ -49,7 +49,6 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/resource.h>
-#include <machine/intr.h>
 
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
@@ -201,7 +200,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
 	struct dpaa2_mc_softc *sc;
 	uintptr_t rid;
-	u_int xref;
+	u_int xref, devid;
 	int error;
 
 	sc = device_get_softc(mcdev);
@@ -209,7 +208,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	/* NOTE: Use child's ICID (shared by all devices in one DPRC) as rid. */
 	error = acpi_iort_map_named_msi("MCE0", rid, &xref, &devid);
 	if (error != 0)
-		return (ACPI_MSI_XREF);
+		return (0);
 	return (xref);
 }
 
