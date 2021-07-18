@@ -198,18 +198,19 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 static u_int
 dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
-	struct dpaa2_mc_softc *sc;
-	u_int rid = 0;
+	struct dpaa2_devinfo *dinfo;
 	u_int xref, devid;
 	int error;
 
-	sc = device_get_softc(mcdev);
-
-	/* NOTE: Use child's ICID (shared by all devices in one DPRC) as rid. */
-	error = acpi_iort_map_named_msi("MCE0", rid, &xref, &devid);
-	if (error != 0)
-		return (0);
-	return (xref);
+	dinfo = device_get_ivars(child);
+	if (dinfo) {
+		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
+		    &devid);
+		if (error)
+			return (0);
+		return (xref);
+	}
+	return (0);
 }
 
 static device_method_t dpaa2_mc_methods[] = {

@@ -65,6 +65,15 @@ struct dpaa2_rc_softc {
 	int			 unit;
 };
 
+/*
+ * Information about a child device attached to MC or DPRC.
+ */
+struct dpaa2_devinfo {
+	device_t		 pdev;
+	device_t		 dev;
+	uint16_t		 icid;
+};
+
 DECLARE_CLASS(dpaa2_mc_driver);
 
 /* for device interface */
