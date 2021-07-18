@@ -47,13 +47,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
+#include "pcib_if.h"
+#include "pci_if.h"
+
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-/* Device interface */
-static int dpaa2_rc_probe(device_t dev);
-static int dpaa2_rc_attach(device_t dev);
-static int dpaa2_rc_detach(device_t dev);
+MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
 /*
  * Device interface.
@@ -75,11 +75,14 @@ dpaa2_rc_attach(device_t dev)
 	device_t pdev;
 	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
+	struct dpaa2_devinfo *dinfo = NULL;
 	dpaa2_cmd_t cmd;
 	dpaa2_obj_t obj;
+	dpaa2_rc_attr_t dprc_attr;
 	uint32_t major, minor, rev;
 	uint32_t cont_id, obj_count;
 	uint16_t rc_token;
+	int irqs[1];
 	int error;
 
 	sc = device_get_softc(dev);
@@ -91,6 +94,21 @@ dpaa2_rc_attach(device_t dev)
 		/* Root DPRC attached directly to the MC bus. */
 		pdev = device_get_parent(dev);
 		mcsc = device_get_softc(pdev);
+
+		/*
+		 * Allocate device info to let the MC bus access ICID of the
+		 * DPRC object.
+		 */
+		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
+		    M_WAITOK | M_ZERO);
+		if (!dinfo) {
+			device_printf(dev, "Failed to allocate dpaa2_devinfo\n");
+			dpaa2_rc_detach(dev);
+			return (ENXIO);
+		}
+		device_set_ivars(dev, dinfo);
+		dinfo->pdev = pdev;
+		dinfo->dev = dev;
 
 		/* Prepare helper portal object to send commands to MC. */
 		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
@@ -152,17 +170,31 @@ dpaa2_rc_attach(device_t dev)
 	}
 	device_printf(dev, "Objects in container: %u\n", obj_count);
 
-	for (uint32_t i = 0; i < obj_count; i++) {
-		error = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, &obj);
-		if (error) {
-			device_printf(dev, "Failed to get object: ID=%u\n", i);
-			continue;
-		}
-		device_printf(dev, "Object: id=%u vendor=%u irqs=%u regions=%u "
-		    "version=%u.%u type=%s label=%s\n", obj.id, obj.vendor,
-		    obj.irq_count, obj.reg_count, obj.ver_major, obj.ver_minor,
-		    (char *) &obj.type[0], (char *) &obj.label[0]);
+	error = dpaa2_cmd_rc_get_attributes(sc->portal, cmd, &dprc_attr);
+	if (error) {
+		device_printf(dev, "Failed to get attributes of the container: "
+		    "ID=%u\n", cont_id);
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
 	}
+	device_printf(dev, "ICID: %u\n", dprc_attr.icid);
+	if (dinfo)
+		dinfo->icid = dprc_attr.icid;
+
+	/*
+	 * Ask MC bus to allocate MSI for this DPRC using its pseudo-pcib
+	 * interface.
+	 */
+	error = PCIB_ALLOC_MSI(device_get_parent(dev), dev, 1, 1, irqs);
+	if (error) {
+		device_printf(dev, "Failed to allocate MSI for DPRC: "
+		    "error=%u\n", error);
+		dpaa2_mcp_free_command(cmd);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
+	device_printf(dev, "MSI allocated: irq=%d\n", irqs[0]);
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
 	dpaa2_mcp_free_command(cmd);
@@ -174,10 +206,15 @@ static int
 dpaa2_rc_detach(device_t dev)
 {
 	struct dpaa2_rc_softc *sc;
+	struct dpaa2_devinfo *dinfo;
 
 	sc = device_get_softc(dev);
+	dinfo = device_get_ivars(dev);
+
 	if (sc->portal)
 		dpaa2_mcp_free_portal(sc->portal);
+	if (dinfo)
+		free(dinfo, M_DPAA2_RC);
 
 	return (0);
 }
