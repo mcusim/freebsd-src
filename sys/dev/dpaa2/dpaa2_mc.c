@@ -199,7 +199,7 @@ static u_int
 dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
 	struct dpaa2_mc_softc *sc;
-	uintptr_t rid;
+	u_int rid = 0;
 	u_int xref, devid;
 	int error;
 

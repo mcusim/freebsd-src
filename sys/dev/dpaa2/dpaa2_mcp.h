@@ -74,17 +74,32 @@
  * flags: Object attributes flags.
  */
 typedef struct {
-	uint32_t		 id;
-	uint16_t		 vendor;
-	uint8_t			 irq_count;
-	uint8_t			 reg_count;
-	uint32_t		 state;
-	uint16_t		 ver_major;
-	uint16_t		 ver_minor;
-	uint16_t		 flags;
-	uint8_t			 type[16];
-	uint8_t			 label[16];
+	uint32_t	id;
+	uint16_t	vendor;
+	uint8_t		irq_count;
+	uint8_t		reg_count;
+	uint32_t	state;
+	uint16_t	ver_major;
+	uint16_t	ver_minor;
+	uint16_t	flags;
+	uint8_t		type[16];
+	uint8_t		label[16];
 } dpaa2_obj_t;
+
+/*
+ * Attributes of the DPRC object.
+ *
+ * cont_id: Container's ID.
+ * portal_id: Container's portal ID.
+ * options: Container's options as set at container's creation.
+ * icid: Container's isolation context ID.
+ */
+typedef struct {
+	uint32_t	cont_id;
+	uint32_t	portal_id;
+	uint32_t	options;
+	uint16_t	icid;
+} dpaa2_rc_attr_t;
 
 /*
  * Opaque pointers.
@@ -123,6 +138,10 @@ int	dpaa2_cmd_rc_get_obj_count(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		uint32_t *obj_count);
 int	dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		uint32_t obj_idx, dpaa2_obj_t *obj);
+int	dpaa2_cmd_rc_get_obj_descriptor(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		uint32_t obj_id, const char *type, dpaa2_obj_t *obj);
+int	dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		dpaa2_rc_attr_t *attr);
 
 /*
  * Data Path Network Interface (DPNI) commands.
