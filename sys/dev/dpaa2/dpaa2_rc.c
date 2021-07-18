@@ -55,6 +55,9 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
+/* Forward declarations. */
+static int dpaa2_rc_detach(device_t dev);
+
 /*
  * Device interface.
  */
@@ -77,7 +80,6 @@ dpaa2_rc_attach(device_t dev)
 	struct dpaa2_rc_softc *sc;
 	struct dpaa2_devinfo *dinfo = NULL;
 	dpaa2_cmd_t cmd;
-	dpaa2_obj_t obj;
 	dpaa2_rc_attr_t dprc_attr;
 	uint32_t major, minor, rev;
 	uint32_t cont_id, obj_count;
