@@ -204,10 +204,19 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 
 	dinfo = device_get_ivars(child);
 	if (dinfo) {
+		/* For debug purposes only! */
+		device_printf(mcdev, "Mapping named node (MCE0) with rid=%d to "
+		    "MSI\n", dinfo->icid);
+
 		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
 		    &devid);
-		if (error)
+		if (error) {
+			/* For debug purposes only! */
+			device_printf(mcdev, "Failed to map named IORT node to "
+			    "MSI: %d\n", error);
+
 			return (0);
+		}
 		return (xref);
 	}
 	return (0);
