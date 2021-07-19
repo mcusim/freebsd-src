@@ -739,7 +739,7 @@ pic_lookup_locked(device_t dev, intptr_t xref, int flags)
 		    (flags & FLAG_TYPE_MASK))
 			continue;
 		/* For debug purposes only! */
-		printf("%s: xref=%d, pic_xref=%d\n", __func__, xref,
+		printf("%s: xref=%ld, pic_xref=%ld\n", __func__, xref,
 		    pic->pic_xref);
 
 		if (dev == NULL) {
@@ -1345,7 +1345,7 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	pic = pic_lookup(NULL, xref, FLAG_MSI);
 	if (pic == NULL) {
 		/* For debug purposes only! */
-		printf("%s: pic_lookup() returned NULL, xref=%d\n", __func__,
+		printf("%s: pic_lookup() returned NULL, xref=%ld\n", __func__,
 		    xref);
 
 		return (ESRCH);
