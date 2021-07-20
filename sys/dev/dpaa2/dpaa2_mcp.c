@@ -52,6 +52,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
+#include "pcib_if.h"
+#include "pci_if.h"
+
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
