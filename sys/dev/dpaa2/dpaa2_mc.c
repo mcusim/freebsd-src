@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
 #define	mcreg_write_4(_sc, _r, _v)	bus_write_4(&(_sc)->map[1], (_r), (_v))
 
+MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex memory");
+
 static struct resource_spec dpaa2_mc_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
@@ -74,6 +76,7 @@ dpaa2_mc_attach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
 	struct resource_map_request req;
+	struct dpaa2_devinfo *dinfo = NULL;
 	uint32_t val;
 	int error;
 
@@ -124,6 +127,19 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	/* Allocate device info to keep information about MC bus. */
+	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
+	    M_WAITOK | M_ZERO);
+	if (!dinfo) {
+		device_printf(dev, "Failed to allocate dpaa2_devinfo\n");
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+	device_set_ivars(dev, dinfo);
+	dinfo->pdev = device_get_parent(dev);
+	dinfo->dev = dev;
+	dinfo->dtype = DPAA2_DEV_MC;
+
 	/*
 	 * Add a root resource container as the only child of the bus. All of
 	 * the direct descendant containers will be attached to the root one
@@ -144,6 +160,7 @@ int
 dpaa2_mc_detach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
+	struct dpaa2_devinfo *dinfo = NULL;
 	int error;
 
 	bus_generic_detach(dev);
@@ -152,6 +169,10 @@ dpaa2_mc_detach(device_t dev)
 	if (sc->rcdev)
 		device_delete_child(dev, sc->rcdev);
 	bus_release_resources(dev, dpaa2_mc_spec, sc->res);
+
+	dinfo = device_get_ivars(dev);
+	if (dinfo)
+		free(dinfo, M_DPAA2_MC);
 
 	error = bus_generic_detach(dev);
 	if (error != 0)
@@ -195,6 +216,27 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 #endif
 }
 
+int
+dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
+    uintptr_t *id)
+{
+	struct dpaa2_devinfo *mcinfo;
+	struct dpaa2_devinfo *dinfo;
+
+	mcinfo = device_get_ivars(mcdev);
+	dinfo = device_get_ivars(child);
+
+	if (mcinfo->dtype != DPAA2_DEV_MC)
+		return (1);
+
+	if (type == PCI_ID_MSI)
+		return (dpaa2_mc_map_id(mcdev, child, id));
+	else {
+		*id = dinfo->icid;
+		return (0);
+	}
+}
+
 static u_int
 dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
@@ -220,6 +262,26 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 		return (xref);
 	}
 	return (0);
+}
+
+static u_int
+dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
+{
+	struct dpaa2_devinfo *dinfo;
+	u_int xref, devid;
+	int error;
+
+	dinfo = device_get_ivars(child);
+	if (dinfo) {
+		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
+		    &devid);
+		if (error == 0)
+			*id = devid;
+		else
+			*id = dinfo->icid; /* RID not in IORT, likely FW bug, ignore */
+		return (0);
+	}
+	return (1);
 }
 
 static device_method_t dpaa2_mc_methods[] = {

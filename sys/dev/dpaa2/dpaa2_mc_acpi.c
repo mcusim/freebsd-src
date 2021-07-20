@@ -103,16 +103,24 @@ dpaa2_mc_acpi_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	return (dpaa2_mc_map_msi(mcdev, child, irq, addr, data));
 }
 
+static int
+dpaa2_mc_acpi_get_id(device_t mcdev, device_t child, enum pci_id_type type,
+    uintptr_t *id)
+{
+	return (dpaa2_mc_get_id(mcdev, child, type, id));
+}
+
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
 	DEVMETHOD(device_attach,	dpaa2_mc_acpi_attach),
 	DEVMETHOD(device_detach,	dpaa2_mc_acpi_detach),
 
-	/* pseudo-pcib interface */
+	/* Pseudo-PCIB interface */
 	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),
 	DEVMETHOD(pcib_release_msi,	dpaa2_mc_acpi_release_msi),
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
+	DEVMETHOD(pcib_get_id,		dpaa2_mc_acpi_get_id),
 
 	DEVMETHOD_END
 };
