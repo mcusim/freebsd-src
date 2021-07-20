@@ -227,15 +227,25 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 
+	/* For debug purposes only! */
+	device_printf(mcdev, "%s: called\n", __func__);
+
 	mcinfo = device_get_ivars(mcdev);
 	dinfo = device_get_ivars(child);
 
-	if (mcinfo->dtype != DPAA2_DEV_MC)
+	if (mcinfo->dtype != DPAA2_DEV_MC) {
+		/* For debug purposes only! */
+		device_printf(mcdev, "not dpaa2_mc device\n");
 		return (1);
+	}
 
-	if (type == PCI_ID_MSI)
+	if (type == PCI_ID_MSI) {
+		/* For debug purposes only! */
+		device_printf(mcdev, "%s: mapping to MSI ID\n", __func__);
 		return (dpaa2_mc_map_id(mcdev, child, id));
-	else {
+	} else {
+		/* For debug purposes only! */
+		device_printf(mcdev, "%s: returning ICID\n", __func__);
 		*id = dinfo->icid;
 		return (0);
 	}
@@ -279,12 +289,20 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 	if (dinfo) {
 		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
 		    &devid);
-		if (error == 0)
+		if (error == 0) {
+			/* For debug purposes only! */
+			device_printf(mcdev, "%s: found devid=%d\n", __func__,
+			    devid);
 			*id = devid;
-		else
+		} else {
+			/* For debug purposes only! */
+			device_printf(mcdev, "%s: no devid\n", __func__);
 			*id = dinfo->icid; /* RID not in IORT, likely FW bug, ignore */
+		}
 		return (0);
 	}
+	/* For debug purposes only! */
+	device_printf(mcdev, "%s: no devinfo!\n", __func__);
 	return (1);
 }
 
