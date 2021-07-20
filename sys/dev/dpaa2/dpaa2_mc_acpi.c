@@ -50,11 +50,12 @@ __FBSDID("$FreeBSD$");
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
+#include "acpi_bus_if.h"
+#include "pcib_if.h"
+#include "pci_if.h"
+
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
-
-#include "pcib_if.h"
-#include "acpi_bus_if.h"
 
 static int
 dpaa2_mc_acpi_probe(device_t dev)
