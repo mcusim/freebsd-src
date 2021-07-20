@@ -111,6 +111,7 @@ dpaa2_rc_attach(device_t dev)
 		device_set_ivars(dev, dinfo);
 		dinfo->pdev = pdev;
 		dinfo->dev = dev;
+		dinfo->dtype = DPAA2_DEV_RC;
 
 		/* Prepare helper portal object to send commands to MC. */
 		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
@@ -221,11 +222,28 @@ dpaa2_rc_detach(device_t dev)
 	return (0);
 }
 
+static int
+dpaa2_rc_get_id_method(device_t dev, device_t child, enum pci_id_type type,
+    uintptr_t *id)
+{
+	struct dpaa2_devinfo *dinfo;
+
+	dinfo = device_get_ivars(dev);
+	if (dinfo->dtype == DPAA2_DEV_MC)
+		return (PCIB_GET_ID(dev, child, type, id));
+	else
+		return (PCIB_GET_ID(device_get_parent(dev), child, type, id));
+}
+
 static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_rc_probe),
 	DEVMETHOD(device_attach,	dpaa2_rc_attach),
 	DEVMETHOD(device_detach,	dpaa2_rc_detach),
+
+	/* Pseudo-PCI interface */
+	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id_method),
+
 	DEVMETHOD_END
 };
 
