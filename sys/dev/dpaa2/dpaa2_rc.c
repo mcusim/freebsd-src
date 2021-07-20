@@ -223,10 +223,13 @@ dpaa2_rc_detach(device_t dev)
 }
 
 static int
-dpaa2_rc_get_id_method(device_t dev, device_t child, enum pci_id_type type,
+dpaa2_rc_get_id(device_t dev, device_t child, enum pci_id_type type,
     uintptr_t *id)
 {
 	struct dpaa2_devinfo *dinfo;
+
+	/* For debug purposes only! */
+	device_printf(dev, "%s: called\n", __func__);
 
 	dinfo = device_get_ivars(dev);
 	if (dinfo->dtype == DPAA2_DEV_MC)
@@ -242,7 +245,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(device_detach,	dpaa2_rc_detach),
 
 	/* Pseudo-PCI interface */
-	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id_method),
+	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id),
 
 	DEVMETHOD_END
 };
