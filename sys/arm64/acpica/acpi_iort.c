@@ -122,9 +122,6 @@ iort_entry_get_id_mapping_index(struct iort_node *node)
 
 	switch(node->type) {
 	case ACPI_IORT_NODE_SMMU_V3:
-		/* For debug purposes only! */
-		printf("%s: SMMUv3 node\n", __func__);
-
 		/* The ID mapping field was added in version 1 */
 		if (node->revision < 1)
 			return (-1);
@@ -142,17 +139,10 @@ iort_entry_get_id_mapping_index(struct iort_node *node)
 		if (node->data.smmu_v3.IdMappingIndex >= node->nentries)
 			return (-1);
 
-		/* For debug purposes only! */
-		printf("%s: Should be a useful mapping index returned\n",
-		    __func__);
 		return (node->data.smmu_v3.IdMappingIndex);
 	case ACPI_IORT_NODE_PMCG:
-		/* For debug purposes only! */
-		printf("%s: PMCG node\n", __func__);
 		return (0);
 	default:
-		/* For debug purposes only! */
-		printf("%s: Unexpected node\n", __func__);
 		break;
 	}
 
@@ -172,16 +162,9 @@ iort_entry_lookup(struct iort_node *node, u_int id, u_int *outid)
 	id_map = iort_entry_get_id_mapping_index(node);
 	entry = node->entries.mappings;
 
-	/* For debug purposes only! */
-	printf("%s: id_map=%d, node_entries=%d, id=%d\n", __func__,
-	    id_map, node->nentries, id);
-
 	for (i = 0; i < node->nentries; i++, entry++) {
 		if (i == id_map)
 			continue;
-		/* For debug purposes only! */
-		printf("%s: entry_base=%d, entry_end=%d, id=%d\n", __func__,
-		    entry->base, entry->end, id);
 		if (entry->base <= id && id <= entry->end)
 			break;
 	}
@@ -191,8 +174,6 @@ iort_entry_lookup(struct iort_node *node, u_int id, u_int *outid)
 		*outid = entry->outbase + (id - entry->base);
 	else
 		*outid = entry->outbase;
-	/* For debug purposes only! */
-	printf("%s: Should be a useful outnode returned\n", __func__);
 	return (entry->out_node);
 }
 
@@ -280,23 +261,11 @@ iort_named_comp_map(const char *devname, u_int rid, u_int outtype, u_int *outid)
 
 	out_node = NULL;
 	TAILQ_FOREACH(node, &named_nodes, next) {
-		/* For debug purposes only! */
-		printf("%s: devname=%s, rid=%d, named_comp=%s\n", __func__,
-		    devname, rid, node->data.named_comp.DeviceName);
-
 		if (strstr(node->data.named_comp.DeviceName, devname) == NULL)
 			continue;
-
-		/* For debug purposes only! */
-		printf("%s: Named node found: %s\n", __func__,
-		    node->data.named_comp.DeviceName);
-
 		out_node = iort_entry_lookup(node, rid, &nxtid);
-		if (out_node != NULL) {
-			/* For debug purposes only! */
-			printf("%s: Out node found\n", __func__);
+		if (out_node != NULL)
 			break;
-		}
 	}
 
 	/* Could not find a named node with this devname. */
