@@ -228,9 +228,6 @@ dpaa2_rc_get_id(device_t dev, device_t child, enum pci_id_type type,
 {
 	struct dpaa2_devinfo *dinfo;
 
-	/* For debug purposes only! */
-	device_printf(dev, "%s: called\n", __func__);
-
 	dinfo = device_get_ivars(dev);
 	if (dinfo->dtype == DPAA2_DEV_MC)
 		return (PCIB_GET_ID(dev, child, type, id));
