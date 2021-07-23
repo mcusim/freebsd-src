@@ -111,13 +111,6 @@ dpaa2_mc_acpi_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	return (dpaa2_mc_get_id(mcdev, child, type, id));
 }
 
-static int
-dpaa2_mc_acpi_pci_get_id(device_t mcdev, device_t child, enum pci_id_type type,
-    uintptr_t *id)
-{
-	return (dpaa2_mc_get_id(mcdev, child, type, id));
-}
-
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
@@ -129,9 +122,6 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 	DEVMETHOD(pcib_release_msi,	dpaa2_mc_acpi_release_msi),
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
 	DEVMETHOD(pcib_get_id,		dpaa2_mc_acpi_get_id),
-
-	/* Pseudo-PCI interface */
-	DEVMETHOD(pci_get_id,		dpaa2_mc_acpi_pci_get_id),
 
 	DEVMETHOD_END
 };
