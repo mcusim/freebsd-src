@@ -227,28 +227,17 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 
-	/* For debug purposes only! */
-	device_printf(mcdev, "%s: called\n", __func__);
-
 	mcinfo = device_get_ivars(mcdev);
 	dinfo = device_get_ivars(child);
 
-	if (mcinfo->dtype != DPAA2_DEV_MC) {
-		/* For debug purposes only! */
-		device_printf(mcdev, "not dpaa2_mc device\n");
+	if (mcinfo->dtype != DPAA2_DEV_MC)
 		return (1);
-	}
 
-	if (type == PCI_ID_MSI) {
-		/* For debug purposes only! */
-		device_printf(mcdev, "%s: mapping to MSI ID\n", __func__);
+	if (type == PCI_ID_MSI)
 		return (dpaa2_mc_map_id(mcdev, child, id));
-	} else {
-		/* For debug purposes only! */
-		device_printf(mcdev, "%s: returning ICID\n", __func__);
-		*id = dinfo->icid;
-		return (0);
-	}
+
+	*id = dinfo->icid;
+	return (0);
 }
 
 static u_int
@@ -260,19 +249,10 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 
 	dinfo = device_get_ivars(child);
 	if (dinfo) {
-		/* For debug purposes only! */
-		device_printf(mcdev, "Mapping named node (MCE0) with rid=%d to "
-		    "MSI\n", dinfo->icid);
-
 		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
 		    &devid);
-		if (error) {
-			/* For debug purposes only! */
-			device_printf(mcdev, "Failed to map named IORT node to "
-			    "MSI: %d\n", error);
-
+		if (error)
 			return (0);
-		}
 		return (xref);
 	}
 	return (0);
@@ -287,22 +267,15 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 
 	dinfo = device_get_ivars(child);
 	if (dinfo) {
-		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
+		error = acpi_iort_map_named_msi("MCE", dinfo->icid, &xref,
 		    &devid);
-		if (error == 0) {
-			/* For debug purposes only! */
-			device_printf(mcdev, "%s: found devid=%d\n", __func__,
-			    devid);
+		if (error == 0)
 			*id = devid;
-		} else {
-			/* For debug purposes only! */
-			device_printf(mcdev, "%s: no devid\n", __func__);
-			*id = dinfo->icid; /* RID not in IORT, likely FW bug, ignore */
-		}
+		else
+			*id = dinfo->icid; /* RID not in IORT, likely FW bug */
+
 		return (0);
 	}
-	/* For debug purposes only! */
-	device_printf(mcdev, "%s: no devinfo!\n", __func__);
 	return (1);
 }
 
