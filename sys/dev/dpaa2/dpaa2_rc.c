@@ -273,7 +273,7 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 {
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
-	int actual, i, run, irqs[32];
+	int error, actual, i, run, irqs[32];
 
 	/* Don't let count == 0 get us into trouble. */
 	if (*count == 0)
@@ -376,7 +376,7 @@ dpaa2_rc_release_msi(device_t rcdev, device_t child)
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 	struct resource_list_entry *rle;
-	int error, i, irqs[32];
+	int i, irqs[32];
 
 	/* MSI should be released by the resource container. */
 	if (rcinfo->dtype != DPAA2_DEV_RC)
