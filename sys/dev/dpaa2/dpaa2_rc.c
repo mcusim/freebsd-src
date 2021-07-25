@@ -57,10 +57,12 @@ MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
 /* Forward declarations. */
 static int dpaa2_rc_detach(device_t dev);
+static void dpaa2_rc_add_child(device_t rcdev, struct dpaa2_devinfo *dinfo);
 
 /*
  * Device interface.
  */
+
 static int
 dpaa2_rc_probe(device_t dev)
 {
@@ -189,15 +191,16 @@ dpaa2_rc_attach(device_t dev)
 	 * Ask MC bus to allocate MSI for this DPRC using its pseudo-pcib
 	 * interface.
 	 */
-	error = PCIB_ALLOC_MSI(device_get_parent(dev), dev, 1, 1, irqs);
-	if (error) {
-		device_printf(dev, "Failed to allocate MSI for DPRC: "
-		    "error=%u\n", error);
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-	device_printf(dev, "MSI allocated: irq=%d\n", irqs[0]);
+
+	/* error = PCIB_ALLOC_MSI(device_get_parent(dev), dev, 1, 1, irqs); */
+	/* if (error) { */
+	/* 	device_printf(dev, "Failed to allocate MSI for DPRC: " */
+	/* 	    "error=%u\n", error); */
+	/* 	dpaa2_mcp_free_command(cmd); */
+	/* 	dpaa2_rc_detach(dev); */
+	/* 	return (ENXIO); */
+	/* } */
+	/* device_printf(dev, "MSI allocated: irq=%d\n", irqs[0]); */
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
 	dpaa2_mcp_free_command(cmd);
@@ -222,17 +225,222 @@ dpaa2_rc_detach(device_t dev)
 	return (0);
 }
 
+/*
+ * Bus interface.
+ */
+
 static int
-dpaa2_rc_get_id(device_t dev, device_t child, enum pci_id_type type,
+dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
+    int flags, driver_filter_t *filter, driver_intr_t *intr, void *arg,
+    void **cookiep)
+{
+	return (ENODEV);
+}
+
+static int
+dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
+    void *cookie)
+{
+	return (ENODEV);
+}
+
+struct resource *
+dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
+    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
+{
+	return (NULL);
+}
+
+static int
+dpaa2_rc_release_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r)
+{
+	return (ENODEV);
+}
+
+/*
+ * Pseudo-PCI interface.
+ */
+
+/*
+ * Attempt to allocate *count MSI messages. The actual number allocated is
+ * returned in *count. After this function returns, each message will be
+ * available to the driver as SYS_RES_IRQ resources starting at a rid 1.
+ *
+ * NOTE: Implementation is similar to sys/dev/pci/pci.c.
+ */
+static int
+dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
+{
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	struct resource_list_entry *rle;
+	int actual, error, i, run, irqs[32];
+
+	/* Don't let count == 0 get us into trouble. */
+	if (*count == 0)
+		return (EINVAL);
+
+	/* MSI should be allocated by the resource container. */
+	if (rcinfo->dtype != DPAA2_DEV_RC)
+		return (ENODEV);
+
+	/* Already have allocated messages? */
+	if (dinfo->msi.msi_alloc != 0)
+		return (ENXIO);
+
+	if (bootverbose)
+		device_printf(child,
+		    "attempting to allocate %d MSI vectors (%d supported)\n",
+		    *count, dinfo->msi.msi_msgnum);
+
+	/* Don't ask for more than the device supports. */
+	actual = min(*count, dinfo->msi.msi_msgnum);
+
+	/* Don't ask for more than 32 messages. */
+	actual = min(actual, 32);
+
+	/* MSI requires power of 2 number of messages. */
+	if (!powerof2(actual))
+		return (EINVAL);
+
+	for (;;) {
+		/* Try to allocate N messages. */
+		error = PCIB_ALLOC_MSI(device_get_parent(rcdev), child, actual,
+		    actual, irqs);
+		if (error == 0)
+			break;
+		if (actual == 1)
+			return (error);
+
+		/* Try N / 2. */
+		actual >>= 1;
+	}
+
+	/*
+	 * We now have N actual messages mapped onto SYS_RES_IRQ resources in
+	 * the irqs[] array, so add new resources starting at rid 1.
+	 */
+	for (i = 0; i < actual; i++)
+		resource_list_add(&dinfo->resources, SYS_RES_IRQ, i + 1,
+		    irqs[i], irqs[i], 1);
+
+	if (bootverbose) {
+		if (actual == 1)
+			device_printf(child, "using IRQ %d for MSI\n", irqs[0]);
+		else {
+			/*
+			 * Be fancy and try to print contiguous runs
+			 * of IRQ values as ranges.  'run' is true if
+			 * we are in a range.
+			 */
+			device_printf(child, "using IRQs %d", irqs[0]);
+			run = 0;
+			for (i = 1; i < actual; i++) {
+				/* Still in a run? */
+				if (irqs[i] == irqs[i - 1] + 1) {
+					run = 1;
+					continue;
+				}
+
+				/* Finish previous range. */
+				if (run) {
+					printf("-%d", irqs[i - 1]);
+					run = 0;
+				}
+
+				/* Start new range. */
+				printf(",%d", irqs[i]);
+			}
+
+			/* Unfinished range? */
+			if (run)
+				printf("-%d", irqs[actual - 1]);
+			printf(" for MSI\n");
+		}
+	}
+
+	/* Update counts of alloc'd messages. */
+	dinfo->msi.msi_alloc = actual;
+	dinfo->msi.msi_handlers = 0;
+	*count = actual;
+	return (0);
+}
+
+/*
+ * Release the MSI messages associated with this DPAA2 device.
+ *
+ * NOTE: Implementation is similar to sys/dev/pci/pci.c.
+ */
+static int
+dpaa2_rc_release_msi(device_t rcdev, device_t child)
+{
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	struct resource_list_entry *rle;
+	int error, i, irqs[32];
+
+	/* MSI should be released by the resource container. */
+	if (rcinfo->dtype != DPAA2_DEV_RC)
+		return (ENODEV);
+
+	/* Do we have any messages to release? */
+	if (dinfo->msi.msi_alloc == 0)
+		return (ENODEV);
+	KASSERT(dinfo->msi.msi_alloc <= 32,
+	    ("more than 32 alloc'd MSI messages"));
+
+	/* Make sure none of the resources are allocated. */
+	if (dinfo->msi.msi_handlers > 0)
+		return (EBUSY);
+	for (i = 0; i < dinfo->msi.msi_alloc; i++) {
+		rle = resource_list_find(&dinfo->resources, SYS_RES_IRQ, i + 1);
+		KASSERT(rle != NULL, ("missing MSI resource"));
+		if (rle->res != NULL)
+			return (EBUSY);
+		irqs[i] = rle->start;
+	}
+
+	/* Release the messages. */
+	PCIB_RELEASE_MSI(device_get_parent(rcdev), child, dinfo->msi.msi_alloc,
+	    irqs);
+	for (i = 0; i < dinfo->msi.msi_alloc; i++)
+		resource_list_delete(&dinfo->resources, SYS_RES_IRQ, i + 1);
+
+	/* Update alloc count. */
+	dinfo->msi.msi_alloc = 0;
+	return (0);
+}
+
+/*
+ * Return the max supported MSI messages this DPAA2 device supports.
+ * Basically, assuming the MD code can alloc messages, this function
+ * should return the maximum value that pci_alloc_msi() can return.
+ */
+static int
+dpaa2_rc_msi_count(device_t rcdev, device_t child)
+{
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+
+	return (dinfo->msi.msi_msgnum);
+}
+
+static int
+dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
     uintptr_t *id)
 {
-	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 
-	dinfo = device_get_ivars(dev);
-	if (dinfo->dtype == DPAA2_DEV_MC)
-		return (PCIB_GET_ID(dev, child, type, id));
-	else
-		return (PCIB_GET_ID(device_get_parent(dev), child, type, id));
+	if (rcinfo->dtype != DPAA2_DEV_RC)
+		return (ENXIO);
+
+	return (PCIB_GET_ID(device_get_parent(rcdev), child, type, id));
+}
+
+static void
+dpaa2_rc_add_child(device_t rcdev, struct dpaa2_devinfo *dinfo)
+{
+	return;
 }
 
 static device_method_t dpaa2_rc_methods[] = {
@@ -241,7 +449,16 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(device_attach,	dpaa2_rc_attach),
 	DEVMETHOD(device_detach,	dpaa2_rc_detach),
 
+	/* Bus interface */
+	/* DEVMETHOD(bus_setup_intr,	dpaa2_rc_setup_intr), */
+	/* DEVMETHOD(bus_teardown_intr,	dpaa2_rc_teardown_intr), */
+	/* DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource), */
+	/* DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource), */
+
 	/* Pseudo-PCI interface */
+	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
+	DEVMETHOD(pci_release_msi,	dpaa2_rc_release_msi),
+	DEVMETHOD(pci_msi_count,	dpaa2_rc_msi_count),
 	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id),
 
 	DEVMETHOD_END

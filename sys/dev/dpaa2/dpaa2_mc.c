@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
 #define	mcreg_write_4(_sc, _r, _v)	bus_write_4(&(_sc)->map[1], (_r), (_v))
 
+#define IORT_DEVICE_NAME		"MCE"
+
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex memory");
 
 static struct resource_spec dpaa2_mc_spec[] = {
@@ -74,6 +76,10 @@ static struct resource_spec dpaa2_mc_spec[] = {
 /* Forward declarations. */
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
+
+/*
+ * For device interface.
+ */
 
 int
 dpaa2_mc_attach(device_t dev)
@@ -131,7 +137,7 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Allocate device info to keep information about MC bus. */
+	/* Allocate devinfo to keep information about the MC bus itself. */
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
@@ -185,6 +191,10 @@ dpaa2_mc_detach(device_t dev)
 	return (device_delete_children(dev));
 }
 
+/*
+ * For pseudo-pcib interface.
+ */
+
 int
 dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
@@ -231,7 +241,7 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	dinfo = device_get_ivars(child);
 
 	if (mcinfo->dtype != DPAA2_DEV_MC)
-		return (1);
+		return (ENXIO);
 
 	if (type == PCI_ID_MSI)
 		return (dpaa2_mc_map_id(mcdev, child, id));
@@ -267,8 +277,15 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 
 	dinfo = device_get_ivars(child);
 	if (dinfo) {
-		error = acpi_iort_map_named_msi("MCE", dinfo->icid, &xref,
-		    &devid);
+		/*
+		 * The first named components from IORT table with the given
+		 * name (as a substring) will be used.
+		 *
+		 * TODO: Find a way to form a device name based on "mcdev", i.e.
+		 *       dpaa2_mcX -> MCEx.
+		 */
+		error = acpi_iort_map_named_msi(IORT_DEVICE_NAME, dinfo->icid,
+		    &xref, &devid);
 		if (error == 0)
 			*id = devid;
 		else
@@ -276,7 +293,7 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 
 		return (0);
 	}
-	return (1);
+	return (ENXIO);
 }
 
 static device_method_t dpaa2_mc_methods[] = {

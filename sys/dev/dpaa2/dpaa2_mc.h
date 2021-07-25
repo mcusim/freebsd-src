@@ -39,8 +39,8 @@
 
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */
-	DPAA2_DEV_RC,		/* Resource Container */
-	DPAA2_DEV_IO,		/* I/O */
+	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
+	DPAA2_DEV_IO,		/* I/O object (to work with QBMAN portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
 	DPAA2_DEV_MCP		/* Management Complex Portal */
 };
@@ -74,22 +74,45 @@ struct dpaa2_rc_softc {
 };
 
 /*
- * Information about a child device attached to MC or DPRC.
+ * Information about MSI messages supported by the DPAA2 object.
+ *
+ * msi_msgnum: Number of MSI messages supported by the DPAA2 object.
+ * msi_alloc: Number of MSI messages allocated for the DPAA2 object.
+ * msi_handlers: Number of MSI message handlers configured.
+ */
+struct dpaa2_msinfo {
+	uint8_t			 msi_msgnum;
+	uint8_t			 msi_alloc;
+	uint32_t		 msi_handlers;
+};
+
+/*
+ * Information about DPAA2 device.
+ *
+ * pdev: Parent device.
+ * dev: Devinfo is associated with this device.
+ * icid: Isolation context ID of the DPAA2 object. It is shared between a
+ *       resource container and all of its children.
+ * dtype: Type of the DPAA2 object.
+ * resources: Resources allocated for this DPAA2 device.
+ * msi: Information about MSI messages supported by the DPAA2 object.
  */
 struct dpaa2_devinfo {
 	device_t		 pdev;
 	device_t		 dev;
 	uint16_t		 icid;
 	enum dpaa2_dev_type	 dtype;
+	struct resource_list	 resources;
+	struct dpaa2_msinfo	 msi;
 };
 
 DECLARE_CLASS(dpaa2_mc_driver);
 
-/* for device interface */
+/* For device interface */
 int dpaa2_mc_attach(device_t dev);
 int dpaa2_mc_detach(device_t dev);
 
-/* for pseudo-pcib interface */
+/* For pseudo-pcib interface */
 int dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs);
 int dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs);
