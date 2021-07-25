@@ -86,7 +86,6 @@ dpaa2_rc_attach(device_t dev)
 	uint32_t major, minor, rev;
 	uint32_t cont_id, obj_count;
 	uint16_t rc_token;
-	int irqs[1];
 	int error;
 
 	sc = device_get_softc(dev);
@@ -244,7 +243,7 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 	return (ENODEV);
 }
 
-struct resource *
+static struct resource *
 dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
     rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
 {
@@ -274,8 +273,7 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 {
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
-	struct resource_list_entry *rle;
-	int actual, error, i, run, irqs[32];
+	int actual, i, run, irqs[32];
 
 	/* Don't let count == 0 get us into trouble. */
 	if (*count == 0)
