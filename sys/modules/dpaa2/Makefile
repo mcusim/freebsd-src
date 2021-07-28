@@ -8,7 +8,8 @@ SRCS=	bus_if.h \
 	opt_platform.h \
 	dpaa2_mc.c \
 	dpaa2_rc.c \
-	dpaa2_mcp.c
+	dpaa2_mcp.c \
+	dpaa2_io.c
 
 .if ${MACHINE_CPUARCH} == "aarch64" || \
     ${MACHINE_CPUARCH} == "amd64" || \

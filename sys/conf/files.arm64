@@ -318,6 +318,7 @@ dev/vnic/lmac_if.m				optional inet | inet6 | vnic
 dev/dpaa2/dpaa2_mc.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_rc.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_mcp.c				optional SOC_NXP_LS
+dev/dpaa2/dpaa2_io.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_mc_acpi.c			optional SOC_NXP_LS acpi
 #dev/dpaa2/dpaa2_mc_fdt.c			optional SOC_NXP_LS fdt
 
