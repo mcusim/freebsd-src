@@ -40,7 +40,7 @@
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */
 	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
-	DPAA2_DEV_IO,		/* I/O object (to work with QBMAN portal) */
+	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
 	DPAA2_DEV_MCP		/* Management Complex Portal */
 };
@@ -66,11 +66,20 @@ struct dpaa2_mc_softc {
  * dev: Device associated with this software context.
  * portal: Helper object to send commands to the MC portal.
  * unit: Helps to distinguish between root (0) and child DRPCs.
+ * cont_id: Container ID.
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
 	dpaa2_mcp_t		 portal;
 	int			 unit;
+	uint32_t		 cont_id;
+};
+
+/*
+ * Software context for the DPAA2 I/O driver.
+ */
+struct dpaa2_io_softc {
+	device_t		 dev;
 };
 
 /*
@@ -120,6 +129,5 @@ int dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
     uint32_t *data);
 int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
-
 
 #endif /* _DPAA2_MC_H */
