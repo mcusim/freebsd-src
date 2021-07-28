@@ -155,7 +155,7 @@ dpaa2_rc_detach(device_t dev)
  * Bus interface.
  */
 
-struct resource_list *
+static struct resource_list *
 dpaa2_rc_get_resource_list(device_t rcdev, device_t child)
 {
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
