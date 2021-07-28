@@ -57,7 +57,9 @@ MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
 /* Forward declarations. */
 static int dpaa2_rc_detach(device_t dev);
-static void dpaa2_rc_add_child(device_t rcdev, struct dpaa2_devinfo *dinfo);
+static int dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc);
+static int dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+    const dpaa2_obj_t *obj);
 
 /*
  * Device interface.
@@ -66,10 +68,7 @@ static void dpaa2_rc_add_child(device_t rcdev, struct dpaa2_devinfo *dinfo);
 static int
 dpaa2_rc_probe(device_t dev)
 {
-	/*
-	 * Do not perform any checks. DPRC device will be added by a parent DPRC
-	 * or by MC itself.
-	 */
+	/* DPRC device will be added by a parent DPRC or by MC bus itself. */
 	device_set_desc(dev, "DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
 }
@@ -81,11 +80,6 @@ dpaa2_rc_attach(device_t dev)
 	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_rc_softc *sc;
 	struct dpaa2_devinfo *dinfo = NULL;
-	dpaa2_cmd_t cmd;
-	dpaa2_rc_attr_t dprc_attr;
-	uint32_t major, minor, rev;
-	uint32_t cont_id, obj_count;
-	uint16_t rc_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -118,7 +112,8 @@ dpaa2_rc_attach(device_t dev)
 		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF);
 		if (error) {
-			device_printf(dev, "Failed to allocate dpaa2_mcp\n");
+			device_printf(dev, "Failed to allocate dpaa2_mcp: "
+			    "error=%d\n", error);
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
 		}
@@ -127,82 +122,14 @@ dpaa2_rc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	/* Create DPAA2 devices for objects in this container. */
+	error = dpaa2_rc_discover_objects(sc);
 	if (error) {
-		device_printf(dev, "Failed to allocate dpaa2_cmd\n");
+		device_printf(dev, "Failed to discover objects in container: "
+		    "error=%d\n", error);
 		dpaa2_rc_detach(dev);
 		return (ENXIO);
 	}
-
-	/*
-	 * Print info about MC and DPAA2 objects.
-	 */
-
-	error = dpaa2_cmd_mng_get_version(sc->portal, cmd, &major, &minor, &rev);
-	if (error) {
-		device_printf(dev, "Failed to get MC firmware version\n");
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-	device_printf(dev, "MC firmware version: %u.%u.%u\n", major, minor, rev);
-
-	error = dpaa2_cmd_mng_get_container_id(sc->portal, cmd, &cont_id);
-	if (error) {	
-		device_printf(dev, "Failed to get container ID\n");
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-	device_printf(dev, "Resource container ID: %u\n", cont_id);
-
-	error = dpaa2_cmd_rc_open(sc->portal, cmd, cont_id, &rc_token);
-	if (error) {
-		device_printf(dev, "Failed to open container: ID=%u\n", cont_id);
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-
-	error = dpaa2_cmd_rc_get_obj_count(sc->portal, cmd, &obj_count);
-	if (error) {
-		device_printf(dev, "Failed to count objects in container: "
-		    "ID=%u\n", cont_id);
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-	device_printf(dev, "Objects in container: %u\n", obj_count);
-
-	error = dpaa2_cmd_rc_get_attributes(sc->portal, cmd, &dprc_attr);
-	if (error) {
-		device_printf(dev, "Failed to get attributes of the container: "
-		    "ID=%u\n", cont_id);
-		dpaa2_mcp_free_command(cmd);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
-	}
-	device_printf(dev, "ICID: %u\n", dprc_attr.icid);
-	if (dinfo)
-		dinfo->icid = dprc_attr.icid;
-
-	/*
-	 * Ask MC bus to allocate MSI for this DPRC using its pseudo-pcib
-	 * interface.
-	 */
-
-	/* error = PCIB_ALLOC_MSI(device_get_parent(dev), dev, 1, 1, irqs); */
-	/* if (error) { */
-	/* 	device_printf(dev, "Failed to allocate MSI for DPRC: " */
-	/* 	    "error=%u\n", error); */
-	/* 	dpaa2_mcp_free_command(cmd); */
-	/* 	dpaa2_rc_detach(dev); */
-	/* 	return (ENXIO); */
-	/* } */
-	/* device_printf(dev, "MSI allocated: irq=%d\n", irqs[0]); */
-
-	dpaa2_cmd_rc_close(sc->portal, cmd);
-	dpaa2_mcp_free_command(cmd);
 
 	return (0);
 }
@@ -228,33 +155,12 @@ dpaa2_rc_detach(device_t dev)
  * Bus interface.
  */
 
-static int
-dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
-    int flags, driver_filter_t *filter, driver_intr_t *intr, void *arg,
-    void **cookiep)
+struct resource_list *
+dpaa2_rc_get_resource_list(device_t rcdev, device_t child)
 {
-	return (ENODEV);
-}
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 
-static int
-dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
-    void *cookie)
-{
-	return (ENODEV);
-}
-
-static struct resource *
-dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
-    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
-{
-	return (NULL);
-}
-
-static int
-dpaa2_rc_release_resource(device_t rcdev, device_t child, int type, int rid,
-    struct resource *r)
-{
-	return (ENODEV);
+	return (&dinfo->resources);
 }
 
 /*
@@ -410,10 +316,8 @@ dpaa2_rc_release_msi(device_t rcdev, device_t child)
 	return (0);
 }
 
-/*
- * Return the max supported MSI messages this DPAA2 device supports.
- * Basically, assuming the MD code can alloc messages, this function
- * should return the maximum value that pci_alloc_msi() can return.
+/**
+ * @brief Return the maximum number of the MSI supported by this DPAA2 device.
  */
 static int
 dpaa2_rc_msi_count(device_t rcdev, device_t child)
@@ -430,15 +334,159 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 
 	if (rcinfo->dtype != DPAA2_DEV_RC)
-		return (ENXIO);
+		return (ENODEV);
 
 	return (PCIB_GET_ID(device_get_parent(rcdev), child, type, id));
 }
 
-static void
-dpaa2_rc_add_child(device_t rcdev, struct dpaa2_devinfo *dinfo)
+/**
+ * @internal
+ * @brief Create and add devices for DPAA2 objects in this resource container.
+ */
+static int
+dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 {
-	return;
+	device_t rcdev = sc->dev;
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	dpaa2_cmd_t cmd = NULL;
+	dpaa2_rc_attr_t dprc_attr;
+	dpaa2_obj_t obj;
+	uint32_t major, minor, rev, obj_count;
+	uint16_t rc_token;
+	int rc;
+
+	/* Allocate a command to send to MC hardware. */
+	rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (rc) {
+		device_printf(rcdev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    rc);
+		return (ENXIO);
+	}
+
+	/* Print MC firmware version. */
+	rc = dpaa2_cmd_mng_get_version(sc->portal, cmd, &major, &minor, &rev);
+	if (rc) {
+		device_printf(rcdev, "Failed to get MC firmware version: "
+		    "error=%d\n", rc);
+		dpaa2_mcp_free_command(cmd);
+		return (ENXIO);
+	}
+	device_printf(rcdev, "MC firmware version: %u.%u.%u\n", major, minor,
+	    rev);
+
+	/* Obtain container ID associated with a given MC portal. */
+	rc = dpaa2_cmd_mng_get_container_id(sc->portal, cmd, &sc->cont_id);
+	if (rc) {
+		device_printf(rcdev, "Failed to get container ID: error=%d\n",
+		    rc);
+		dpaa2_mcp_free_command(cmd);
+		return (ENXIO);
+	}
+	if (bootverbose)
+		device_printf(rcdev, "Resource container ID: %u\n", sc->cont_id);
+
+	/* Open the resource container. */
+	rc = dpaa2_cmd_rc_open(sc->portal, cmd, sc->cont_id, &rc_token);
+	if (rc) {
+		device_printf(rcdev, "Failed to open container ID=%u: "
+		    "error=%d\n", sc->cont_id, rc);
+		dpaa2_mcp_free_command(cmd);
+		return (ENXIO);
+	}
+
+	/* Obtain a number of objects in this container. */
+	rc = dpaa2_cmd_rc_get_obj_count(sc->portal, cmd, &obj_count);
+	if (rc) {
+		device_printf(rcdev, "Failed to count objects in container "
+		    "ID=%u: error=%d\n", sc->cont_id, rc);
+		dpaa2_mcp_free_command(cmd);
+		return (ENXIO);
+	}
+	if (bootverbose)
+		device_printf(rcdev, "Objects in container: %u\n", obj_count);
+
+	/* Obtain container attributes (including ICID). */
+	rc = dpaa2_cmd_rc_get_attributes(sc->portal, cmd, &dprc_attr);
+	if (rc) {
+		device_printf(rcdev, "Failed to get attributes of the "
+		    "container ID=%u: error=%d\n", sc->cont_id, rc);
+		dpaa2_mcp_free_command(cmd);
+		return (ENXIO);
+	}
+	if (bootverbose)
+		device_printf(rcdev, "ICID: %u\n", dprc_attr.icid);
+	if (rcinfo)
+		rcinfo->icid = dprc_attr.icid;
+
+	/* Add devices to the resource container. */
+	for (uint32_t i = 0; i < obj_count; i++) {
+		rc = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, &obj);
+		if (rc) {
+			device_printf(rcdev, "Failed to get object: index=%u, "
+			    "error=%d\n", i, rc);
+			continue;
+		}
+		dpaa2_rc_add_child(sc, cmd, &obj);
+	}
+	bus_generic_probe(rcdev);
+	bus_generic_attach(rcdev);
+
+	dpaa2_cmd_rc_close(sc->portal, cmd);
+	dpaa2_mcp_free_command(cmd);
+
+	return (rc);
+}
+
+/**
+ * @internal
+ * @brief Add a new DPAA2 device to the resource container bus.
+ */
+static int
+dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+    const dpaa2_obj_t *obj)
+{
+	device_t rcdev = sc->dev;
+	device_t dev;
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_devinfo *dinfo;
+
+	/* Add a device if it is DPIO. */
+	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
+		dev = device_add_child(rcdev, "dpaa2_io", obj->id);
+		if (dev == NULL) {
+			device_printf(rcdev, "Failed to add a child device: "
+			    "type=%s, id=%u\n", (const char *)obj->type,
+			    obj->id);
+			return (ENXIO);
+		}
+
+		/* Allocate devinfo for a child device. */
+		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
+		    M_WAITOK | M_ZERO);
+		if (!dinfo) {
+			device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
+			    "for: type=%s, id=%u\n", (const char *)obj->type,
+			    obj->id);
+			return (ENXIO);
+		}
+		device_set_ivars(dev, dinfo);
+		dinfo->pdev = rcdev;
+		dinfo->dev = dev;
+		dinfo->dtype = DPAA2_DEV_IO;
+
+		/* Children share their parent container's ICID. */
+		dinfo->icid = rcinfo->icid;
+
+		/* MSI configuration */
+		dinfo->msi.msi_msgnum = obj->irq_count;
+		dinfo->msi.msi_alloc = 0;
+		dinfo->msi.msi_handlers = 0;
+
+		/* Initialize a resource list for this child device. */
+		resource_list_init(&dinfo->resources);
+	}
+
+	return (0);
 }
 
 static device_method_t dpaa2_rc_methods[] = {
@@ -448,10 +496,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(device_detach,	dpaa2_rc_detach),
 
 	/* Bus interface */
-	/* DEVMETHOD(bus_setup_intr,	dpaa2_rc_setup_intr), */
-	/* DEVMETHOD(bus_teardown_intr,	dpaa2_rc_teardown_intr), */
-	/* DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource), */
-	/* DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource), */
+	DEVMETHOD(bus_get_resource_list,dpaa2_rc_get_resource_list),
+	/* DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted), */
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
