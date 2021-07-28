@@ -282,7 +282,7 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 		 * name (as a substring) will be used.
 		 *
 		 * TODO: Find a way to form a device name based on "mcdev", i.e.
-		 *       dpaa2_mcX -> MCEx.
+		 *       dpaa2_mcX -> MCEx?
 		 */
 		error = acpi_iort_map_named_msi(IORT_DEVICE_NAME, dinfo->icid,
 		    &xref, &devid);
