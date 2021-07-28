@@ -62,7 +62,7 @@ __FBSDID("$FreeBSD$");
 
 #define CMD_PARAMS_N		7u
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
-#define CMD_SLEEP_ATTEMPTS	150u	/* max 150 ms */
+#define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
 #define CMD_SPIN_TIMEOUT	10u	/* us */
 #define CMD_SPIN_ATTEMPTS	15u	/* max. 150 us */
 
@@ -193,20 +193,16 @@ int
 dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
     struct resource_map *map, const uint16_t flags)
 {
+	const int mflags = flags & DPAA2_PORTAL_NOWAIT_ALLOC
+	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
 	dpaa2_mcp_t p;
-	int mflags = M_WAITOK | M_ZERO;
 
 	if (!portal || !res || !map)
-		return (1);
-	*portal = NULL;
-
-	/* Prepare malloc flags. */
-	if (flags & DPAA2_PORTAL_NOWAIT_ALLOC)
-		mflags = M_NOWAIT | M_ZERO;
+		return (EINVAL);
 
 	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
 	if (!p)
-		return (1);
+		return (ENOMEM);
 
 	p->res = res;
 	p->map = map;
@@ -221,7 +217,6 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 		mtx_init(&p->lock, "MC portal sleep lock", NULL, MTX_DEF);
 		cv_init(&p->cv, "MC portal cv");
 	}
-
 	*portal = p;
 
 	return (0);
@@ -259,21 +254,17 @@ dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 int
 dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 {
+	const int mflags = flags & DPAA2_CMD_NOWAIT_ALLOC
+	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
 	dpaa2_cmd_t c;
 	struct dpaa2_cmd_header *hdr;
-	int mflags = M_WAITOK | M_ZERO;
 
 	if (!cmd)
-		return (1);
-	*cmd = NULL;
-
-	/* Prepare malloc flags. */
-	if (flags & DPAA2_CMD_NOWAIT_ALLOC)
-		mflags = M_NOWAIT | M_ZERO;
+		return (EINVAL);
 
 	c = malloc(sizeof(struct dpaa2_cmd), M_DPAA2_MCP, mflags);
 	if (!c)
-		return (1);
+		return (ENOMEM);
 
 	hdr = (struct dpaa2_cmd_header *) &c->header;
 	hdr->srcid = 0;
@@ -282,15 +273,12 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 	hdr->cmdid = 0;
 	hdr->flags_hw = DPAA2_CMD_DEF;
 	hdr->flags_sw = DPAA2_CMD_DEF;
-
 	if (flags & DPAA2_CMD_HIGH_PRIO)
 		hdr->flags_hw |= HW_FLAG_HIGH_PRIO;
 	if (flags & DPAA2_CMD_INTR_DIS)
 		hdr->flags_sw |= SW_FLAG_INTR_DIS;
-
 	for (uint32_t i = 0; i < CMD_PARAMS_N; i++)
 		c->params[i] = 0;
-
 	*cmd = c;
 
 	return (0);
@@ -555,7 +543,7 @@ exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
 	if (!portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
-	/* Prepare command for the MC hardware. */
+	/* Prepare a command for the MC hardware. */
 	hdr = (struct dpaa2_cmd_header *) &cmd->header;
 	hdr->cmdid = cmdid;
 	hdr->status = DPAA2_CMD_STAT_READY;
@@ -567,7 +555,7 @@ exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
 		return (DPAA2_CMD_STAT_INVALID_STATE);
 	}
 
-	/* Send command to MC and wait for the result. */
+	/* Send a command to MC and wait for the result. */
 	send_command(portal, cmd);
 	error = wait_for_command(portal, cmd);
 	if (error) {
@@ -628,7 +616,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 
 	/* Return an error on expired timeout. */
 	if (i > attempts)
-		return (1);
+		return (DPAA2_CMD_STAT_TIMEOUT);
 
-	return (0);
+	return (DPAA2_CMD_STAT_OK);
 }
