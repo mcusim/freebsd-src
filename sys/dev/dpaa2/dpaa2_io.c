@@ -39,6 +39,17 @@ __FBSDID("$FreeBSD$");
  * release and acquire operations – using QBMan.
  */
 
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/bus.h>
+#include <sys/rman.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
+
+#include "dpaa2_mcp.h"
+#include "dpaa2_mc.h"
+
 /*
  * Device interface.
  */
