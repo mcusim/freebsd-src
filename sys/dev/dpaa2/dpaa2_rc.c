@@ -227,7 +227,7 @@ dpaa2_rc_child_detached(device_t rcdev, device_t child)
 	if (dinfo->msi.msi_alloc != 0) {
 		device_printf(child, "Leaked %d MSI vectors!\n",
 		    dinfo->msi.msi_alloc);
-		(void)pci_release_msi(child);
+		PCI_RELEASE_MSI(rcdev, child);
 	}
 	if (resource_list_release_active(rl, rcdev, child, SYS_RES_MEMORY) != 0)
 		device_printf(child, "Leaked memory resources!\n");
