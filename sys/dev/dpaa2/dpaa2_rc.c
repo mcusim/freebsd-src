@@ -208,7 +208,7 @@ dpaa2_rc_child_deleted(device_t rcdev, device_t child)
 		free(dinfo, M_DPAA2_RC);
 }
 
-void
+static void
 dpaa2_rc_child_detached(device_t rcdev, device_t child)
 {
 	struct dpaa2_devinfo *dinfo;
