@@ -57,9 +57,17 @@
 #define DPAA2_CMD_STAT_INVALID_STATE	0xC	/* Invalid state */
 #define DPAA2_CMD_STAT_ERR		0xFF	/* General error */
 
+/* Object's memory region flags. */
+#define DPAA2_RC_REG_CACHEABLE		0x1	/* Cacheable memory mapping */
+
 /*
  * Public types.
  */
+
+enum dpaa2_rc_region_type {
+	DPAA2_RC_REG_MC_PORTAL		= 0,
+	DPAA2_RC_REG_QBMAN_PORTAL	= 1
+};
 
 /**
  * @brief Information about DPAA2 object.
@@ -86,7 +94,7 @@ typedef struct {
 	uint8_t		label[16];
 } dpaa2_obj_t;
 
-/*
+/**
  * @brief Attributes of the DPRC object.
  *
  * cont_id: Container's ID.
@@ -100,6 +108,23 @@ typedef struct {
 	uint32_t	options;
 	uint16_t	icid;
 } dpaa2_rc_attr_t;
+
+/**
+ * @brief Description of the object's memory region.
+ *
+ * base_paddr: Region base physical address.
+ * base_offset: Region base offset.
+ * size: Region size (in bytes).
+ * flags: Region flags (cacheable, etc.)
+ * type: Type of a software portal this region belongs to.
+ */
+typedef struct {
+	uint64_t	base_paddr;
+	uint64_t	base_offset;
+	uint32_t	size;
+	uint32_t	flags;
+	enum dpaa2_rc_region_type type;
+} dpaa2_rc_obj_region_t;
 
 /*
  * Opaque pointers.
@@ -142,6 +167,9 @@ int	dpaa2_cmd_rc_get_obj_descriptor(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    uint32_t obj_id, const char *type, dpaa2_obj_t *obj);
 int	dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    dpaa2_rc_attr_t *attr);
+int	dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    uint32_t obj_id, uint8_t reg_idx, const char *type,
+	    dpaa2_rc_obj_region_t *reg);
 
 /*
  * Data Path Network Interface (DPNI) commands.
