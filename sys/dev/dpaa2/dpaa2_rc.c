@@ -88,12 +88,19 @@ dpaa2_rc_attach(device_t dev)
 	sc->unit = device_get_unit(dev);
 
 	if (sc->unit == 0) {
-		/* Root DPRC attached directly to the MC bus. */
+		/* Root DPRC should be attached directly to the MC bus. */
 		pdev = device_get_parent(dev);
 		mcsc = device_get_softc(pdev);
+		dinfo = device_get_ivars(pdev);
+		if (dinfo && dinfo->dtype != DPAA2_DEV_MC) {
+			device_printf(dev, "Root DPRC attached not to the MC "
+			    "bus: dtype=%d\n", dinfo->dtype);
+			return (ENXIO);
+		}
+		dinfo = NULL;
 
 		/*
-		 * Allocate device info to let the MC bus access ICID of the
+		 * Allocate devinfo to let the parent MC bus access ICID of the
 		 * DPRC object.
 		 */
 		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
@@ -128,7 +135,7 @@ dpaa2_rc_attach(device_t dev)
 		device_printf(dev, "Failed to discover objects in container: "
 		    "error=%d\n", error);
 		dpaa2_rc_detach(dev);
-		return (ENXIO);
+		return (error);
 	}
 
 	return (0);
@@ -139,6 +146,11 @@ dpaa2_rc_detach(device_t dev)
 {
 	struct dpaa2_rc_softc *sc;
 	struct dpaa2_devinfo *dinfo;
+	int error;
+
+	error = bus_generic_detach(dev);
+	if (error)
+		return (error);
 
 	sc = device_get_softc(dev);
 	dinfo = device_get_ivars(dev);
@@ -148,7 +160,7 @@ dpaa2_rc_detach(device_t dev)
 	if (dinfo)
 		free(dinfo, M_DPAA2_RC);
 
-	return (0);
+	return (device_delete_children(dev));
 }
 
 /*
@@ -161,6 +173,39 @@ dpaa2_rc_get_resource_list(device_t rcdev, device_t child)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 
 	return (&dinfo->resources);
+}
+
+static void
+dpaa2_rc_child_deleted(device_t rcdev, device_t child)
+{
+	struct pci_devinfo *dinfo;
+	struct resource_list *rl;
+	struct resource_list_entry *rle;
+
+	dinfo = device_get_ivars(child);
+	rl = &dinfo->resources;
+
+	/* Free all allocated resources */
+	STAILQ_FOREACH(rle, rl, link) {
+		if (rle->res) {
+			if (rman_get_flags(rle->res) & RF_ACTIVE ||
+			    resource_list_busy(rl, rle->type, rle->rid)) {
+				device_printf(child,
+				    "Resource still owned, oops. "
+				    "(type=%d, rid=%d, addr=%lx)\n",
+				    rle->type, rle->rid,
+				    rman_get_start(rle->res));
+				bus_release_resource(child, rle->type, rle->rid,
+				    rle->res);
+			}
+			resource_list_unreserve(rl, rcdev, child, rle->type,
+			    rle->rid);
+		}
+	}
+	resource_list_free(rl);
+
+	if (dinfo)
+		free(dinfo, M_DPAA2_RC);
 }
 
 /*
@@ -399,6 +444,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 	if (rc) {
 		device_printf(rcdev, "Failed to count objects in container "
 		    "ID=%u: error=%d\n", sc->cont_id, rc);
+		dpaa2_cmd_rc_close(sc->portal, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -410,6 +456,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 	if (rc) {
 		device_printf(rcdev, "Failed to get attributes of the "
 		    "container ID=%u: error=%d\n", sc->cont_id, rc);
+		dpaa2_cmd_rc_close(sc->portal, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -428,13 +475,11 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 		}
 		dpaa2_rc_add_child(sc, cmd, &obj);
 	}
-	bus_generic_probe(rcdev);
-	bus_generic_attach(rcdev);
-
 	dpaa2_cmd_rc_close(sc->portal, cmd);
 	dpaa2_mcp_free_command(cmd);
 
-	return (rc);
+	bus_generic_probe(rcdev);
+	return (bus_generic_attach(rcdev));
 }
 
 /**
@@ -497,7 +542,7 @@ static device_method_t dpaa2_rc_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_get_resource_list,dpaa2_rc_get_resource_list),
-	/* DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted), */
+	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
