@@ -738,9 +738,6 @@ pic_lookup_locked(device_t dev, intptr_t xref, int flags)
 		if ((pic->pic_flags & FLAG_TYPE_MASK) !=
 		    (flags & FLAG_TYPE_MASK))
 			continue;
-		/* For debug purposes only! */
-		printf("%s: xref=%ld, pic_xref=%ld\n", __func__, xref,
-		    pic->pic_xref);
 
 		if (dev == NULL) {
 			if (xref == pic->pic_xref)
@@ -1343,13 +1340,8 @@ intr_alloc_msi(device_t pci, device_t child, intptr_t xref, int count,
 	int err, i;
 
 	pic = pic_lookup(NULL, xref, FLAG_MSI);
-	if (pic == NULL) {
-		/* For debug purposes only! */
-		printf("%s: pic_lookup() returned NULL, xref=%ld\n", __func__,
-		    xref);
-
+	if (pic == NULL)
 		return (ESRCH);
-	}
 
 	KASSERT((pic->pic_flags & FLAG_TYPE_MASK) == FLAG_MSI,
 	    ("%s: Found a non-MSI controller: %s", __func__,
