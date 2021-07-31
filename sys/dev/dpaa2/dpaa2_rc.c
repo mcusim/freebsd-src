@@ -178,7 +178,7 @@ dpaa2_rc_get_resource_list(device_t rcdev, device_t child)
 static void
 dpaa2_rc_child_deleted(device_t rcdev, device_t child)
 {
-	struct pci_devinfo *dinfo;
+	struct dpaa2_devinfo *dinfo;
 	struct resource_list *rl;
 	struct resource_list_entry *rle;
 
