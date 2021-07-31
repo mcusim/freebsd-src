@@ -170,8 +170,8 @@ struct __packed dpaa2_obj {
 	uint8_t			 label[16];
 };
 
-/*
- * Helper object which allows to access fields of the DPRC attributes response.
+/**
+ * #brief Helper object to access fields of the DPRC attributes response.
  */
 struct __packed dpaa2_rc_attr {
 	uint32_t		 cont_id;
@@ -498,6 +498,51 @@ dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	attr->portal_id = pattr->portal_id;
 	attr->options = pattr->options;
 	attr->icid = pattr->icid;
+
+	return (rc);
+}
+
+int
+dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint32_t obj_id, uint8_t reg_idx, const char *type,
+    dpaa2_rc_obj_region_t *reg)
+{
+	struct __packed obj_region_args {
+		uint32_t	obj_id;
+		uint16_t	_reserved1;
+		uint8_t		reg_idx;
+		uint8_t		_reserved2;
+		uint64_t	_reserved3;
+		uint64_t	_reserved4;
+		uint8_t		type[16];
+	} *args;
+	struct __packed obj_region {
+		uint64_t	_reserved1;
+		uint64_t	base_offset;
+		uint32_t	size;
+		uint32_t	type;
+		uint32_t	flags;
+		uint32_t	_reserved2;
+		uint64_t	base_paddr;
+	} *resp;
+	int rc;
+
+	if (!portal || !cmd || !type || reg)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct obj_region_args *) &cmd->params[0];
+	args->obj_id = obj_id;
+	args->reg_idx = reg_idx;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	rc = exec_command(portal, cmd, 0x15E3);
+
+	resp = (struct obj_region *) &cmd->params[0];
+	reg->base_paddr = resp->base_paddr;
+	reg->base_offset = resp->base_offset;
+	reg->size = resp->size;
+	reg->flags = resp->flags;
+	reg->type = resp->type & 0xFu;
 
 	return (rc);
 }
