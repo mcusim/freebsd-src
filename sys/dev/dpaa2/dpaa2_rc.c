@@ -208,6 +208,31 @@ dpaa2_rc_child_deleted(device_t rcdev, device_t child)
 		free(dinfo, M_DPAA2_RC);
 }
 
+void
+dpaa2_rc_child_detached(device_t rcdev, device_t child)
+{
+	struct dpaa2_devinfo *dinfo;
+	struct resource_list *rl;
+
+	dinfo = device_get_ivars(child);
+	rl = &dinfo->resources;
+
+	/*
+	 * Have to deallocate IRQs before releasing any MSI messages and
+	 * have to release MSI messages before deallocating any memory
+	 * BARs.
+	 */
+	if (resource_list_release_active(rl, rcdev, child, SYS_RES_IRQ) != 0)
+		device_printf(child, "Leaked IRQ resources!\n");
+	if (dinfo->msi.msi_alloc != 0) {
+		device_printf(child, "Leaked %d MSI vectors!\n",
+		    dinfo->msi.msi_alloc);
+		(void)pci_release_msi(child);
+	}
+	if (resource_list_release_active(rl, rcdev, child, SYS_RES_MEMORY) != 0)
+		device_printf(child, "Leaked memory resources!\n");
+}
+
 /*
  * Pseudo-PCI interface.
  */
@@ -575,6 +600,9 @@ static device_method_t dpaa2_rc_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_get_resource_list,dpaa2_rc_get_resource_list),
 	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
+	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
+	DEVMETHOD(bus_set_resource,	bus_generic_rl_set_resource),
+	DEVMETHOD(bus_get_resource,	bus_generic_rl_get_resource),
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
