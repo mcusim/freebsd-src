@@ -475,6 +475,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 		}
 		dpaa2_rc_add_child(sc, cmd, &obj);
 	}
+
 	dpaa2_cmd_rc_close(sc->portal, cmd);
 	dpaa2_mcp_free_command(cmd);
 
@@ -494,6 +495,8 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	device_t dev;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo;
+	dpaa2_rc_obj_region_t reg;
+	uint64_t start, end, count;
 
 	/* Add a device if it is DPIO. */
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
@@ -529,6 +532,34 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 
 		/* Initialize a resource list for this child device. */
 		resource_list_init(&dinfo->resources);
+
+		/* Add memory regions to the resource list. */
+		for (uint8_t i = 0; i < obj->reg_count; i++) {
+			rc = dpaa2_cmd_rc_get_obj_region(sc->portal, cmd,
+			    obj->id, i, "dpio", &reg);
+			if (rc) {
+				device_printf(rcdev, "Failed to obtain info "
+				    "about memory region: type=%s, id=%u, "
+				    "reg_idx=%u\n", "dpio", obj->id, i);
+				continue;
+			}
+
+			if (bootverbose)
+				device_printf(rcdev, "Adding DPIO memory region "
+				    "#%u: paddr=%jx, base_offset=%jx, "
+				    "size=%u, flags=%u, type=%s\n", i,
+				    (uintmax_t)reg.base_paddr,
+				    (uintmax_t)reg.base_offset,
+				    reg.size, reg.flags,
+				    reg.type == DPAA2_RC_REG_MC_PORTAL ?
+				    "mc_portal" : "qbman_portal");
+
+			count = reg.size;
+			start = reg.base_paddr;
+			end = reg.base_paddr + reg.size - 1;
+			resource_list_add(&dinfo->resources, SYS_RES_MEMORY,
+			    i, start, end, count);
+		}
 	}
 
 	return (0);
