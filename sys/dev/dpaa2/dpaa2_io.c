@@ -30,13 +30,15 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * The DPAA2 I/O (DPIO) driver.
+ * QBMan command interface and the DPAA2 I/O (DPIO) driver.
  *
- * The DPIO object allows configuration of the QBMan software portal, with
- * optional notification capabilities. Software portals are used by the driver
- * to communicate with the QBMan. The DPIO object’s main purpose is to enable
- * the driver to perform I/O – enqueue and dequeue operations, as well as buffer
- * release and acquire operations – using QBMan.
+ * The DPIO object allows configuration of the QBMan software portal with
+ * optional notification capabilities.
+ *
+ * Software portals are used by the driver to communicate with the QBMan. The
+ * DPIO object’s main purpose is to enable the driver to perform I/O – enqueue
+ * and dequeue operations, as well as buffer release and acquire operations –
+ * using QBMan.
  */
 
 #include <sys/param.h>

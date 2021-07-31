@@ -61,8 +61,8 @@
  * Public types.
  */
 
-/*
- * Information about DPAA2 object.
+/**
+ * @brief Information about DPAA2 object.
  *
  * id: ID of a logical object resource.
  * vendor: Object vendor identifier.
@@ -87,7 +87,7 @@ typedef struct {
 } dpaa2_obj_t;
 
 /*
- * Attributes of the DPRC object.
+ * @brief Attributes of the DPRC object.
  *
  * cont_id: Container's ID.
  * portal_id: Container's portal ID.
