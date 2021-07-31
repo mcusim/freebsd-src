@@ -497,6 +497,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_rc_obj_region_t reg;
 	uint64_t start, end, count;
+	int rc;
 
 	/* Add a device if it is DPIO. */
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
