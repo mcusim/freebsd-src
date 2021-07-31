@@ -55,13 +55,13 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-static struct resource_spec dpaa2_io_spec[] = {
-	/* SYS_RES_IRQ, 1: MSI should be allocated separately */
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
-	RESOURCE_SPEC_END
-};
+/* static struct resource_spec dpaa2_io_spec[] = { */
+/* 	/\* SYS_RES_IRQ, 1: MSI should be allocated separately *\/ */
+/* 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED }, */
+/* 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED }, */
+/* 	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL }, */
+/* 	RESOURCE_SPEC_END */
+/* }; */
 
 /*
  * Device interface.
