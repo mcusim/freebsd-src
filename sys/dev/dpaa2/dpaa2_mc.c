@@ -101,7 +101,7 @@ dpaa2_mc_attach(device_t dev)
 
 	if (sc->res[1]) {
 		resource_init_map_request(&req);
-		req.memattr = VM_MEMATTR_DEVICE;
+		req.memattr = VM_MEMATTR_DEVICE | VM_MEMATTR_UNCACHEABLE;
 		error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[1],
 		    &req, &sc->map[1]);
 		if (error) {
@@ -128,7 +128,7 @@ dpaa2_mc_attach(device_t dev)
 
 	/* Map MC portal memory resource. */
 	resource_init_map_request(&req);
-	req.memattr = VM_MEMATTR_DEVICE;
+	req.memattr = VM_MEMATTR_DEVICE | VM_MEMATTR_UNCACHEABLE;
 	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0],
 	    &req, &sc->map[0]);
 	if (error) {
