@@ -72,6 +72,37 @@ __FBSDID("$FreeBSD$");
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
 
+/* RC command versioning */
+#define CMD_RC_BASE_VERSION	1
+#define CMD_RC_2ND_VERSION	2
+#define CMD_RC_3RD_VERSION	3
+#define CMD_RC_ID_OFFSET	4
+
+#define CMD_RC(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_BASE_VERSION)
+#define CMD_RC_V2(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_2ND_VERSION)
+#define CMD_RC_V3(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_3RD_VERSION)
+
+/* RC command IDs */
+#define CMDID_RC_CLOSE                        CMD_RC(0x800)
+#define CMDID_RC_OPEN                         CMD_RC(0x805)
+#define CMDID_RC_GET_API_VERSION              CMD_RC(0xA05)
+#define CMDID_RC_GET_ATTR                     CMD_RC(0x004)
+#define CMDID_RC_RESET_CONT                   CMD_RC(0x005)
+#define CMDID_RC_RESET_CONT_V2                CMD_RC_V2(0x005)
+#define CMDID_RC_SET_IRQ                      CMD_RC(0x010)
+#define CMDID_RC_SET_IRQ_ENABLE               CMD_RC(0x012)
+#define CMDID_RC_SET_IRQ_MASK                 CMD_RC(0x014)
+#define CMDID_RC_GET_IRQ_STATUS               CMD_RC(0x016)
+#define CMDID_RC_CLEAR_IRQ_STATUS             CMD_RC(0x017)
+#define CMDID_RC_GET_CONT_ID                  CMD_RC(0x830)
+#define CMDID_RC_GET_OBJ_COUNT                CMD_RC(0x159)
+#define CMDID_RC_GET_OBJ                      CMD_RC(0x15A)
+#define CMDID_RC_GET_OBJ_REG                  CMD_RC(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V2               CMD_RC_V2(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V3               CMD_RC_V3(0x15E)
+#define CMDID_RC_SET_OBJ_IRQ                  CMD_RC(0x15F)
+#define CMDID_RC_GET_CONNECTION               CMD_RC(0x16C)
+
 #define LOCK_PORTAL(portal, flags) do {					\
 	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
 		mtx_lock_spin(&(portal)->lock);				\
@@ -114,6 +145,10 @@ struct dpaa2_mcp {
 	struct mtx		 lock;
 	struct cv		 cv;
 	uint16_t		 flags;
+
+	/* DPRC API cached version */
+	uint16_t		 rc_api_major;
+	uint16_t		 rc_api_minor;
 };
 
 /*
@@ -217,6 +252,10 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 		mtx_init(&p->lock, "MC portal sleep lock", NULL, MTX_DEF);
 		cv_init(&p->cv, "MC portal cv");
 	}
+	/* Reset DPRC API version to cache later. */
+	p->rc_api_major = 0;
+	p->rc_api_minor = 0;
+
 	*portal = p;
 
 	return (0);
@@ -525,17 +564,50 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		uint32_t	_reserved2;
 		uint64_t	base_paddr;
 	} *resp;
+	uint16_t cmdid;
+	uint16_t api_major, api_minor;
 	int rc;
 
 	if (!portal || !cmd || !type || reg)
 		return (DPAA2_CMD_STAT_ERR);
+
+	/*
+	 * If the DPRC object version was not yet cached, cache it now.
+	 * Otherwise use the already cached value.
+	 */
+	if (!portal->rc_api_major && !portal->rc_api_minor) {
+		rc = dpaa2_cmd_rc_get_api_version(portal, cmd, &api_major,
+		    &api_minor);
+		if (rc)
+			return (rc);
+		portal->rc_api_major = api_major;
+		portal->rc_api_minor = api_minor;
+	} else {
+		api_major = portal->rc_api_major;
+		api_minor = portal->rc_api_minor;
+	}
+
+	if (api_major > 6u || (api_major == 6u && api_minor >= 6u))
+		/*
+		 * MC API version 6.6 changed the size of the MC portals and
+		 * software portals to 64K (as implemented by hardware).
+		 */
+		cmdid = CMDID_RC_GET_OBJ_REG_V3;
+	else if (api_major == 6u && api_minor >= 3u)
+		/*
+		 * MC API version 6.3 introduced a new field to the region
+		 * descriptor: base_address.
+		 */
+		cmdid = CMDID_RC_GET_OBJ_REG_V2;
+	else
+		cmdid = CMDID_RC_GET_OBJ_REG;
 
 	args = (struct obj_region_args *) &cmd->params[0];
 	args->obj_id = obj_id;
 	args->reg_idx = reg_idx;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	rc = exec_command(portal, cmd, 0x15E3);
+	rc = exec_command(portal, cmd, cmdid);
 
 	resp = (struct obj_region *) &cmd->params[0];
 	reg->base_paddr = resp->base_paddr;
@@ -543,6 +615,28 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	reg->size = resp->size;
 	reg->flags = resp->flags;
 	reg->type = resp->type & 0xFu;
+
+	return (rc);
+}
+
+int
+dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    uint16_t *major, uint16_t *minor)
+{
+	struct __packed rc_api_version {
+		uint16_t	major;
+		uint16_t	minor;
+	} *resp;
+	int rc;
+
+	if (!portal || !cmd || !major || !minor)
+		return (DPAA2_CMD_STAT_ERR);
+
+	rc = exec_command(portal, cmd, CMDID_RC_GET_API_VERSION);
+
+	resp = (struct rc_api_version *) &cmd->params[0];
+	*major = resp->major;
+	*minor = resp->minor;
 
 	return (rc);
 }
