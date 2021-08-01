@@ -582,6 +582,8 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 			return (rc);
 		portal->rc_api_major = api_major;
 		portal->rc_api_minor = api_minor;
+		printf("%s: DPRC API version: %u.%u\n", __func__, api_major,
+		    api_minor);
 	} else {
 		api_major = portal->rc_api_major;
 		api_minor = portal->rc_api_minor;
