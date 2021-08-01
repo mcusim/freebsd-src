@@ -568,7 +568,7 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	uint16_t api_major, api_minor;
 	int rc;
 
-	if (!portal || !cmd || !type || reg)
+	if (!portal || !cmd || !type || !reg)
 		return (DPAA2_CMD_STAT_ERR);
 
 	/*

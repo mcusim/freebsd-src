@@ -566,7 +566,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 			if (rc) {
 				device_printf(rcdev, "Failed to obtain memory "
 				    "region for obj=dpio, id=%u, reg_idx=%u: "
-				    "error=%d", obj->id, i, rc);
+				    "error=%d\n", obj->id, i, rc);
 				continue;
 			}
 
