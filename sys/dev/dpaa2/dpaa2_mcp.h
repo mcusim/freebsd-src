@@ -170,6 +170,8 @@ int	dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 int	dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    uint32_t obj_id, uint8_t reg_idx, const char *type,
 	    dpaa2_rc_obj_region_t *reg);
+int	dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    uint16_t *major, uint16_t *minor);
 
 /*
  * Data Path Network Interface (DPNI) commands.
