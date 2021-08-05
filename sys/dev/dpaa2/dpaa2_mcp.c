@@ -582,8 +582,6 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 			return (rc);
 		portal->rc_api_major = api_major;
 		portal->rc_api_minor = api_minor;
-		printf("%s: DPRC API version: %u.%u\n", __func__, api_major,
-		    api_minor);
 	} else {
 		api_major = portal->rc_api_major;
 		api_minor = portal->rc_api_minor;
@@ -641,6 +639,31 @@ dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	*minor = resp->minor;
 
 	return (rc);
+}
+
+int
+dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint8_t enable)
+{
+	struct __packed set_irq_enable_args {
+		uint8_t		enable;
+		uint8_t		_reserved1;
+		uint16_t	_reserved2;
+		uint8_t		irq_idx;
+		uint8_t		_reserved3;
+		uint16_t	_reserved4;
+		uint64_t	_reserved5[6];
+	} *args;
+	int rc;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_irq_enable_args *) &cmd->params[0];
+	args->irq_idx = irq_idx;
+	args->enable = enable;
+
+	return (exec_command(portal, cmd, CMDID_RC_SET_IRQ_ENABLE));
 }
 
 /*
