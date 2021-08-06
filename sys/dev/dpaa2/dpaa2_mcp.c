@@ -654,7 +654,6 @@ dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx
 		uint16_t	_reserved4;
 		uint64_t	_reserved5[6];
 	} *args;
-	int rc;
 
 	if (!portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
