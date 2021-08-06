@@ -195,13 +195,13 @@ dpaa2_rc_delete_resource(device_t rcdev, device_t child, int type, int rid)
 	if (rle->res) {
 		if (rman_get_flags(rle->res) & RF_ACTIVE ||
 		    resource_list_busy(rl, type, rid)) {
-			device_printf(dev, "delete_resource: "
+			device_printf(rcdev, "delete_resource: "
 			    "Resource still owned by child, oops. "
 			    "(type=%d, rid=%d, addr=%jx)\n",
 			    type, rid, rman_get_start(rle->res));
 			return;
 		}
-		resource_list_unreserve(rl, dev, child, type, rid);
+		resource_list_unreserve(rl, rcdev, child, type, rid);
 	}
 	resource_list_delete(rl, type, rid);
 }
@@ -212,7 +212,6 @@ dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid
     u_int flags)
 {
 	struct resource_list *rl;
-	struct resource_list_entry *rle;
 	struct dpaa2_devinfo *dinfo;
 
 	dinfo = device_get_ivars(child);
