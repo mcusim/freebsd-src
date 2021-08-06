@@ -111,6 +111,7 @@ dpaa2_rc_attach(device_t dev)
 			return (ENXIO);
 		}
 		device_set_ivars(dev, dinfo);
+
 		dinfo->pdev = pdev;
 		dinfo->dev = dev;
 		dinfo->dtype = DPAA2_DEV_RC;
@@ -174,6 +175,170 @@ dpaa2_rc_get_resource_list(device_t rcdev, device_t child)
 
 	return (&dinfo->resources);
 }
+
+static void
+dpaa2_rc_delete_resource(device_t rcdev, device_t child, int type, int rid)
+{
+	struct resource_list *rl;
+	struct resource_list_entry *rle;
+	struct dpaa2_devinfo *dinfo;
+
+	if (device_get_parent(child) != rcdev)
+		return;
+
+	dinfo = device_get_ivars(child);
+	rl = &dinfo->resources;
+	rle = resource_list_find(rl, type, rid);
+	if (rle == NULL)
+		return;
+
+	if (rle->res) {
+		if (rman_get_flags(rle->res) & RF_ACTIVE ||
+		    resource_list_busy(rl, type, rid)) {
+			device_printf(dev, "delete_resource: "
+			    "Resource still owned by child, oops. "
+			    "(type=%d, rid=%d, addr=%jx)\n",
+			    type, rid, rman_get_start(rle->res));
+			return;
+		}
+		resource_list_unreserve(rl, dev, child, type, rid);
+	}
+	resource_list_delete(rl, type, rid);
+}
+
+static struct resource *
+dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid,
+    rman_res_t start, rman_res_t end, rman_res_t count, u_long num,
+    u_int flags)
+{
+	struct resource_list *rl;
+	struct resource_list_entry *rle;
+	struct dpaa2_devinfo *dinfo;
+
+	dinfo = device_get_ivars(child);
+	rl = &dinfo->resources;
+	if (type == SYS_RES_IRQ) {
+		/*
+		 * Can't alloc legacy interrupt once MSI messages have
+		 * been allocated.
+		 */
+		if (*rid == 0 && dinfo->msi.msi_alloc > 0)
+			return (NULL);
+	}
+
+	return (resource_list_alloc(rl, rcdev, child, type, rid,
+	    start, end, count, flags));
+}
+
+static struct resource *
+dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
+    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
+{
+	if (device_get_parent(child) != rcdev)
+		return (BUS_ALLOC_RESOURCE(device_get_parent(rcdev), child,
+		    type, rid, start, end, count, flags));
+
+	return (dpaa2_rc_alloc_multi_resource(rcdev, child, type, rid, start,
+	    end, count, 1, flags));
+}
+
+static int
+dpaa2_rc_release_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r)
+{
+	struct resource_list *rl;
+	struct dpaa2_devinfo *dinfo;
+
+	if (device_get_parent(child) != rcdev)
+		return (BUS_RELEASE_RESOURCE(device_get_parent(rcdev), child,
+		    type, rid, r));
+
+	dinfo = device_get_ivars(child);
+	rl = &dinfo->resources;
+	return (resource_list_release(rl, rcdev, child, type, rid, r));
+}
+
+#ifdef notyet /* Re-work to de/activate IRQ for different types of objects. */
+static int
+dpaa2_rc_activate_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r)
+{
+	struct dpaa2_rc_softc *sc;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	int rc;
+
+	rc = bus_generic_activate_resource(rcdev, child, type, rid, r);
+	if (rc)
+		return (rc);
+
+	/* MSI should be enabled. */
+	if (device_get_parent(child) == rcdev && type == SYS_RES_IRQ &&
+	    rid >= 1) {
+		sc = device_get_softc(rcdev);
+		dinfo = device_get_ivars(child);
+
+		/* Allocate a command to send to MC hardware. */
+		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+		if (rc) {
+			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
+			    "error=%d\n", rc);
+			return (ENODEV);
+		}
+
+		rc = dpaa2_cmd_rc_set_irq_enable(sc->portal, cmd,
+		    rid - 1, 1u);
+		if (rc) {
+			dpaa2_mcp_free_command(cmd);
+			device_printf(rcdev, "Failed to enable IRQ %d: "
+			    "error=%d\n", rid, rc);
+			return (ENODEV);
+		}
+		dpaa2_mcp_free_command(cmd);
+	}
+	return (0);
+}
+
+static int
+dpaa2_rc_deactivate_resource(device_t rcdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	struct dpaa2_rc_softc *sc;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	int rc;
+
+	error = bus_generic_deactivate_resource(rcdev, child, type, rid, r);
+	if (error)
+		return (error);
+
+	/* MSI should be disabled. */
+	if (device_get_parent(child) == rcdev && type == SYS_RES_IRQ &&
+	    rid >= 1) {
+		sc = device_get_softc(rcdev);
+		dinfo = device_get_ivars(child);
+
+		/* Allocate a command to send to MC hardware. */
+		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+		if (rc) {
+			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
+			    "error=%d\n", rc);
+			return (ENODEV);
+		}
+
+		rc = dpaa2_cmd_rc_set_irq_enable(sc->portal, cmd,
+		    rid - 1, 0u);
+		if (rc) {
+			dpaa2_mcp_free_command(cmd);
+			device_printf(rcdev, "Failed to disable IRQ %d: "
+			    "error=%d\n", rid, rc);
+			return (ENODEV);
+		}
+		dpaa2_mcp_free_command(cmd);
+	}
+	return (0);
+}
+#endif /* notyet */
 
 static void
 dpaa2_rc_child_deleted(device_t rcdev, device_t child)
@@ -487,8 +652,11 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 	}
 	if (bootverbose)
 		device_printf(rcdev, "ICID: %u\n", dprc_attr.icid);
-	if (rcinfo)
+	if (rcinfo) {
+		rcinfo->id = dprc_attr.cont_id;
+		rcinfo->portal_id = dprc_attr.portal_id;
 		rcinfo->icid = dprc_attr.icid;
+	}
 
 	/* Add devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
@@ -544,19 +712,20 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 			return (ENXIO);
 		}
 		device_set_ivars(dev, dinfo);
+
 		dinfo->pdev = rcdev;
 		dinfo->dev = dev;
+		dinfo->id = obj->id;
 		dinfo->dtype = DPAA2_DEV_IO;
-
-		/* Children share their parent container's ICID. */
+		/* Children share their parent container's ICID and portal ID. */
 		dinfo->icid = rcinfo->icid;
-
+		dinfo->portal_id = rcinfo->portal_id;
 		/* MSI configuration */
 		dinfo->msi.msi_msgnum = obj->irq_count;
 		dinfo->msi.msi_alloc = 0;
 		dinfo->msi.msi_handlers = 0;
 
-		/* Initialize a resource list for this child device. */
+		/* Initialize a resource list for the child. */
 		resource_list_init(&dinfo->resources);
 
 		/* Add memory regions to the resource list. */
@@ -569,20 +738,9 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 				    "error=%d\n", obj->id, i, rc);
 				continue;
 			}
-
-			if (bootverbose)
-				device_printf(rcdev, "Adding DPIO memory region "
-				    "#%u: paddr=%jx, base_offset=%jx, "
-				    "size=%u, flags=%u, type=%s\n", i,
-				    (uintmax_t)reg.base_paddr,
-				    (uintmax_t)reg.base_offset,
-				    reg.size, reg.flags,
-				    reg.type == DPAA2_RC_REG_MC_PORTAL ?
-				    "mc_portal" : "qbman_portal");
-
 			count = reg.size;
-			start = reg.base_paddr;
-			end = reg.base_paddr + reg.size - 1;
+			start = reg.base_paddr + reg.base_offset;
+			end = reg.base_paddr + reg.base_offset + reg.size - 1;
 			resource_list_add(&dinfo->resources, SYS_RES_MEMORY,
 			    i, start, end, count);
 		}
@@ -599,10 +757,17 @@ static device_method_t dpaa2_rc_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_get_resource_list,dpaa2_rc_get_resource_list),
-	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
-	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
 	DEVMETHOD(bus_set_resource,	bus_generic_rl_set_resource),
 	DEVMETHOD(bus_get_resource,	bus_generic_rl_get_resource),
+	DEVMETHOD(bus_delete_resource,	dpaa2_rc_delete_resource),
+	DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource),
+	DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
+	DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource),
+	/* DEVMETHOD(bus_activate_resource, dpaa2_rc_activate_resource), */
+	/* DEVMETHOD(bus_deactivate_resource, dpaa2_rc_deactivate_resource), */
+
+	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
+	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
