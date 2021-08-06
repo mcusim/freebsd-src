@@ -72,14 +72,16 @@ enum dpaa2_rc_region_type {
 /**
  * @brief Information about DPAA2 object.
  *
- * id: ID of a logical object resource.
- * vendor: Object vendor identifier.
- * irq_count: Number of interrupts supported by the object.
- * reg_count: Number of mappable regions supported by the object.
- * state: Object state (combination of states).
- * ver_major: Major version of the object.
- * ver_minor: Minor version of the object.
- * flags: Object attributes flags.
+ * id:		ID of a logical object resource.
+ * vendor:	Object vendor identifier.
+ * irq_count:	Number of interrupts supported by the object.
+ * reg_count:	Number of mappable regions supported by the object.
+ * state:	Object state (combination of states).
+ * ver_major:	Major version of the object.
+ * ver_minor:	Minor version of the object.
+ * flags:	Object attributes flags.
+ * type:	...
+ * label:	...
  */
 typedef struct {
 	uint32_t	id;
@@ -97,10 +99,10 @@ typedef struct {
 /**
  * @brief Attributes of the DPRC object.
  *
- * cont_id: Container's ID.
- * portal_id: Container's portal ID.
- * options: Container's options as set at container's creation.
- * icid: Container's isolation context ID.
+ * cont_id:	Container's ID.
+ * portal_id:	Container's portal ID.
+ * options:	Container's options as set at container's creation.
+ * icid:	Container's isolation context ID.
  */
 typedef struct {
 	uint32_t	cont_id;
@@ -112,11 +114,11 @@ typedef struct {
 /**
  * @brief Description of the object's memory region.
  *
- * base_paddr: Region base physical address.
- * base_offset: Region base offset.
- * size: Region size (in bytes).
- * flags: Region flags (cacheable, etc.)
- * type: Type of a software portal this region belongs to.
+ * base_paddr:	Region base physical address.
+ * base_offset:	Region base offset.
+ * size:	Region size (in bytes).
+ * flags:	Region flags (cacheable, etc.)
+ * type:	Type of a software portal this region belongs to.
  */
 typedef struct {
 	uint64_t	base_paddr;
