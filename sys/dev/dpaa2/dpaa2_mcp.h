@@ -29,6 +29,13 @@
 #ifndef	_DPAA2_MCP_H
 #define	_DPAA2_MCP_H
 
+/*
+ * MC command interface and the DPAA2 Management Complex Portal (DPMCP) driver.
+ *
+ * DPMCP is an optional object exported by MC to control the MC portal operation
+ * mode (polling or interrupt-based).
+ */
+
 /* Portal flags. */
 #define DPAA2_PORTAL_DEF		0x0u
 #define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
@@ -99,7 +106,7 @@ typedef struct {
 /**
  * @brief Attributes of the DPRC object.
  *
- * cont_id:	Container's ID.
+ * cont_id:	Container ID.
  * portal_id:	Container's portal ID.
  * options:	Container's options as set at container's creation.
  * icid:	Container's isolation context ID.
@@ -180,8 +187,18 @@ int	dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 /*
  * Data Path Network Interface (DPNI) commands.
  */
-int	dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
-	    uint16_t *token);
+int	dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    const uint32_t dpni_id, uint16_t *token);
 int	dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+
+/*
+ * Data Path I/O (DPIO) commands.
+ */
+int	dpaa2_cmd_io_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    const uint32_t dpio_id, uint16_t *token);
+int	dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_io_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    const uint8_t irq_idx, const uint8_t enable);
+
 
 #endif /* _DPAA2_MCP_H */

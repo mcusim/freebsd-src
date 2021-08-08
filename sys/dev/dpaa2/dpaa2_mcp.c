@@ -72,7 +72,7 @@ __FBSDID("$FreeBSD$");
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
 
-/* RC command versioning */
+/* ------------------------- DPRC command IDs ------------------------------- */
 #define CMD_RC_BASE_VERSION	1
 #define CMD_RC_2ND_VERSION	2
 #define CMD_RC_3RD_VERSION	3
@@ -82,26 +82,45 @@ __FBSDID("$FreeBSD$");
 #define CMD_RC_V2(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_2ND_VERSION)
 #define CMD_RC_V3(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_3RD_VERSION)
 
-/* RC command IDs */
-#define CMDID_RC_CLOSE                        CMD_RC(0x800)
-#define CMDID_RC_OPEN                         CMD_RC(0x805)
-#define CMDID_RC_GET_API_VERSION              CMD_RC(0xA05)
-#define CMDID_RC_GET_ATTR                     CMD_RC(0x004)
-#define CMDID_RC_RESET_CONT                   CMD_RC(0x005)
-#define CMDID_RC_RESET_CONT_V2                CMD_RC_V2(0x005)
-#define CMDID_RC_SET_IRQ                      CMD_RC(0x010)
-#define CMDID_RC_SET_IRQ_ENABLE               CMD_RC(0x012)
-#define CMDID_RC_SET_IRQ_MASK                 CMD_RC(0x014)
-#define CMDID_RC_GET_IRQ_STATUS               CMD_RC(0x016)
-#define CMDID_RC_CLEAR_IRQ_STATUS             CMD_RC(0x017)
-#define CMDID_RC_GET_CONT_ID                  CMD_RC(0x830)
-#define CMDID_RC_GET_OBJ_COUNT                CMD_RC(0x159)
-#define CMDID_RC_GET_OBJ                      CMD_RC(0x15A)
-#define CMDID_RC_GET_OBJ_REG                  CMD_RC(0x15E)
-#define CMDID_RC_GET_OBJ_REG_V2               CMD_RC_V2(0x15E)
-#define CMDID_RC_GET_OBJ_REG_V3               CMD_RC_V3(0x15E)
-#define CMDID_RC_SET_OBJ_IRQ                  CMD_RC(0x15F)
-#define CMDID_RC_GET_CONNECTION               CMD_RC(0x16C)
+#define CMDID_RC_OPEN				CMD_RC(0x805)
+#define CMDID_RC_CLOSE				CMD_RC(0x800)
+#define CMDID_RC_GET_API_VERSION		CMD_RC(0xA05)
+#define CMDID_RC_GET_ATTR			CMD_RC(0x004)
+#define CMDID_RC_RESET_CONT			CMD_RC(0x005)
+#define CMDID_RC_RESET_CONT_V2			CMD_RC_V2(0x005)
+#define CMDID_RC_SET_IRQ			CMD_RC(0x010)
+#define CMDID_RC_SET_IRQ_ENABLE			CMD_RC(0x012)
+#define CMDID_RC_SET_IRQ_MASK			CMD_RC(0x014)
+#define CMDID_RC_GET_IRQ_STATUS			CMD_RC(0x016)
+#define CMDID_RC_CLEAR_IRQ_STATUS		CMD_RC(0x017)
+#define CMDID_RC_GET_CONT_ID			CMD_RC(0x830)
+#define CMDID_RC_GET_OBJ_COUNT			CMD_RC(0x159)
+#define CMDID_RC_GET_OBJ			CMD_RC(0x15A)
+#define CMDID_RC_GET_OBJ_DESC			CMD_RC(0x162)
+#define CMDID_RC_GET_OBJ_REG			CMD_RC(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V2			CMD_RC_V2(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V3			CMD_RC_V3(0x15E)
+#define CMDID_RC_SET_OBJ_IRQ			CMD_RC(0x15F)
+#define CMDID_RC_GET_CONNECTION			CMD_RC(0x16C)
+
+/* ------------------------- DPIO command IDs ------------------------------- */
+#define CMD_IO_BASE_VERSION	1
+#define CMD_IO_ID_OFFSET	4
+
+#define CMD_IO(id)	(((id) << CMD_IO_ID_OFFSET) | CMD_IO_BASE_VERSION)
+
+#define CMDID_IO_OPEN				CMD_IO(0x803)
+#define CMDID_IO_CLOSE				CMD_IO(0x800)
+#define CMDID_IO_SET_IRQ_ENABLE			CMD_IO(0x012)
+
+/* ------------------------- DPNI command IDs ------------------------------- */
+#define CMD_NI_BASE_VERSION	1
+#define CMD_NI_ID_OFFSET	4
+
+#define CMD_NI(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_BASE_VERSION)
+
+#define CMDID_NI_OPEN				CMD_NI(0x801)
+#define CMDID_NI_CLOSE				CMD_NI(0x800)
 
 #define LOCK_PORTAL(portal, flags) do {					\
 	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
@@ -130,14 +149,18 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
     "memory");
 
-/*
- * Helper object to send commands to the MC portal.
+/**
+ * @brief Helper object to send commands to the MC portal.
  *
- * res: Unmapped portal's I/O memory.
- * map: Mapped portal's I/O memory.
- * lock: Lock to send a command to the portal and wait for the result.
- * cv: Conditional variable helps to wait for the helper object's state change.
- * flags: Current object state.
+ * res:			Unmapped portal's I/O memory.
+ * map:			Mapped portal's I/O memory.
+ * lock:		Lock to send a command to the portal and wait for the
+ *			result.
+ * cv:			Conditional variable helps to wait for the helper
+ *			object's state change.
+ * flags:		Current object state.
+ * rc_api_major:	Major version of the DPRC API (cached).
+ * rc_api_minor:	Minor version of the DPRC API (cached).
  */
 struct dpaa2_mcp {
 	struct resource		*res;
@@ -145,37 +168,35 @@ struct dpaa2_mcp {
 	struct mtx		 lock;
 	struct cv		 cv;
 	uint16_t		 flags;
-
-	/* DPRC API cached version */
 	uint16_t		 rc_api_major;
 	uint16_t		 rc_api_minor;
 };
 
-/*
- * Command object holds data to be written to the MC portal.
+/**
+ * @brief Command object holds data to be written to the MC portal.
  *
- * header: 8 least significant bytes of the MC portal.
- * params: Parameters to pass together with the command to MC. Might keep
- *         command execution results.
+ * header:	8 least significant bytes of the MC portal.
+ * params:	Parameters to pass together with the command to MC. Might keep
+ *		command execution results.
  */
 struct dpaa2_cmd {
 	uint64_t		 header;
 	uint64_t		 params[CMD_PARAMS_N];
 };
 
-/*
- * Helper object which allows to access fields of the MC command header.
+/**
+ * @brief Helper object to access fields of the MC command header.
  *
- * srcid: The SoC architected source ID of the submitter. This field is reserved
- *        and cannot be written by a GPP processor.
- * flags_hw: Bits from 8 to 15 of the command header. Most of them are reserved
- *           at the moment.
- * status: Command ready/status. This field is used as the handshake field
- *         between MC and the driver. MC reports command completion with
- *         success/error codes in this field.
- * flags_sw:
- * token:
- * cmdid:
+ * srcid:	The SoC architected source ID of the submitter. This field is
+ *		reserved and cannot be written by a GPP processor.
+ * flags_hw:	Bits from 8 to 15 of the command header. Most of them are
+ *		reserved at the moment.
+ * status:	Command ready/status. This field is used as the handshake field
+ *		between MC and the driver. MC reports command completion with
+ *		success/error codes in this field.
+ * flags_sw:	...
+ * token:	...
+ * cmdid:	...
  */
 struct __packed dpaa2_cmd_header {
 	uint8_t			 srcid;
@@ -186,8 +207,8 @@ struct __packed dpaa2_cmd_header {
 	uint16_t		 cmdid;
 };
 
-/*
- * Helper object which allows to access fields of the DPAA2 object information
+/**
+ * @brief Helper object to access fields of the DPAA2 object information
  * response.
  */
 struct __packed dpaa2_obj {
@@ -206,7 +227,7 @@ struct __packed dpaa2_obj {
 };
 
 /**
- * #brief Helper object to access fields of the DPRC attributes response.
+ * @brief Helper object to access fields of the DPRC attributes response.
  */
 struct __packed dpaa2_rc_attr {
 	uint32_t		 cont_id;
@@ -216,9 +237,12 @@ struct __packed dpaa2_rc_attr {
 	uint32_t		 portal_id;
 };
 
-static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid);
+static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    const uint16_t cmdid);
 static void send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 static int wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    const uint8_t irq_idx, const uint8_t enable, const uint16_t cmdid);
 
 /*
  * Management routines.
@@ -366,48 +390,53 @@ int
 dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t *major,
     uint32_t *minor, uint32_t *rev)
 {
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !major || !minor || !rev)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, 0x8311);
-	*major = cmd->params[0] >> 32;
-	*minor = cmd->params[1] & 0xFFFFFFFF;
-	*rev = cmd->params[0] & 0xFFFFFFFF;
+	error = exec_command(portal, cmd, 0x8311);
+	if (!error) {
+		*major = cmd->params[0] >> 32;
+		*minor = cmd->params[1] & 0xFFFFFFFF;
+		*rev = cmd->params[0] & 0xFFFFFFFF;
+	}
 
-	return (rc);
+	return (error);
 }
 
 int
 dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *pvr, uint32_t *svr)
 {
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !pvr || !svr)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, 0x8321);
-	*pvr = cmd->params[0] >> 32;
-	*svr = cmd->params[0] & 0xFFFFFFFF;
+	error = exec_command(portal, cmd, 0x8321);
+	if (!error) {
+		*pvr = cmd->params[0] >> 32;
+		*svr = cmd->params[0] & 0xFFFFFFFF;
+	}
 
-	return (rc);
+	return (error);
 }
 
 int
 dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !cont_id)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, 0x8301);
-	*cont_id = cmd->params[0] & 0xFFFFFFFF;
+	error = exec_command(portal, cmd, 0x8301);
+	if (!error)
+		*cont_id = cmd->params[0] & 0xFFFFFFFF;
 
-	return (rc);
+	return (error);
 }
 
 /*
@@ -419,17 +448,20 @@ dpaa2_cmd_rc_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t cont_id,
     uint16_t *token)
 {
 	struct dpaa2_cmd_header *hdr;
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !token)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = cont_id;
-	rc = exec_command(portal, cmd, 0x8051);
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	*token = hdr->token;
 
-	return (rc);
+	error = exec_command(portal, cmd, CMDID_RC_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
 }
 
 int
@@ -438,22 +470,23 @@ dpaa2_cmd_rc_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 	if (!portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (exec_command(portal, cmd, 0x8001));
+	return (exec_command(portal, cmd, CMDID_RC_CLOSE));
 }
 
 int
 dpaa2_cmd_rc_get_obj_count(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t *obj_count)
 {
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !obj_count)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, 0x1591);
-	*obj_count = (uint32_t)(cmd->params[0] >> 32);
+	error = exec_command(portal, cmd, CMDID_RC_GET_OBJ_COUNT);
+	if (!error)
+		*obj_count = (uint32_t)(cmd->params[0] >> 32);
 
-	return (rc);
+	return (error);
 }
 
 int
@@ -461,63 +494,66 @@ dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t obj_idx, dpaa2_obj_t *obj)
 {
 	struct dpaa2_obj *pobj;
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !obj)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = obj_idx;
-	rc = exec_command(portal, cmd, 0x15A1);
 
-	pobj = (struct dpaa2_obj *) &cmd->params[0];
-	obj->id = pobj->id;
-	obj->vendor = pobj->vendor;
-	obj->irq_count = pobj->irq_count;
-	obj->reg_count = pobj->reg_count;
-	obj->state = pobj->state;
-	obj->ver_major = pobj->ver_major;
-	obj->ver_minor = pobj->ver_minor;
-	obj->flags = pobj->flags;
-	memcpy(obj->type, pobj->type, sizeof(pobj->type));
-	memcpy(obj->label, pobj->label, sizeof(pobj->label));
+	error = exec_command(portal, cmd, CMDID_RC_GET_OBJ);
+	if (!error) {
+		pobj = (struct dpaa2_obj *) &cmd->params[0];
+		obj->id = pobj->id;
+		obj->vendor = pobj->vendor;
+		obj->irq_count = pobj->irq_count;
+		obj->reg_count = pobj->reg_count;
+		obj->state = pobj->state;
+		obj->ver_major = pobj->ver_major;
+		obj->ver_minor = pobj->ver_minor;
+		obj->flags = pobj->flags;
+		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		memcpy(obj->label, pobj->label, sizeof(pobj->label));
+	}
 
-	return (rc);
+	return (error);
 }
 
 int
 dpaa2_cmd_rc_get_obj_descriptor(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     uint32_t obj_id, const char *type, dpaa2_obj_t *obj)
 {
-	struct __packed get_obj_desc_arg {
+	struct __packed get_obj_desc_args {
 		uint32_t	obj_id;
 		uint32_t	_reserved1;
 		uint8_t		type[16];
 	} *args;
 	struct dpaa2_obj *pobj;
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !type || !obj)
 		return (DPAA2_CMD_STAT_ERR);
 
-	args = (struct get_obj_desc_arg *) &cmd->params[0];
+	args = (struct get_obj_desc_args *) &cmd->params[0];
 	args->obj_id = obj_id;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	rc = exec_command(portal, cmd, 0x1621);
+	error = exec_command(portal, cmd, CMDID_RC_GET_OBJ_DESC);
+	if (!error) {
+		pobj = (struct dpaa2_obj *) &cmd->params[0];
+		obj->id = pobj->id;
+		obj->vendor = pobj->vendor;
+		obj->irq_count = pobj->irq_count;
+		obj->reg_count = pobj->reg_count;
+		obj->state = pobj->state;
+		obj->ver_major = pobj->ver_major;
+		obj->ver_minor = pobj->ver_minor;
+		obj->flags = pobj->flags;
+		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		memcpy(obj->label, pobj->label, sizeof(pobj->label));
+	}
 
-	pobj = (struct dpaa2_obj *) &cmd->params[0];
-	obj->id = pobj->id;
-	obj->vendor = pobj->vendor;
-	obj->irq_count = pobj->irq_count;
-	obj->reg_count = pobj->reg_count;
-	obj->state = pobj->state;
-	obj->ver_major = pobj->ver_major;
-	obj->ver_minor = pobj->ver_minor;
-	obj->flags = pobj->flags;
-	memcpy(obj->type, pobj->type, sizeof(pobj->type));
-	memcpy(obj->label, pobj->label, sizeof(pobj->label));
-
-	return (rc);
+	return (error);
 }
 
 int
@@ -525,20 +561,21 @@ dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
     dpaa2_rc_attr_t *attr)
 {
 	struct dpaa2_rc_attr *pattr;
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !attr)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, 0x0041);
+	error = exec_command(portal, cmd, CMDID_RC_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_rc_attr *) &cmd->params[0];
+		attr->cont_id = pattr->cont_id;
+		attr->portal_id = pattr->portal_id;
+		attr->options = pattr->options;
+		attr->icid = pattr->icid;
+	}
 
-	pattr = (struct dpaa2_rc_attr *) &cmd->params[0];
-	attr->cont_id = pattr->cont_id;
-	attr->portal_id = pattr->portal_id;
-	attr->options = pattr->options;
-	attr->icid = pattr->icid;
-
-	return (rc);
+	return (error);
 }
 
 int
@@ -564,9 +601,8 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		uint32_t	_reserved2;
 		uint64_t	base_paddr;
 	} *resp;
-	uint16_t cmdid;
-	uint16_t api_major, api_minor;
-	int rc;
+	uint16_t cmdid, api_major, api_minor;
+	int error;
 
 	if (!portal || !cmd || !type || !reg)
 		return (DPAA2_CMD_STAT_ERR);
@@ -576,10 +612,10 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	 * Otherwise use the already cached value.
 	 */
 	if (!portal->rc_api_major && !portal->rc_api_minor) {
-		rc = dpaa2_cmd_rc_get_api_version(portal, cmd, &api_major,
+		error = dpaa2_cmd_rc_get_api_version(portal, cmd, &api_major,
 		    &api_minor);
-		if (rc)
-			return (rc);
+		if (error)
+			return (error);
 		portal->rc_api_major = api_major;
 		portal->rc_api_minor = api_minor;
 	} else {
@@ -607,16 +643,17 @@ dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	args->reg_idx = reg_idx;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	rc = exec_command(portal, cmd, cmdid);
+	error = exec_command(portal, cmd, cmdid);
+	if (!error) {
+		resp = (struct obj_region *) &cmd->params[0];
+		reg->base_paddr = resp->base_paddr;
+		reg->base_offset = resp->base_offset;
+		reg->size = resp->size;
+		reg->flags = resp->flags;
+		reg->type = resp->type & 0xFu;
+	}
 
-	resp = (struct obj_region *) &cmd->params[0];
-	reg->base_paddr = resp->base_paddr;
-	reg->base_offset = resp->base_offset;
-	reg->size = resp->size;
-	reg->flags = resp->flags;
-	reg->type = resp->type & 0xFu;
-
-	return (rc);
+	return (error);
 }
 
 int
@@ -627,23 +664,110 @@ dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		uint16_t	major;
 		uint16_t	minor;
 	} *resp;
-	int rc;
+	int error;
 
 	if (!portal || !cmd || !major || !minor)
 		return (DPAA2_CMD_STAT_ERR);
 
-	rc = exec_command(portal, cmd, CMDID_RC_GET_API_VERSION);
+	error = exec_command(portal, cmd, CMDID_RC_GET_API_VERSION);
+	if (!error) {
+		resp = (struct rc_api_version *) &cmd->params[0];
+		*major = resp->major;
+		*minor = resp->minor;
+	}
 
-	resp = (struct rc_api_version *) &cmd->params[0];
-	*major = resp->major;
-	*minor = resp->minor;
-
-	return (rc);
+	return (error);
 }
 
 int
 dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx,
     uint8_t enable)
+{
+	return (set_irq_enable(portal, cmd, irq_idx, enable,
+	    CMDID_RC_SET_IRQ_ENABLE));
+}
+
+/*
+ * Data Path Network Interface (DPNI) commands.
+ */
+
+int
+dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, const uint32_t dpni_id,
+    uint16_t *token)
+{
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpni_id;
+	error = exec_command(portal, cmd, CMDID_NI_OPEN);
+ 	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+int
+dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_NI_CLOSE));
+}
+
+/*
+ * Data Path I/O (DPIO) commands.
+ */
+
+int
+dpaa2_cmd_io_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, const uint32_t dpio_id,
+    uint16_t *token)
+{
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpio_id;
+	error = exec_command(portal, cmd, CMDID_IO_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+int
+dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_IO_CLOSE));
+}
+
+int
+dpaa2_cmd_io_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    const uint8_t irq_idx, const uint8_t enable)
+{
+	return (set_irq_enable(portal, cmd, irq_idx, enable,
+	    CMDID_IO_SET_IRQ_ENABLE));
+}
+
+/*
+ * Internal functions.
+ */
+
+static int
+set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, const uint8_t irq_idx,
+    const uint8_t enable, const uint16_t cmdid)
 {
 	struct __packed set_irq_enable_args {
 		uint8_t		enable;
@@ -660,40 +784,9 @@ dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx
 
 	args = (struct set_irq_enable_args *) &cmd->params[0];
 	args->irq_idx = irq_idx;
-	args->enable = enable;
+	args->enable = enable == 0u ? 0u : 1u;
 
-	return (exec_command(portal, cmd, CMDID_RC_SET_IRQ_ENABLE));
-}
-
-/*
- * Data Path Network Interface (DPNI) commands.
- */
-
-int
-dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t dpni_id,
-    uint16_t *token)
-{
-	struct dpaa2_cmd_header *hdr;
-	int rc;
-
-	if (!portal || !cmd || !token)
-		return (DPAA2_CMD_STAT_ERR);
-
-	cmd->params[0] = dpni_id;
-	rc = exec_command(portal, cmd, 0x8011);
-	hdr = (struct dpaa2_cmd_header *) &cmd->header;
-	*token = hdr->token;
-
-	return (rc);
-}
-
-int
-dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
-{
-	if (!portal || !cmd)
-		return (DPAA2_CMD_STAT_ERR);
-
-	return (exec_command(portal, cmd, 0x8001));
+	return (exec_command(portal, cmd, cmdid));
 }
 
 static int
