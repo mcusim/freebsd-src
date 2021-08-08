@@ -250,42 +250,6 @@ iort_named_comp_map(const char *devname, u_int rid, u_int outtype, u_int *outid)
 	return (out_node);
 }
 
-/*
- * Map a named component node to a SMMU node or an ITS node, based on outtype.
- */
-static struct iort_node *
-iort_named_comp_map(const char *devname, u_int rid, u_int outtype, u_int *outid)
-{
-	struct iort_node *node, *out_node;
-	u_int nxtid;
-
-	out_node = NULL;
-	TAILQ_FOREACH(node, &named_nodes, next) {
-		if (strstr(node->data.named_comp.DeviceName, devname) == NULL)
-			continue;
-		out_node = iort_entry_lookup(node, rid, &nxtid);
-		if (out_node != NULL)
-			break;
-	}
-
-	/* Could not find a named node with this devname. */
-	if (out_node == NULL)
-		return (NULL);
-
-	/* Node can be SMMU or ITS. If SMMU, we need another lookup. */
-	if (outtype == ACPI_IORT_NODE_ITS_GROUP &&
-	    (out_node->type == ACPI_IORT_NODE_SMMU_V3 ||
-	    out_node->type == ACPI_IORT_NODE_SMMU)) {
-		out_node = iort_entry_lookup(out_node, nxtid, &nxtid);
-		if (out_node == NULL)
-			return (NULL);
-	}
-
-	KASSERT(out_node->type == outtype, ("mapping fail"));
-	*outid = nxtid;
-	return (out_node);
-}
-
 #ifdef notyet
 /*
  * Not implemented, map a PCIe device to the SMMU it is associated with.
