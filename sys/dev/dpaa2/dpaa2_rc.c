@@ -57,9 +57,11 @@ MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
 /* Forward declarations. */
 static int dpaa2_rc_detach(device_t dev);
-static int dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc);
-static int dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+static int discover_objects(struct dpaa2_rc_softc *sc);
+static int add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj);
+static int enable_irq_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r, const uint8_t enable);
 
 /*
  * Device interface.
@@ -131,7 +133,7 @@ dpaa2_rc_attach(device_t dev)
 	}
 
 	/* Create DPAA2 devices for objects in this container. */
-	error = dpaa2_rc_discover_objects(sc);
+	error = discover_objects(sc);
 	if (error) {
 		device_printf(dev, "Failed to discover objects in container: "
 		    "error=%d\n", error);
@@ -257,87 +259,33 @@ dpaa2_rc_release_resource(device_t rcdev, device_t child, int type, int rid,
 	return (resource_list_release(rl, rcdev, child, type, rid, r));
 }
 
-#ifdef notyet /* Re-work to de/activate IRQ for different types of objects. */
 static int
 dpaa2_rc_activate_resource(device_t rcdev, device_t child, int type, int rid,
     struct resource *r)
 {
-	struct dpaa2_rc_softc *sc;
-	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
-	int rc;
+	int error;
 
-	rc = bus_generic_activate_resource(rcdev, child, type, rid, r);
-	if (rc)
-		return (rc);
+	error = bus_generic_activate_resource(rcdev, child, type, rid, r);
+	if (error)
+		return (error);
 
-	/* MSI should be enabled. */
-	if (device_get_parent(child) == rcdev && type == SYS_RES_IRQ &&
-	    rid >= 1) {
-		sc = device_get_softc(rcdev);
-		dinfo = device_get_ivars(child);
-
-		/* Allocate a command to send to MC hardware. */
-		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-		if (rc) {
-			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
-			    "error=%d\n", rc);
-			return (ENODEV);
-		}
-
-		rc = dpaa2_cmd_rc_set_irq_enable(sc->portal, cmd,
-		    rid - 1, 1u);
-		if (rc) {
-			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to enable IRQ %d: "
-			    "error=%d\n", rid, rc);
-			return (ENODEV);
-		}
-		dpaa2_mcp_free_command(cmd);
-	}
-	return (0);
+	/* Enable MSI (IRQ resource with rid >= 1). */
+	return (enable_irq_resource(rcdev, child, type, rid, r, 1u));
 }
 
 static int
 dpaa2_rc_deactivate_resource(device_t rcdev, device_t child, int type,
     int rid, struct resource *r)
 {
-	struct dpaa2_rc_softc *sc;
-	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
-	int rc;
+	int error;
 
 	error = bus_generic_deactivate_resource(rcdev, child, type, rid, r);
 	if (error)
 		return (error);
 
-	/* MSI should be disabled. */
-	if (device_get_parent(child) == rcdev && type == SYS_RES_IRQ &&
-	    rid >= 1) {
-		sc = device_get_softc(rcdev);
-		dinfo = device_get_ivars(child);
-
-		/* Allocate a command to send to MC hardware. */
-		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-		if (rc) {
-			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
-			    "error=%d\n", rc);
-			return (ENODEV);
-		}
-
-		rc = dpaa2_cmd_rc_set_irq_enable(sc->portal, cmd,
-		    rid - 1, 0u);
-		if (rc) {
-			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to disable IRQ %d: "
-			    "error=%d\n", rid, rc);
-			return (ENODEV);
-		}
-		dpaa2_mcp_free_command(cmd);
-	}
-	return (0);
+	/* Disable MSI (IRQ resource with rid >= 1). */
+	return (enable_irq_resource(rcdev, child, type, rid, r, 0u));
 }
-#endif /* notyet */
 
 static void
 dpaa2_rc_child_deleted(device_t rcdev, device_t child)
@@ -578,7 +526,7 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
  * @brief Create and add devices for DPAA2 objects in this resource container.
  */
 static int
-dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
+discover_objects(struct dpaa2_rc_softc *sc)
 {
 	device_t rcdev = sc->dev;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -665,7 +613,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 			    "error=%d\n", i, rc);
 			continue;
 		}
-		dpaa2_rc_add_child(sc, cmd, &obj);
+		add_child(sc, cmd, &obj);
 	}
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
@@ -680,7 +628,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
  * @brief Add a new DPAA2 device to the resource container bus.
  */
 static int
-dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
 	device_t rcdev = sc->dev;
@@ -748,6 +696,81 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	return (0);
 }
 
+/**
+ * @internal
+ * @brief Helps to enable or disable given IRQ using MC command interface.
+ */
+static int
+enable_irq_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r, const uint8_t enable)
+{
+	struct dpaa2_rc_softc *rcsc;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	uint16_t token;
+	int rc, error = 0;
+
+	/* Enable or disable MSI (IRQ resources with rid >= 1). */
+	if (device_get_parent(child) == rcdev && type == SYS_RES_IRQ &&
+	    rid >= 1) {
+		rcsc = device_get_softc(rcdev);
+		dinfo = device_get_ivars(child);
+
+		/* Allocate a command to send to MC hardware. */
+		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+		if (rc) {
+			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
+			    "error=%d\n", rc);
+			return (ENODEV);
+		}
+
+		switch (dinfo->dtype) {
+		case DPAA2_DEV_IO:
+			/* Open a control session for the DPAA2 object. */
+			rc = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id,
+			    &token);
+			if (rc) {
+				dpaa2_mcp_free_command(cmd);
+				device_printf(rcdev, "Failed to open DPIO "
+				    "object of dpaa2_io%d: error=%d\n",
+				    device_get_unit(child), rc);
+				return (ENODEV);
+			}
+
+			/* Enable or disable IRQ. */
+			error = dpaa2_cmd_io_set_irq_enable(rcsc->portal, cmd,
+			    rid - 1, enable);
+			if (error) {
+				device_printf(rcdev, "Failed to %s IRQ %d "
+				    "for dpaa2_io%d: error=%d\n",
+				    enable > 0u ? "enable" : "disable", rid,
+				    device_get_unit(child), error);
+			}
+
+			/* Close the control session of the object. */
+			rc = dpaa2_cmd_io_close(rcsc->portal, cmd);
+			if (rc) {
+				dpaa2_mcp_free_command(cmd);
+				device_printf(rcdev, "Failed to close DPIO "
+				    "object of dpaa2_io%d: error=%d\n",
+				    device_get_unit(child), rc);
+				return (ENODEV);
+			}
+			break;
+		default:
+			if (bootverbose)
+				device_printf(rcdev, "Cannot %s IRQ for "
+				    "unsupported DPAA2 object: type=%d\n",
+				    enable > 0u ? "enable" : "disable", rid,
+				    dinfo->dtype);
+			break;
+		}
+		dpaa2_mcp_free_command(cmd);
+	}
+
+	return (error);
+}
+
 static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_rc_probe),
@@ -762,8 +785,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource),
 	DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
 	DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource),
-	/* DEVMETHOD(bus_activate_resource, dpaa2_rc_activate_resource), */
-	/* DEVMETHOD(bus_deactivate_resource, dpaa2_rc_deactivate_resource), */
+	DEVMETHOD(bus_activate_resource, dpaa2_rc_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, dpaa2_rc_deactivate_resource),
 
 	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
 	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
