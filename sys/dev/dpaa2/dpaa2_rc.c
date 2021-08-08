@@ -759,7 +759,7 @@ enable_irq_resource(device_t rcdev, device_t child, int type, int rid,
 			break;
 		default:
 			if (bootverbose)
-				device_printf(rcdev, "Cannot %s IRQ for "
+				device_printf(rcdev, "Cannot %s IRQ %d for "
 				    "unsupported DPAA2 object: type=%d\n",
 				    enable > 0u ? "enable" : "disable", rid,
 				    dinfo->dtype);
