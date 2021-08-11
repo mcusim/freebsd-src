@@ -134,4 +134,6 @@ int dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
 
+const char *dpaa2_get_type(enum dpaa2_dev_type dtype);
+
 #endif /* _DPAA2_MC_H */

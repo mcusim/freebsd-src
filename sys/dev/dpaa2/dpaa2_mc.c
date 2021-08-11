@@ -250,6 +250,26 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	return (0);
 }
 
+const char *
+dpaa2_get_type(enum dpaa2_dev_type dtype)
+{
+	switch (dtype) {
+	case DPAA2_DEV_MC:
+		return ("mc");
+	case DPAA2_DEV_RC:
+		return ("dprc");
+	case DPAA2_DEV_IO:
+		return ("dpio");
+	case DPAA2_DEV_NI:
+		return ("dpni")
+	case DPAA2_DEV_MCP:
+		return ("dpmcp");
+	default:
+		return ("unknown");
+	}
+	return ("unknown");
+}
+
 static u_int
 dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
