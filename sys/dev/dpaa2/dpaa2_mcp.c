@@ -687,6 +687,35 @@ dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx
 	    CMDID_RC_SET_IRQ_ENABLE));
 }
 
+int
+dpaa2_cmd_rc_set_obj_irq(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
+    const char *type)
+{
+	struct __packed set_obj_irq_args {
+		uint32_t	data;
+		uint8_t		irq_idx;
+		uint8_t		_reserved1[3];
+		uint64_t	addr;
+		uint32_t	irq_usr;
+		uint32_t	obj_id;
+		uint8_t		type[16];
+	} *args;
+
+	if (!portal || !cmd || !type)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_obj_irq_args *) &cmd->params[0];
+	args->irq_idx = irq_idx;
+	args->addr = addr;
+	args->data = data;
+	args->irq_usr = irq_usr;
+	args->obj_id = obj_id;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	return (exec_command(portal, cmd, CMDID_RC_SET_OBJ_IRQ));
+}
+
 /*
  * Data Path Network Interface (DPNI) commands.
  */
