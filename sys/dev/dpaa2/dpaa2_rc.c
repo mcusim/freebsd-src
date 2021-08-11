@@ -814,7 +814,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
 		rc = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to open DPRC: error=&d\n",
+			device_printf(rcdev, "Failed to open DPRC: error=%d\n",
 			    rc);
 			return (ENODEV);
 		}
@@ -826,7 +826,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
 			if (rc) {
 				dpaa2_mcp_free_command(cmd);
 				device_printf(rcdev, "Failed to setup IRQ: "
-				    "rid=%d, addr=%jx, data=%x, error=&d\n",
+				    "rid=%d, addr=%jx, data=%x, error=%d\n",
 				    rid, addr, data, rc);
 				return (ENODEV);
 			}
@@ -849,7 +849,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
 			    rid - 1, enable);
 			if (error) {
 				device_printf(rcdev, "Failed to %s IRQ: "
-				    "rid=&d, error=%d\n",
+				    "rid=%d, error=%d\n",
 				    enable ? "enable" : "disable", rid, error);
 			}
 			/* Close the control session of the object. */
@@ -876,7 +876,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to close DPRC: "
-			    "error=&d\n", rc);
+			    "error=%d\n", rc);
 			return (ENODEV);
 		}
 
