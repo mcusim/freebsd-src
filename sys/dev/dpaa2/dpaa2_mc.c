@@ -261,7 +261,7 @@ dpaa2_get_type(enum dpaa2_dev_type dtype)
 	case DPAA2_DEV_IO:
 		return ("dpio");
 	case DPAA2_DEV_NI:
-		return ("dpni")
+		return ("dpni");
 	case DPAA2_DEV_MCP:
 		return ("dpmcp");
 	default:
