@@ -54,8 +54,11 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 
 /* Macros to enable/disable IRQ using MC command interface. */
-#define enable_irq(rc, d, r, a, d)  configure_irq((rc), (d), (r), 1u, (a), (d))
-#define disable_irq(rc, d, r, a, d) configure_irq((rc), (d), (r), 0u, (a), (d))
+#define enable_irq(rc, dev, rid, addr, data) \
+    configure_irq((rc), (dev), (rid), 1u, (addr), (data))
+
+#define disable_irq(rc, dev, rid) \
+    configure_irq((rc), (dev), (rid), 0u, 0u, 0u)
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
@@ -410,7 +413,7 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 			return (EINVAL);
 
 		/* Disable MSI for this DPAA2 object. */
-		error = disable_irq(rcdev, child, rid, 0, 0);
+		error = disable_irq(rcdev, child, rid);
 		if (error) {
 			device_printf(rcdev, "Failed to disable IRQ for "
 			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
