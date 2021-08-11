@@ -183,6 +183,9 @@ int	dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    uint16_t *major, uint16_t *minor);
 int	dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    uint8_t irq_idx, uint8_t enable);
+int	dpaa2_cmd_rc_set_obj_irq(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    uint8_t irq_idx, uint64_t addr, uint32_t data, uint32_t irq_usr,
+	    uint32_t obj_id, const char *type);
 
 /*
  * Data Path Network Interface (DPNI) commands.
