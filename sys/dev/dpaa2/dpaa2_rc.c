@@ -54,21 +54,20 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 
 /* Macros to enable/disable IRQ using MC command interface. */
-#define enable_irq(rc, dev, rid, addr, data) \
-    configure_irq((rc), (dev), (rid), 1u, (addr), (data))
-
-#define disable_irq(rc, dev, rid) \
-    configure_irq((rc), (dev), (rid), 0u, 0u, 0u)
+#define dpaa2_rc_enable_irq(rc, dev, rid, addr, data) \
+    dpaa2_rc_configure_irq((rc), (dev), (rid), 1u, (addr), (data))
+#define dpaa2_rc_disable_irq(rc, dev, rid) \
+    dpaa2_rc_configure_irq((rc), (dev), (rid), 0u, 0u, 0u)
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
 /* Forward declarations. */
 static int dpaa2_rc_detach(device_t dev);
-static int discover_objects(struct dpaa2_rc_softc *sc);
-static int add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+static int dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc);
+static int dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj);
-static int configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
-    uint64_t addr, uint32_t data);
+static int dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid,
+    uint8_t enable, uint64_t addr, uint32_t data);
 
 /*
  * Device interface.
@@ -140,7 +139,7 @@ dpaa2_rc_attach(device_t dev)
 	}
 
 	/* Create DPAA2 devices for objects in this container. */
-	error = discover_objects(sc);
+	error = dpaa2_rc_discover_objects(sc);
 	if (error) {
 		device_printf(dev, "Failed to discover objects in container: "
 		    "error=%d\n", error);
@@ -371,7 +370,7 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		}
 
 		/* Enable MSI for this DPAA2 object. */
-		error = enable_irq(rcdev, child, rid, addr, data);
+		error = dpaa2_rc_enable_irq(rcdev, child, rid, addr, data);
 		if (error) {
 			device_printf(rcdev, "Failed to enable IRQ for "
 			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
@@ -413,7 +412,7 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 			return (EINVAL);
 
 		/* Disable MSI for this DPAA2 object. */
-		error = disable_irq(rcdev, child, rid);
+		error = dpaa2_rc_disable_irq(rcdev, child, rid);
 		if (error) {
 			device_printf(rcdev, "Failed to disable IRQ for "
 			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
@@ -612,7 +611,7 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
  * @brief Create and add devices for DPAA2 objects in this resource container.
  */
 static int
-discover_objects(struct dpaa2_rc_softc *sc)
+dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 {
 	device_t rcdev = sc->dev;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -699,7 +698,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 			    "error=%d\n", i, rc);
 			continue;
 		}
-		add_child(sc, cmd, &obj);
+		dpaa2_rc_add_child(sc, cmd, &obj);
 	}
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
@@ -714,7 +713,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
  * @brief Add a new DPAA2 device to the resource container bus.
  */
 static int
-add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
 	device_t rcdev = sc->dev;
@@ -787,7 +786,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
  * @brief Configure given IRQ using MC command interface.
  */
 static int
-configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
+dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint8_t enable,
     uint64_t addr, uint32_t data)
 {
 	struct dpaa2_rc_softc *rcsc;
