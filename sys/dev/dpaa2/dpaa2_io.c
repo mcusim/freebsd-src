@@ -49,8 +49,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 
+#include <vm/vm.h>
+
 #include <machine/bus.h>
 #include <machine/resource.h>
+
+#include <dev/pci/pcivar.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"
@@ -200,7 +204,7 @@ static void
 dpaa2_io_msi_intr(void *arg)
 {
 	/* NOTE: Useless interrupt handler. */
-	volatile uint32 val = 0;
+	volatile uint32_t val = 0;
 	for (uint32_t i = 0; i < 100; i++)
 		val++;
 }
