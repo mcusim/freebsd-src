@@ -49,6 +49,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 
+#include <machine/bus.h>
+#include <machine/resource.h>
+
 #include "pcib_if.h"
 #include "pci_if.h"
 
@@ -89,7 +92,7 @@ dpaa2_io_probe(device_t dev)
 static int
 dpaa2_io_attach(device_t dev)
 {
-	struct device_t pdev;
+	device_t pdev;
 	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_io_softc *sc;
 	struct resource_map_request req;
