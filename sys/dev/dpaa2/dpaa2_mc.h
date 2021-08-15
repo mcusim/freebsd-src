@@ -30,6 +30,7 @@
 #define	_DPAA2_MC_H
 
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
+#define DPAA2_IO_MSI_COUNT	1
 
 /* MC Registers */
 #define MC_REG_GCR1		0x00u
@@ -80,6 +81,11 @@ struct dpaa2_rc_softc {
  */
 struct dpaa2_io_softc {
 	device_t		 dev;
+	struct resource 	*res[3];
+	struct resource_map	 map[3];
+	int			 irq_rid[DPAA2_IO_MSI_COUNT];
+	struct resource		*irq_resource;
+	void			*intr; /* interrupt handle */
 };
 
 /*

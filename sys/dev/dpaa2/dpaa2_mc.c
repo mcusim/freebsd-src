@@ -113,9 +113,6 @@ dpaa2_mc_attach(device_t dev)
 		/* Reset P1_STOP bit to resume MC processor. */
 		val = mcreg_read_4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
 		mcreg_write_4(sc, MC_REG_GCR1, val);
-
-		/* Might be necessary to configure StreamID for SMMU. */
-		/* ... */
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
