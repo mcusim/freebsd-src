@@ -101,7 +101,6 @@ dpaa2_io_attach(device_t dev)
 	struct dpaa2_io_softc *sc;
 	struct resource_map_request req;
 	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
 	int error;
 
 	sc = device_get_softc(dev);
