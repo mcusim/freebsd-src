@@ -245,6 +245,11 @@ dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
 		return (BUS_ALLOC_RESOURCE(device_get_parent(rcdev), child,
 		    type, rid, start, end, count, flags));
 
+	if (bootverbose)
+		device_printf(rcdev, "%s: Allocating resource for a child: "
+		    "type=%d, rid=%d, start=%jx, end=%jx, count=%d, flags=%d\n",
+		    __func__, type, *rid, start, end, count, flags);
+
 	return (dpaa2_rc_alloc_multi_resource(rcdev, child, type, rid, start,
 	    end, count, 1, flags));
 }
