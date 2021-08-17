@@ -4786,7 +4786,7 @@ bus_alloc_resource(device_t dev, int type, int *rid, rman_res_t start,
 	    count, flags);
 	/* For debug purposes only! */
 	device_printf(dev, "%s: Going to return after BUS_ALLOC_RESOURCE: "
-	    "res=%jx\n", __func__, res);
+	    "res=0x%jx\n", __func__, (uintmax_t) res);
 	return (res);
 }
 
