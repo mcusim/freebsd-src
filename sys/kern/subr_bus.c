@@ -4741,6 +4741,9 @@ bus_alloc_resources(device_t dev, struct resource_spec *rs,
 		res[i] = bus_alloc_resource_any(dev,
 		    rs[i].type, &rs[i].rid, rs[i].flags);
 		if (res[i] == NULL && !(rs[i].flags & RF_OPTIONAL)) {
+			/* For debug purposes only! */
+			device_printf(dev, "%s: Failed to allocate resource: "
+			    "i=%d\n", __func__, i);
 			bus_release_resources(dev, rs, res);
 			return (ENXIO);
 		}
@@ -4774,10 +4777,16 @@ bus_alloc_resource(device_t dev, int type, int *rid, rman_res_t start,
 {
 	struct resource *res;
 
-	if (dev->parent == NULL)
+	if (dev->parent == NULL) {
+		/* For debug purposes only! */
+		device_printf(dev, "%s: Parent is NULL!\n", __func__);
 		return (NULL);
+	}
 	res = BUS_ALLOC_RESOURCE(dev->parent, dev, type, rid, start, end,
 	    count, flags);
+	/* For debug purposes only! */
+	device_printf(dev, "%s: Going to return after BUS_ALLOC_RESOURCE: "
+	    "res=%jx\n", __func__, res);
 	return (res);
 }
 

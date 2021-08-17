@@ -241,14 +241,15 @@ static struct resource *
 dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
     rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
 {
-	if (device_get_parent(child) != rcdev)
+	if (device_get_parent(child) != rcdev) {
+		device_printf(rcdev, "%s: Parent does not match\n", __func__);
 		return (BUS_ALLOC_RESOURCE(device_get_parent(rcdev), child,
 		    type, rid, start, end, count, flags));
+	}
 
-	if (bootverbose)
-		device_printf(rcdev, "%s: Allocating resource for a child: "
-		    "type=%d, rid=%d, start=%jx, end=%jx, count=%lu, flags=%d\n",
-		    __func__, type, *rid, start, end, count, flags);
+	device_printf(rcdev, "%s: Allocating resource for a child: "
+	    "type=%d, rid=%d, start=%jx, end=%jx, count=%lu, flags=%d\n",
+	    __func__, type, *rid, start, end, count, flags);
 
 	return (dpaa2_rc_alloc_multi_resource(rcdev, child, type, rid, start,
 	    end, count, 1, flags));
