@@ -71,7 +71,7 @@ __FBSDID("$FreeBSD$");
  *	2: control registers of the QBMan software portal?
  */
 static struct resource_spec dpaa2_io_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE },
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
 	RESOURCE_SPEC_END
@@ -116,6 +116,30 @@ dpaa2_io_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	/* Map cache-enabled part of the software portal memory. */
+	resource_init_map_request(&req);
+	req.memattr = VM_MEMATTR_WRITE_BACK;
+	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0],
+	    &req, &sc->map[0]);
+	if (error) {
+		device_printf(dev, "Failed to map cache-enabled part of the "
+		    "software portal memory: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Map cache-inhibited part of the software portal memory. */
+	resource_init_map_request(&req);
+	req.memattr = VM_MEMATTR_DEVICE;
+	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[1],
+	    &req, &sc->map[1]);
+	if (error) {
+		device_printf(dev, "Failed to map cache-inhibited part of the "
+		    "software portal memory: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
 	/* An attempt to map a region with control registers. */
 	if (sc->res[2]) {
 		resource_init_map_request(&req);
@@ -128,18 +152,6 @@ dpaa2_io_attach(device_t dev)
 			dpaa2_mc_detach(dev);
 			return (ENXIO);
 		}
-	}
-
-	/* Map cache-inhibited part of the software portal memory. */
-	resource_init_map_request(&req);
-	req.memattr = VM_MEMATTR_DEVICE;
-	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0],
-	    &req, &sc->map[0]);
-	if (error) {
-		device_printf(dev, "Failed to map cache-inhibited part of the "
-		    "software portal memory: error=%d\n", error);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
 	}
 
 	error = dpaa2_io_setup_msi(sc);
