@@ -104,6 +104,7 @@ struct dpaa2_msinfo {
 /**
  * @brief Information about DPAA2 device.
  *
+ * resources:	Resources available for this DPAA2 device.
  * pdev:	Parent device.
  * dev:		Device this devinfo is associated with.
  * id:		ID of a logical DPAA2 object resource.
@@ -111,17 +112,16 @@ struct dpaa2_msinfo {
  * icid:	Isolation context ID of the DPAA2 object. It is shared
  *		between a resource container and all of its children.
  * dtype:	Type of the DPAA2 object.
- * resources:	Resources allocated for this DPAA2 device.
  * msi:		Information about MSI messages supported by the DPAA2 object.
  */
 struct dpaa2_devinfo {
+	struct resource_list	 resources;
 	device_t		 pdev;
 	device_t		 dev;
 	uint32_t		 id;
 	uint32_t		 portal_id;
 	uint16_t		 icid;
 	enum dpaa2_dev_type	 dtype;
-	struct resource_list	 resources;
 	struct dpaa2_msinfo	 msi;
 };
 
