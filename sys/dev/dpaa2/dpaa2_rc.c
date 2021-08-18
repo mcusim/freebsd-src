@@ -216,8 +216,7 @@ dpaa2_rc_delete_resource(device_t rcdev, device_t child, int type, int rid)
 
 static struct resource *
 dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid,
-    rman_res_t start, rman_res_t end, rman_res_t count, u_long num,
-    u_int flags)
+    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
 {
 	struct resource_list *rl;
 	struct dpaa2_devinfo *dinfo;
@@ -252,7 +251,7 @@ dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
 	    __func__, type, *rid, start, end, count, flags);
 
 	return (dpaa2_rc_alloc_multi_resource(rcdev, child, type, rid, start,
-	    end, count, 1, flags));
+	    end, count, flags));
 }
 
 static int
