@@ -3496,43 +3496,23 @@ resource_list_alloc(struct resource_list *rl, device_t bus, device_t child,
 	int passthrough = (device_get_parent(child) != bus);
 	int isdefault = RMAN_IS_DEFAULT_RANGE(start, end);
 
-	if (passthrough) {
-		/* For debug purposes only! */
-		if (bootverbose)
-			device_printf(bus, "passthrough alloc!\n");
+	if (passthrough)
 		return (BUS_ALLOC_RESOURCE(device_get_parent(bus), child,
 		    type, rid, start, end, count, flags));
-	}
 
 	rle = resource_list_find(rl, type, *rid);
 
-	if (!rle) {
-		/* For debug purposes only! */
-		if (bootverbose)
-			device_printf(bus, "no resource found: type=%d, "
-			    "rid=%d\n", type, *rid);
+	if (!rle)
 		return (NULL);		/* no resource of that type/rid */
-	}
 
 	if (rle->res) {
 		if (rle->flags & RLE_RESERVED) {
-			if (rle->flags & RLE_ALLOCATED) {
-				/* For debug purposes only! */
-				if (bootverbose)
-					device_printf(bus, "already allocated: "
-					    "type=%d, rid=%d\n", type, *rid);
+			if (rle->flags & RLE_ALLOCATED)
 				return (NULL);
-			}
 			if ((flags & RF_ACTIVE) &&
 			    bus_activate_resource(child, type, *rid,
-			    rle->res) != 0) {
-				/* For debug purposes only! */
-				if (bootverbose)
-					device_printf(bus, "failed to activate "
-					    "resource: type=%d, rid=%d\n",
-					    type, *rid);
+			    rle->res) != 0)
 				return (NULL);
-			}
 			rle->flags |= RLE_ALLOCATED;
 			return (rle->res);
 		}
@@ -3560,9 +3540,6 @@ resource_list_alloc(struct resource_list *rl, device_t bus, device_t child,
 		rle->count = count;
 	}
 
-	/* For debug purposes only! */
-	if (bootverbose)
-		device_printf(bus, "going to return from %s\n", __func__);
 	return (rle->res);
 }
 
@@ -4763,9 +4740,6 @@ bus_alloc_resources(device_t dev, struct resource_spec *rs,
 		res[i] = bus_alloc_resource_any(dev,
 		    rs[i].type, &rs[i].rid, rs[i].flags);
 		if (res[i] == NULL && !(rs[i].flags & RF_OPTIONAL)) {
-			/* For debug purposes only! */
-			device_printf(dev, "%s: Failed to allocate resource: "
-			    "i=%d\n", __func__, i);
 			bus_release_resources(dev, rs, res);
 			return (ENXIO);
 		}
@@ -4799,16 +4773,10 @@ bus_alloc_resource(device_t dev, int type, int *rid, rman_res_t start,
 {
 	struct resource *res;
 
-	if (dev->parent == NULL) {
-		/* For debug purposes only! */
-		device_printf(dev, "%s: Parent is NULL!\n", __func__);
+	if (dev->parent == NULL)
 		return (NULL);
-	}
 	res = BUS_ALLOC_RESOURCE(dev->parent, dev, type, rid, start, end,
 	    count, flags);
-	/* For debug purposes only! */
-	device_printf(dev, "%s: Going to return after BUS_ALLOC_RESOURCE: "
-	    "res=0x%jx\n", __func__, (uintmax_t) res);
 	return (res);
 }
 
