@@ -53,12 +53,14 @@ enum dpaa2_dev_type {
  * rcdev: Child device associated with the root resource container.
  * res: Unmapped MC command portal and control registers resources.
  * map: Mapped MC command portal and control registers resources.
+ * io_rman: I/O memory resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
 	device_t		 rcdev;
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
+	struct rman		 io_rman;
 };
 
 /*
@@ -130,6 +132,11 @@ DECLARE_CLASS(dpaa2_mc_driver);
 /* For device interface */
 int dpaa2_mc_attach(device_t dev);
 int dpaa2_mc_detach(device_t dev);
+
+/* For bus interface */
+struct resource * dpaa2_mc_alloc_resource(device_t mcdev, device_t child,
+    int type, int *rid, rman_res_t start, rman_res_t end, rman_res_t count,
+    u_int flags);
 
 /* For pseudo-pcib interface */
 int dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,

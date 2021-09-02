@@ -134,6 +134,15 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
+	/* Initialize resource manager of the I/O memory. */
+	sc->io_rman.rm_type = RMAN_ARRAY;
+	sc->io_rman.rm_descr = "DPAA2 I/O memory";
+	error = rman_init(&sc->io_rman);
+	if (error) {
+		device_printf(dev, "rman_init() failed. error = %d\n", error);
+		return (error);
+	}
+
 	/* Allocate devinfo to keep information about the MC bus itself. */
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
 	    M_WAITOK | M_ZERO);
@@ -186,6 +195,57 @@ dpaa2_mc_detach(device_t dev)
 		return (error);
 
 	return (device_delete_children(dev));
+}
+
+/*
+ * For bus interface.
+ */
+
+struct resource *
+dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
+    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
+{
+	struct dpaa2_mc_softc *sc;
+	struct resource *res;
+	struct rman *rm;
+	int error;
+
+	sc = device_get_softc(mcdev);
+	rm = &sc->io_rman;
+
+	/*
+	 * I/O region which should be managed by the MC is not previously known.
+	 */
+	error = rman_manage_region(rm, start, end);
+	if (error) {
+		device_printf(mcdev, "rman_manage_region() failed. error = %d\n",
+		    error);
+		return (NULL);
+	}
+
+	if (bootverbose)
+		device_printf(mcdev, "rman_reserve_resource: start=%#jx, "
+		    "end=%#jx, count=%#jx\n", start, end, count);
+	res = rman_reserve_resource(rm, start, end, count, flags, child);
+	if (res == NULL)
+		goto fail;
+
+	rman_set_rid(res, *rid);
+
+	if (flags & RF_ACTIVE)
+		if (bus_activate_resource(child, type, *rid, res)) {
+			rman_release_resource(res);
+			goto fail;
+		}
+
+	return (res);
+
+fail:
+	device_printf(mcdev, "%s FAIL: type=%d, rid=%d, "
+	    "start=%016jx, end=%016jx, count=%016jx, flags=%x\n",
+	    __func__, type, *rid, start, end, count, flags);
+
+	return (NULL);
 }
 
 /*

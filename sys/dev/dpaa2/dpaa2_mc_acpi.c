@@ -111,11 +111,22 @@ dpaa2_mc_acpi_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	return (dpaa2_mc_get_id(mcdev, child, type, id));
 }
 
+static struct resource *
+dpaa2_mc_acpi_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
+    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
+{
+	return (dpaa2_mc_alloc_resource(mcdev, child, type, rid, start, end,
+	    count, flags));
+}
+
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
 	DEVMETHOD(device_attach,	dpaa2_mc_acpi_attach),
 	DEVMETHOD(device_detach,	dpaa2_mc_acpi_detach),
+
+	/* Bus interface */
+	DEVMETHOD(bus_alloc_resource,	dpaa2_mc_acpi_alloc_resource),
 
 	/* Pseudo-PCIB interface */
 	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),
