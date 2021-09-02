@@ -3497,23 +3497,42 @@ resource_list_alloc(struct resource_list *rl, device_t bus, device_t child,
 	int isdefault = RMAN_IS_DEFAULT_RANGE(start, end);
 
 	if (passthrough) {
+		/* For debug purposes only! */
+		if (bootverbose)
+			device_printf(bus, "passthrough alloc!\n");
 		return (BUS_ALLOC_RESOURCE(device_get_parent(bus), child,
 		    type, rid, start, end, count, flags));
 	}
 
 	rle = resource_list_find(rl, type, *rid);
 
-	if (!rle)
+	if (!rle) {
+		/* For debug purposes only! */
+		if (bootverbose)
+			device_printf(bus, "no resource found: type=%d, "
+			    "rid=%d\n", type, *rid);
 		return (NULL);		/* no resource of that type/rid */
+	}
 
 	if (rle->res) {
 		if (rle->flags & RLE_RESERVED) {
-			if (rle->flags & RLE_ALLOCATED)
+			if (rle->flags & RLE_ALLOCATED) {
+				/* For debug purposes only! */
+				if (bootverbose)
+					device_printf(bus, "already allocated: "
+					    "type=%d, rid=%d\n", type, *rid);
 				return (NULL);
+			}
 			if ((flags & RF_ACTIVE) &&
 			    bus_activate_resource(child, type, *rid,
-			    rle->res) != 0)
+			    rle->res) != 0) {
+				/* For debug purposes only! */
+				if (bootverbose)
+					device_printf(bus, "failed to activate "
+					    "resource: type=%d, rid=%d\n",
+					    type, *rid);
 				return (NULL);
+			}
 			rle->flags |= RLE_ALLOCATED;
 			return (rle->res);
 		}
@@ -3541,6 +3560,9 @@ resource_list_alloc(struct resource_list *rl, device_t bus, device_t child,
 		rle->count = count;
 	}
 
+	/* For debug purposes only! */
+	if (bootverbose)
+		device_printf(bus, "going to return from %s\n", __func__);
 	return (rle->res);
 }
 
