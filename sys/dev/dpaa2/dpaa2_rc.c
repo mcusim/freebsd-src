@@ -611,6 +611,20 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
 	return (PCIB_GET_ID(device_get_parent(rcdev), child, type, id));
 }
 
+static int
+dpaa2_rc_print_child(device_t rcdev, device_t child)
+{
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	struct resource_list *rl = &dinfo->resources;
+	int retval = 0;
+
+	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
+	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
+	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
+
+	return (retval);
+}
+
 /**
  * @internal
  * @brief Create and add devices for DPAA2 objects in this resource container.
@@ -910,6 +924,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
 	DEVMETHOD(bus_setup_intr,	dpaa2_rc_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	dpaa2_rc_teardown_intr),
+	DEVMETHOD(bus_print_child,	dpaa2_rc_print_child),
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
