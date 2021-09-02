@@ -100,7 +100,7 @@ dpaa2_io_attach(device_t dev)
 	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_io_softc *sc;
 	struct resource_map_request req;
-	struct dpaa2_devinfo *rcinfo, *dinfo;
+	struct dpaa2_devinfo *rcinfo;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -108,18 +108,6 @@ dpaa2_io_attach(device_t dev)
 	pdev = device_get_parent(dev);
 	rcsc = device_get_softc(pdev);
 	rcinfo = device_get_ivars(pdev);
-	dinfo = device_get_ivars(dev);
-
-	if (dinfo) {
-		device_printf(dev, "Resources: \n");
-		resource_list_print_type(&dinfo->resources, "port",
-		    SYS_RES_IOPORT, "%#jx");
-		resource_list_print_type(&dinfo->resources, "mem",
-		    SYS_RES_MEMORY, "%#jx");
-		resource_list_print_type(&dinfo->resources, "irq",
-		    SYS_RES_IRQ, "%jd");
-	} else
-		device_printf(dev, "No devinfo!\n");
 
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
 	if (error) {
