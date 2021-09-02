@@ -240,15 +240,9 @@ static struct resource *
 dpaa2_rc_alloc_resource(device_t rcdev, device_t child, int type, int *rid,
     rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
 {
-	if (device_get_parent(child) != rcdev) {
-		device_printf(rcdev, "%s: Parent does not match\n", __func__);
+	if (device_get_parent(child) != rcdev)
 		return (BUS_ALLOC_RESOURCE(device_get_parent(rcdev), child,
 		    type, rid, start, end, count, flags));
-	}
-
-	device_printf(rcdev, "%s: Allocating resource for a child: "
-	    "type=%d, rid=%d, start=%jx, end=%jx, count=%lu, flags=%d\n",
-	    __func__, type, *rid, start, end, count, flags);
 
 	return (dpaa2_rc_alloc_multi_resource(rcdev, child, type, rid, start,
 	    end, count, flags));
@@ -618,9 +612,17 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	struct resource_list *rl = &dinfo->resources;
 	int retval = 0;
 
+	retval += bus_print_child_header(rcdev, child);
+
 	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
+
+	retval += printf(" at %s (id=%ul)", dpaa2_get_type(dinfo->dtype),
+	    dinfo->id);
+
+	retval += bus_print_child_domain(rcdev, child);
+	retval += bus_print_child_footer(rcdev, child);
 
 	return (retval);
 }
@@ -745,7 +747,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 
 	/* Add a device if it is DPIO. */
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
-		dev = device_add_child(rcdev, "dpaa2_io", obj->id);
+		dev = device_add_child(rcdev, "dpaa2_io", -1);
 		if (dev == NULL) {
 			device_printf(rcdev, "Failed to add a child device: "
 			    "type=%s, id=%u\n", (const char *)obj->type,
