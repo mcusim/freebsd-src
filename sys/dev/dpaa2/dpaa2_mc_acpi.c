@@ -119,6 +119,13 @@ dpaa2_mc_acpi_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	    count, flags));
 }
 
+static int
+dpaa2_mc_acpi_activate_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	return (dpaa2_mc_activate_resource(mcdev, child, type, rid, r));
+}
+
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
@@ -127,6 +134,7 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_alloc_resource,	dpaa2_mc_acpi_alloc_resource),
+	DEVMETHOD(bus_activate_resource, dpaa2_mc_acpi_activate_resource),
 
 	/* Pseudo-PCIB interface */
 	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),

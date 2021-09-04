@@ -137,6 +137,8 @@ int dpaa2_mc_detach(device_t dev);
 struct resource * dpaa2_mc_alloc_resource(device_t mcdev, device_t child,
     int type, int *rid, rman_res_t start, rman_res_t end, rman_res_t count,
     u_int flags);
+static int dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r);
 
 /* For pseudo-pcib interface */
 int dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,

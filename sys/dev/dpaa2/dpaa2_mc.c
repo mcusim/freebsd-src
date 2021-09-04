@@ -208,9 +208,20 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	struct dpaa2_mc_softc *sc;
 	struct resource *res;
 	struct rman *rm;
+	int error;
 
 	sc = device_get_softc(mcdev);
 	rm = &sc->io_rman;
+
+	/*
+	 * I/O region which should be managed by the MC is not previously known.
+	 */
+	error = rman_manage_region(rm, start, end);
+	if (error) {
+		device_printf(mcdev, "rman_manage_region() failed. error = %d\n",
+		    error);
+		goto fail;
+	}
 
 	if (bootverbose)
 		device_printf(mcdev, "rman_reserve_resource: start=%#jx, "
@@ -221,20 +232,39 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 
 	rman_set_rid(res, *rid);
 
-	if (flags & RF_ACTIVE)
+	if (flags & RF_ACTIVE) {
+		if (bootverbose)
+			device_printf(mcdev, "bus_activate_resource: rid=%d, "
+			    "res=%#jx\n", *rid, res);
 		if (bus_activate_resource(child, type, *rid, res)) {
 			rman_release_resource(res);
 			goto fail;
 		}
+	}
 
 	return (res);
 
-fail:
+ fail:
 	device_printf(mcdev, "%s FAIL: type=%d, rid=%d, "
 	    "start=%016jx, end=%016jx, count=%016jx, flags=%x\n",
 	    __func__, type, *rid, start, end, count, flags);
 
 	return (NULL);
+}
+
+static int dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	struct dpaa2_mc_softc *sc;
+	int res;
+
+	sc = device_get_softc(mcdev);
+
+	if ((res = rman_activate_resource(r)) != 0)
+		return (res);
+
+	return (BUS_ACTIVATE_RESOURCE(device_get_parent(mcdev), child, type,
+	    rid, r));
 }
 
 /*
