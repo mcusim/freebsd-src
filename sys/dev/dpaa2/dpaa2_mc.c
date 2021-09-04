@@ -208,7 +208,6 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	struct dpaa2_mc_softc *sc;
 	struct resource *res;
 	struct rman *rm;
-	int error;
 
 	sc = device_get_softc(mcdev);
 	rm = &sc->io_rman;
