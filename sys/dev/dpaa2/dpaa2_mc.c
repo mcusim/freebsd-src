@@ -140,7 +140,7 @@ dpaa2_mc_attach(device_t dev)
 	error = rman_init(&sc->io_rman);
 	if (error) {
 		device_printf(dev, "rman_init() failed. error = %d\n", error);
-		return (error);
+		return (ENXIO);
 	}
 
 	/* Allocate devinfo to keep information about the MC bus itself. */
@@ -212,16 +212,6 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 
 	sc = device_get_softc(mcdev);
 	rm = &sc->io_rman;
-
-	/*
-	 * I/O region which should be managed by the MC is not previously known.
-	 */
-	error = rman_manage_region(rm, start, end);
-	if (error) {
-		device_printf(mcdev, "rman_manage_region() failed. error = %d\n",
-		    error);
-		return (NULL);
-	}
 
 	if (bootverbose)
 		device_printf(mcdev, "rman_reserve_resource: start=%#jx, "
