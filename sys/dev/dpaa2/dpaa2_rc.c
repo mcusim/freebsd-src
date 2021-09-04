@@ -618,7 +618,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
 
-	retval += printf(" at %s (id=%ul)", dpaa2_get_type(dinfo->dtype),
+	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
 	    dinfo->id);
 
 	retval += bus_print_child_domain(rcdev, child);
@@ -737,13 +737,21 @@ static int
 dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
+	device_t mcdev;
 	device_t rcdev = sc->dev;
 	device_t dev;
+	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo;
+	struct rman *rm;
 	dpaa2_rc_obj_region_t reg;
 	uint64_t start, end, count;
 	int rc;
+
+	/* NOTE: Assuming root DPRC for now only, i.e. MC is its parent. */
+	mcdev = device_get_parent(rcdev);
+	mcsc = device_get_softc(mcdev);
+	rm = &mcsc->io_rman;
 
 	/* Add a device if it is DPIO. */
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
@@ -791,9 +799,22 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 				    "error=%d\n", obj->id, i, rc);
 				continue;
 			}
+
+			/*
+			 * Try to add a new (and, probably, unknown) I/O region
+			 * which should be managed by the MC.
+			 */
+			rc = rman_manage_region(rm, reg.base_paddr, ~0);
+			if (rc && bootverbose)
+				device_printf(rcdev, "rman_manage_region() "
+				    "failed (already known region?): error = %d,"
+				    " start=%#jx, end=%#jx\n",
+				    rc, reg.base_paddr, ~0);
+
 			count = reg.size;
 			start = reg.base_paddr + reg.base_offset;
 			end = reg.base_paddr + reg.base_offset + reg.size - 1;
+
 			resource_list_add(&dinfo->resources, SYS_RES_MEMORY,
 			    i, start, end, count);
 		}
