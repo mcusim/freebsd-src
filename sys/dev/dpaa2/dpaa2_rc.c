@@ -627,6 +627,13 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	return (retval);
 }
 
+int
+dpaa2_rc_activate_resource(device_t rcdev, device_t child, int type, int rid,
+    struct resource *r)
+{
+	return (bus_generic_activate_resource(rcdev, child, type, rid, r));
+}
+
 /**
  * @internal
  * @brief Create and add devices for DPAA2 objects in this resource container.
@@ -737,21 +744,13 @@ static int
 dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
-	device_t mcdev;
 	device_t rcdev = sc->dev;
 	device_t dev;
-	struct dpaa2_mc_softc *mcsc;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo;
-	struct rman *rm;
 	dpaa2_rc_obj_region_t reg;
 	uint64_t start, end, count;
 	int rc;
-
-	/* NOTE: Assuming root DPRC for now only, i.e. MC is its parent. */
-	mcdev = device_get_parent(rcdev);
-	mcsc = device_get_softc(mcdev);
-	rm = &mcsc->io_rman;
 
 	/* Add a device if it is DPIO. */
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
@@ -799,17 +798,6 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 				    "error=%d\n", obj->id, i, rc);
 				continue;
 			}
-
-			/*
-			 * Try to add a new (and, probably, unknown) I/O region
-			 * which should be managed by the MC.
-			 */
-			rc = rman_manage_region(rm, reg.base_paddr, ~0);
-			if (rc && bootverbose)
-				device_printf(rcdev, "rman_manage_region() "
-				    "failed (already known region?): error = %d,"
-				    " start=%#jx, end=%#jx\n",
-				    rc, reg.base_paddr, (uintmax_t) ~0);
 
 			count = reg.size;
 			start = reg.base_paddr + reg.base_offset;
@@ -941,7 +929,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource),
 	DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
 	DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource),
-	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
+	DEVMETHOD(bus_activate_resource, dpaa2_rc_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
 	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
 	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
