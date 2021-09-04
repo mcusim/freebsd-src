@@ -235,7 +235,7 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	if (flags & RF_ACTIVE) {
 		if (bootverbose)
 			device_printf(mcdev, "bus_activate_resource: rid=%d, "
-			    "res=%#jx\n", *rid, res);
+			    "res=%#jx\n", *rid, (uintmax_t) res);
 		if (bus_activate_resource(child, type, *rid, res)) {
 			rman_release_resource(res);
 			goto fail;
