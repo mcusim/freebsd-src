@@ -627,7 +627,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	return (retval);
 }
 
-int
+static int
 dpaa2_rc_activate_resource(device_t rcdev, device_t child, int type, int rid,
     struct resource *r)
 {
