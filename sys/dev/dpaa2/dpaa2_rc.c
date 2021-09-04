@@ -809,7 +809,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 				device_printf(rcdev, "rman_manage_region() "
 				    "failed (already known region?): error = %d,"
 				    " start=%#jx, end=%#jx\n",
-				    rc, reg.base_paddr, ~0);
+				    rc, reg.base_paddr, (uintmax_t) ~0);
 
 			count = reg.size;
 			start = reg.base_paddr + reg.base_offset;
