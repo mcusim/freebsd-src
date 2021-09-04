@@ -252,7 +252,8 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	return (NULL);
 }
 
-static int dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
+int
+dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
     int rid, struct resource *r)
 {
 	struct dpaa2_mc_softc *sc;
