@@ -76,7 +76,7 @@ static struct resource_spec dpaa2_mc_spec[] = {
 /* Forward declarations. */
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
-static struct rman *dpaa2_mc_rman(device_t mcdev, int type, int flags);
+static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
 
 /*
  * For device interface.
