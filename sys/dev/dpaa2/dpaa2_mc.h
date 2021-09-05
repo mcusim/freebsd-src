@@ -54,6 +54,7 @@ enum dpaa2_dev_type {
  * res: Unmapped MC command portal and control registers resources.
  * map: Mapped MC command portal and control registers resources.
  * io_rman: I/O memory resource manager.
+ * msi_rman: Message-signalled interrupts resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
@@ -61,6 +62,9 @@ struct dpaa2_mc_softc {
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
 	struct rman		 io_rman;
+	struct rman		 msi_rman;
+	bool			 has_io_rman;
+	bool			 has_msi_rman;
 };
 
 /*
@@ -137,7 +141,13 @@ int dpaa2_mc_detach(device_t dev);
 struct resource * dpaa2_mc_alloc_resource(device_t mcdev, device_t child,
     int type, int *rid, rman_res_t start, rman_res_t end, rman_res_t count,
     u_int flags);
+int dpaa2_mc_adjust_resource(device_t mcdev, device_t child, int type,
+    struct resource *r, rman_res_t start, rman_res_t end);
+int dpaa2_mc_release_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r);
 int dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r);
+int dpaa2_mc_deactivate_resource(device_t mcdev, device_t child, int type,
     int rid, struct resource *r);
 
 /* For pseudo-pcib interface */

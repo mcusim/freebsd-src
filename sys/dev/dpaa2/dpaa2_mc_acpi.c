@@ -120,10 +120,31 @@ dpaa2_mc_acpi_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 }
 
 static int
+dpaa2_mc_acpi_adjust_resource(device_t mcdev, device_t child, int type,
+    struct resource *r, rman_res_t start, rman_res_t end)
+{
+	return (dpaa2_mc_adjust_resource(mcdev, child, type, r, start, end));
+}
+
+static int
+dpaa2_mc_acpi_release_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	return (dpaa2_mc_release_resource(mcdev, child, type, rid, r));
+}
+
+static int
 dpaa2_mc_acpi_activate_resource(device_t mcdev, device_t child, int type,
     int rid, struct resource *r)
 {
 	return (dpaa2_mc_activate_resource(mcdev, child, type, rid, r));
+}
+
+static int
+dpaa2_mc_acpi_deactivate_resource(device_t mcdev, device_t child, int type,
+    int rid, struct resource *r)
+{
+	return (dpaa2_mc_deactivate_resource(mcdev, child, type, rid, r));
 }
 
 static device_method_t dpaa2_mc_acpi_methods[] = {
@@ -134,7 +155,12 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_alloc_resource,	dpaa2_mc_acpi_alloc_resource),
+	DEVMETHOD(bus_adjust_resource,	dpaa2_mc_acpi_adjust_resource),
+	DEVMETHOD(bus_release_resource,	dpaa2_mc_acpi_release_resource),
 	DEVMETHOD(bus_activate_resource, dpaa2_mc_acpi_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, dpaa2_mc_acpi_deactivate_resource),
+	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
+	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 
 	/* Pseudo-PCIB interface */
 	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),

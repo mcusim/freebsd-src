@@ -134,7 +134,7 @@ dpaa2_rc_attach(device_t dev)
 			return (ENXIO);
 		}
 	} else {
-		/* Child DPRCs aren't supported yet. */
+		/* TODO: Child DPRCs aren't supported yet. */
 		return (ENXIO);
 	}
 
@@ -223,14 +223,10 @@ dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid
 
 	dinfo = device_get_ivars(child);
 	rl = &dinfo->resources;
-	if (type == SYS_RES_IRQ) {
-		/*
-		 * Can't alloc legacy interrupt once MSI messages have
-		 * been allocated.
-		 */
-		if (*rid == 0 && dinfo->msi.msi_alloc > 0)
-			return (NULL);
-	}
+
+	/* Legacy interrupt is not supported by DPAA2 objects. */
+	if (type == SYS_RES_IRQ && *rid == 0)
+		return (NULL);
 
 	return (resource_list_alloc(rl, rcdev, child, type, rid,
 	    start, end, count, flags));
@@ -335,8 +331,11 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 
 	error = bus_generic_setup_intr(rcdev, child, irq, flags, filter, intr,
 	    arg, &cookie);
-	if (error)
+	if (error) {
+		device_printf(rcdev, "bus_generic_setup_intr() failed: "
+		    "error=%d\n", error);
 		return (error);
+	}
 
 	/* If this is not a direct child, just bail out. */
 	if (device_get_parent(child) != rcdev) {
@@ -625,13 +624,6 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += bus_print_child_footer(rcdev, child);
 
 	return (retval);
-}
-
-static int
-dpaa2_rc_activate_resource(device_t rcdev, device_t child, int type, int rid,
-    struct resource *r)
-{
-	return (bus_generic_activate_resource(rcdev, child, type, rid, r));
 }
 
 /**
@@ -929,7 +921,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource),
 	DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
 	DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource),
-	DEVMETHOD(bus_activate_resource, dpaa2_rc_activate_resource),
+	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
 	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
 	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
