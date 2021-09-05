@@ -928,6 +928,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(bus_setup_intr,	dpaa2_rc_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	dpaa2_rc_teardown_intr),
 	DEVMETHOD(bus_print_child,	dpaa2_rc_print_child),
+	DEVMETHOD(bus_add_child,	device_add_child_ordered),
 
 	/* Pseudo-PCI interface */
 	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
