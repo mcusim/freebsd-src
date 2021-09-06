@@ -362,6 +362,8 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		error = PCIB_MAP_MSI(rcdev, child, rman_get_start(irq), &addr,
 		    &data);
 		if (error) {
+			device_printf(rcdev, "PCIB_MAP_MSI failed: error=%d\n",
+			    error);
 			(void)bus_generic_teardown_intr(rcdev, child, irq,
 			    cookie);
 			return (error);
