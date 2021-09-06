@@ -62,6 +62,10 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
+/* Macros to enable/disable DPIO object using MC command interface. */
+#define dpaa2_io_enable(dev)	dpaa2_io_configure((dev), 1u)
+#define dpaa2_io_disable(dev)	dpaa2_io_configure((dev), 0u)
+
 /*
  * Interrupts:
  *	0: MSI, should be allocated separately.
@@ -80,6 +84,7 @@ static struct resource_spec dpaa2_io_spec[] = {
 /* Forward declarations. */
 static int dpaa2_io_setup_msi(struct dpaa2_io_softc *sc);
 static void dpaa2_io_msi_intr(void *arg);
+static int dpaa2_io_configure(device_t dev, uint8_t enable);
 
 /*
  * Device interface.
@@ -154,6 +159,13 @@ dpaa2_io_attach(device_t dev)
 		}
 	}
 
+	/* Enable DPIO object. */
+	error = dpaa2_io_enable(dev);
+	if (error) {
+		dpaa2_mc_detach(dev);
+		return (error);
+	}
+
 	error = dpaa2_io_setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI: error=%d\n",
@@ -218,6 +230,79 @@ dpaa2_io_msi_intr(void *arg)
 	volatile uint32_t val = 0;
 	for (uint32_t i = 0; i < 100; i++)
 		val++;
+}
+
+/**
+ * @internal
+ * @brief Enable/disable DPIO object using MC command interface.
+ */
+static int
+dpaa2_io_configure(device_t dev, uint8_t enable)
+{
+	device_t rcdev;
+	struct dpaa2_rc_softc *rcsc;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	uint16_t rc_token, io_token;
+	int rc;
+
+	rcdev = device_get_parent(dev);
+	rcsc = device_get_softc(rcdev);
+	rcinfo = device_get_ivars(rcdev);
+	dinfo = device_get_ivars(dev);
+
+	/* Allocate a command to send to MC hardware. */
+	rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (rc) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    rc);
+		return (ENXIO);
+	}
+
+	/* Open resource container. */
+	rc = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
+	if (rc) {
+		dpaa2_mcp_free_command(cmd);
+		device_printf(dev, "Failed to open DPRC: error=%d\n", rc);
+		return (ENXIO);
+	}
+	/* Open DPIO object. */
+	rc = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id, &io_token);
+	if (rc) {
+		dpaa2_mcp_free_command(cmd);
+		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
+		    dinfo->id, rc);
+		return (ENXIO);
+	}
+
+	/* Enable/disable DPIO object. */
+	rc = (enable) ? dpaa2_cmd_io_enable(rcsc->portal, cmd)
+	    : dpaa2_cmd_io_disable(rcsc->portal, cmd);
+	if (rc)
+		device_printf(dev, "Failed to %s DPIO: id=%d, error=%d\n",
+		    enable ? "enable" : "disable", dinfo->id, rc);
+
+	/* Close the DPIO object. */
+	rc = dpaa2_cmd_io_close(rcsc->portal, cmd);
+	if (rc) {
+		dpaa2_mcp_free_command(cmd);
+		device_printf(dev, "Failed to close DPIO: id=%d, error=%d\n",
+		    dinfo->id, rc);
+		return (ENXIO);
+	}
+	/* Close the resource container. */
+	dpaa2_mcp_set_token(cmd, rc_token);
+	rc = dpaa2_cmd_rc_close(rcsc->portal, cmd);
+	if (rc) {
+		dpaa2_mcp_free_command(cmd);
+		device_printf(dev, "Failed to close DPRC: error=%d\n", rc);
+		return (ENXIO);
+	}
+
+	dpaa2_mcp_free_command(cmd);
+
+	return (0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
