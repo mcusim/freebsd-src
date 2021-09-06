@@ -209,7 +209,7 @@ dpaa2_io_setup_msi(struct dpaa2_io_softc *sc)
 
 /**
  * @internal
- * DPAA2 I/O interrupt handler.
+ * @brief DPAA2 I/O interrupt handler.
  */
 static void
 dpaa2_io_msi_intr(void *arg)
