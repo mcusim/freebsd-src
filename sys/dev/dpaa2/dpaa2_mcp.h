@@ -200,6 +200,8 @@ int	dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    const uint32_t dpio_id, uint16_t *token);
 int	dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_io_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    const uint8_t irq_idx, const uint8_t enable);
 
