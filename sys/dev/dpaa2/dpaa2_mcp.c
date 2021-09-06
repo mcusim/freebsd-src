@@ -111,6 +111,8 @@ __FBSDID("$FreeBSD$");
 
 #define CMDID_IO_OPEN				CMD_IO(0x803)
 #define CMDID_IO_CLOSE				CMD_IO(0x800)
+#define CMDID_IO_ENABLE				CMD_IO(0x002)
+#define CMDID_IO_DISABLE			CMD_IO(0x003)
 #define CMDID_IO_SET_IRQ_ENABLE			CMD_IO(0x012)
 
 /* ------------------------- DPNI command IDs ------------------------------- */
@@ -780,6 +782,24 @@ dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (exec_command(portal, cmd, CMDID_IO_CLOSE));
+}
+
+int
+dpaa2_cmd_io_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_IO_ENABLE));
+}
+
+int
+dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_IO_DISABLE));
 }
 
 int
