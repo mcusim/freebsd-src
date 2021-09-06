@@ -359,8 +359,8 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		 * data register values. If we fail for some reason, teardown
 		 * the interrupt handler.
 		 */
-		error = PCIB_MAP_MSI(rcdev, child, rman_get_start(irq), &addr,
-		    &data);
+		error = PCIB_MAP_MSI(device_get_parent(rcdev), child,
+		    rman_get_start(irq), &addr, &data);
 		if (error) {
 			device_printf(rcdev, "PCIB_MAP_MSI failed: error=%d\n",
 			    error);
