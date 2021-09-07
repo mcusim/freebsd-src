@@ -404,16 +404,6 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 		rle = resource_list_find(&dinfo->resources, SYS_RES_IRQ, rid);
 		if (rle->res != irq)
 			return (EINVAL);
-
-		/* Disable MSI for this DPAA2 object. */
-		error = dpaa2_rc_disable_irq(rcdev, child, rid);
-		if (error) {
-			device_printf(rcdev, "Failed to disable IRQ for "
-			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
-			    dpaa2_get_type(dinfo->dtype),
-			    device_get_unit(child));
-			return (error);
-		}
 		dinfo->msi.msi_handlers--;
 	}
 
