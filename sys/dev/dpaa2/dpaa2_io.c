@@ -100,6 +100,7 @@ dpaa2_io_attach(device_t dev)
 	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_io_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
 	struct resource_map_request req;
 	dpaa2_cmd_t cmd;
 	dpaa2_io_attr_t attr;
@@ -111,6 +112,7 @@ dpaa2_io_attach(device_t dev)
 	pdev = device_get_parent(dev);
 	rcsc = device_get_softc(pdev);
 	rcinfo = device_get_ivars(pdev);
+	dinfo = device_get_ivars(dev);
 
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
 	if (error) {
@@ -165,13 +167,13 @@ dpaa2_io_attach(device_t dev)
 	/* Open resource container and DPIO object. */
 	error = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
 	if (error) {
-		device_printf(dev, "Failed to open DPRC: error=%d\n", rc);
+		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
 	error = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id, &io_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
-		    dinfo->id, rc);
+		    dinfo->id, error);
 		goto err_free_cmd;
 	}
 
@@ -196,9 +198,9 @@ dpaa2_io_attach(device_t dev)
 	    "\tSoftware portal ID: %u\n"
 	    "\tNumber of priorities: %u\n"
 	    "\tChannel mode: %s\n",
-	    attr->swp_version, attr->swp_ce_paddr, attr->swp_ci_paddr,
-	    attr->id, attr->swp_id, attr->priors_num,
-	    attr->chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL"
+	    attr.swp_version, attr.swp_ce_paddr, attr.swp_ci_paddr,
+	    attr.id, attr.swp_id, attr.priors_num,
+	    attr.chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL"
 	);
 	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
 	if (error) {
