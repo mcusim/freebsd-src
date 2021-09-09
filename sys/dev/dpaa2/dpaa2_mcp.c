@@ -113,6 +113,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_IO_CLOSE				CMD_IO(0x800)
 #define CMDID_IO_ENABLE				CMD_IO(0x002)
 #define CMDID_IO_DISABLE			CMD_IO(0x003)
+#define CMDID_IO_GET_ATTR			CMD_IO(0x004)
+#define CMDID_IO_RESET				CMD_IO(0x005)
 
 /* ------------------------- DPNI command IDs ------------------------------- */
 #define CMD_NI_BASE_VERSION	1
@@ -236,6 +238,22 @@ struct __packed dpaa2_rc_attr {
 	uint16_t		 _reserved1;
 	uint32_t		 options;
 	uint32_t		 portal_id;
+};
+
+/**
+ * @brief Helper object to access fields of the DPIO attributes response.
+ */
+struct __packed dpaa2_io_attr {
+	uint32_t		 id;
+	uint16_t		 swp_id;
+	uint8_t			 priors_num;
+	uint8_t			 chan_mode;
+	uint64_t		 swp_ce_paddr;
+	uint64_t		 swp_ci_paddr;
+	uint32_t		 swp_version;
+	uint32_t		 _reserved1;
+	uint32_t		 clk;
+	uint32_t		 _reserved2[5];
 };
 
 static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
@@ -799,6 +817,42 @@ dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (exec_command(portal, cmd, CMDID_IO_DISABLE));
+}
+
+int
+dpaa2_cmd_io_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_IO_RESET));
+}
+
+int
+dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    dpaa2_io_attr_t *attr)
+{
+	struct dpaa2_io_attr *pattr;
+	int error;
+
+	if (!portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(portal, cmd, CMDID_IO_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_io_attr *) &cmd->params[0];
+
+		attr->swp_ce_paddr = pattr->swp_ce_paddr;
+		attr->swp_ci_paddr = pattr->swp_ci_paddr;
+		attr->swp_version = pattr->swp_version;
+		attr->id = pattr->id;
+		attr->swp_id = pattr->swp_id;
+		attr->priors_num = pattr->priors_num;
+		attr->chan_mode = (enum dpaa2_io_chan_mode chan_mode)
+		    pattr->chan_mode;
+	}
+
+	return (error);
 }
 
 /*

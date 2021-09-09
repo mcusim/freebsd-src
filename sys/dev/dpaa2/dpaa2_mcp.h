@@ -62,6 +62,7 @@
 #define DPAA2_CMD_STAT_BUSY		0xA	/* Device is busy */
 #define DPAA2_CMD_STAT_UNSUPPORTED_OP	0xB	/* Unsupported operation */
 #define DPAA2_CMD_STAT_INVALID_STATE	0xC	/* Invalid state */
+#define DPAA2_CMD_STAT_EINVAL		0xFE	/* Invalid argument */
 #define DPAA2_CMD_STAT_ERR		0xFF	/* General error */
 
 /* Object's memory region flags. */
@@ -74,6 +75,11 @@
 enum dpaa2_rc_region_type {
 	DPAA2_RC_REG_MC_PORTAL		= 0,
 	DPAA2_RC_REG_QBMAN_PORTAL	= 1
+};
+
+enum dpaa2_io_chan_mode {
+	DPAA2_IO_NO_CHANNEL		= 0,
+	DPAA2_IO_LOCAL_CHANNEL		= 1
 };
 
 /**
@@ -134,6 +140,28 @@ typedef struct {
 	uint32_t	flags;
 	enum dpaa2_rc_region_type type;
 } dpaa2_rc_obj_region_t;
+
+/**
+ * @brief Attributes of the DPIO object.
+ *
+ * swp_ce_paddr: Physical address of the software portal cache-enabled area.
+ * swp_ci_paddr: Physical address of the software portal cache-inhibited area.
+ * swp_version:	 Hardware IP version of the software portal.
+ * id:		 DPIO object ID.
+ * swp_id:	 Software portal ID.
+ * priors_num:	 Number of priorities for the notification channel (1-8);
+ *		 relevant only if channel mode is "local channel".
+ * chan_mode:	 Notification channel mode.
+ */
+typedef struct {
+	uint64_t	swp_ce_paddr;
+	uint64_t	swp_ci_paddr;
+	uint32_t	swp_version;
+	uint32_t	id;
+	uint16_t	swp_id;
+	uint8_t		priors_num;
+	enum dpaa2_io_chan_mode chan_mode;
+} dpaa2_io_attr_t;
 
 /*
  * Opaque pointers.
@@ -202,6 +230,8 @@ int	dpaa2_cmd_io_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 int	dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-
+int	dpaa2_cmd_io_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    dpaa2_io_attr_t *attr);
 
 #endif /* _DPAA2_MCP_H */
