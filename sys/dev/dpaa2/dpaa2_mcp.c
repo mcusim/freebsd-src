@@ -848,7 +848,7 @@ dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		attr->id = pattr->id;
 		attr->swp_id = pattr->swp_id;
 		attr->priors_num = pattr->priors_num;
-		attr->chan_mode = (enum dpaa2_io_chan_mode chan_mode)
+		attr->chan_mode = (enum dpaa2_io_chan_mode)
 		    pattr->chan_mode;
 	}
 
