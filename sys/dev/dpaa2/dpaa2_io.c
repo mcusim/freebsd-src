@@ -62,10 +62,6 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-/* Macros to enable/disable DPIO object using MC command interface. */
-#define dpaa2_io_enable(dev)	dpaa2_io_configure((dev), 1u)
-#define dpaa2_io_disable(dev)	dpaa2_io_configure((dev), 0u)
-
 /*
  * Interrupts:
  *	0: MSI, should be allocated separately.
@@ -84,7 +80,6 @@ static struct resource_spec dpaa2_io_spec[] = {
 /* Forward declarations. */
 static int dpaa2_io_setup_msi(struct dpaa2_io_softc *sc);
 static void dpaa2_io_msi_intr(void *arg);
-static int dpaa2_io_configure(device_t dev, uint8_t enable);
 
 /*
  * Device interface.
@@ -104,8 +99,11 @@ dpaa2_io_attach(device_t dev)
 	device_t pdev;
 	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_io_softc *sc;
-	struct resource_map_request req;
 	struct dpaa2_devinfo *rcinfo;
+	struct resource_map_request req;
+	dpaa2_cmd_t cmd;
+	dpaa2_io_attr_t attr;
+	uint16_t rc_token, io_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -118,7 +116,7 @@ dpaa2_io_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to allocate resources: error=%d\n",
 		    error);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* Map cache-enabled part of the software portal memory. */
@@ -129,8 +127,7 @@ dpaa2_io_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to map cache-enabled part of the "
 		    "software portal memory: error=%d\n", error);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* Map cache-inhibited part of the software portal memory. */
@@ -141,8 +138,7 @@ dpaa2_io_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to map cache-inhibited part of the "
 		    "software portal memory: error=%d\n", error);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* An attempt to map a region with control registers. */
@@ -154,37 +150,101 @@ dpaa2_io_attach(device_t dev)
 		if (error) {
 			device_printf(dev, "Failed to map control registers: "
 			    "error=%d\n", error);
-			dpaa2_mc_detach(dev);
-			return (ENXIO);
+			goto err_exit;
 		}
 	}
 
-	/* Enable DPIO object. */
-	error = dpaa2_io_enable(dev);
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
-		dpaa2_mc_detach(dev);
-		return (error);
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    error);
+		goto err_exit;
 	}
 
+	/* Open resource container and DPIO object. */
+	error = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: error=%d\n", rc);
+		goto err_free_cmd;
+	}
+	error = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id, &io_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
+		    dinfo->id, rc);
+		goto err_free_cmd;
+	}
+
+	/* Prepare DPIO object. */
+	error = dpaa2_cmd_io_reset(rcsc->portal, cmd);
+	if (error) {
+		device_printf(dev, "Failed to reset DPIO: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+	error = dpaa2_cmd_io_get_attributes(rcsc->portal, cmd, &attr);
+	if (error) {
+		device_printf(dev, "Failed to get DPIO attributes: id=%d, "
+		    "error=%d\n", dinfo->id, error);
+		goto err_free_cmd;
+	}
+	device_printf(dev,
+	    "\tSoftware portal version: %u\n"
+	    "\tCache-enabled area: %#jx\n"
+	    "\tCache-inhibited area: %#jx\n"
+	    "\tDPIO object ID: %u\n"
+	    "\tSoftware portal ID: %u\n"
+	    "\tNumber of priorities: %u\n"
+	    "\tChannel mode: %s\n",
+	    attr->swp_version, attr->swp_ce_paddr, attr->swp_ci_paddr,
+	    attr->id, attr->swp_id, attr->priors_num,
+	    attr->chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL"
+	);
+	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
+	if (error) {
+		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+
+	/* Close the DPIO object and the resource container. */
+	error = dpaa2_cmd_io_close(rcsc->portal, cmd);
+	if (error) {
+		device_printf(dev, "Failed to close DPIO: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = dpaa2_cmd_rc_close(rcsc->portal, cmd);
+	if (error) {
+		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
+		goto err_free_cmd;
+	}
+
+	/* Configure IRQs. */
 	error = dpaa2_io_setup_msi(sc);
 	if (error) {
-		device_printf(dev, "Failed to allocate MSI: error=%d\n",
-		    error);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
+		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
+		goto err_free_cmd;
 	}
-	if ((sc->irq_resource = bus_alloc_resource_any(sc->dev, SYS_RES_IRQ,
+	if ((sc->irq_resource = bus_alloc_resource_any(dev, SYS_RES_IRQ,
 	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
-		device_printf(sc->dev, "Failed to allocate interrupt\n");
-		return (ENXIO);
+		device_printf(dev, "Failed to allocate IRQ resource\n");
+		goto err_free_cmd;
 	}
-	if (bus_setup_intr(sc->dev, sc->irq_resource, INTR_TYPE_CAM|INTR_MPSAFE,
+	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_CAM | INTR_MPSAFE,
 	    NULL, dpaa2_io_msi_intr, sc, &sc->intr)) {
-		device_printf(sc->dev, "Failed to setup interrupt\n");
-		return (ENXIO);
+		device_printf(dev, "Failed to setup IRQ resource\n");
+		goto err_free_cmd;
 	}
 
 	return (0);
+
+ err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+ err_exit:
+	dpaa2_mc_detach(dev);
+	return (ENXIO);
 }
 
 static int
@@ -204,14 +264,11 @@ dpaa2_io_setup_msi(struct dpaa2_io_softc *sc)
 
     val = pci_msi_count(sc->dev);
     if (val < DPAA2_IO_MSI_COUNT)
-	    device_printf(sc->dev, "got %d MSI messages\n", val);
+	    device_printf(sc->dev, "Have %d MSI messages\n", val);
     val = MIN(val, DPAA2_IO_MSI_COUNT);
+
     if (pci_alloc_msi(sc->dev, &val) != 0)
 	    return (EINVAL);
-
-    if (bootverbose)
-	    device_printf(sc->dev, "Using %d MSI interrupt%s\n", val,
-		(val != 1) ? "s" : "");
 
     for (int i = 0; i < val; i++)
 	sc->irq_rid[i] = i + 1;
@@ -230,79 +287,6 @@ dpaa2_io_msi_intr(void *arg)
 	volatile uint32_t val = 0;
 	for (uint32_t i = 0; i < 100; i++)
 		val++;
-}
-
-/**
- * @internal
- * @brief Enable/disable DPIO object using MC command interface.
- */
-static int
-dpaa2_io_configure(device_t dev, uint8_t enable)
-{
-	device_t rcdev;
-	struct dpaa2_rc_softc *rcsc;
-	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
-	uint16_t rc_token, io_token;
-	int rc;
-
-	rcdev = device_get_parent(dev);
-	rcsc = device_get_softc(rcdev);
-	rcinfo = device_get_ivars(rcdev);
-	dinfo = device_get_ivars(dev);
-
-	/* Allocate a command to send to MC hardware. */
-	rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-	if (rc) {
-		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
-		    rc);
-		return (ENXIO);
-	}
-
-	/* Open resource container. */
-	rc = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
-	if (rc) {
-		dpaa2_mcp_free_command(cmd);
-		device_printf(dev, "Failed to open DPRC: error=%d\n", rc);
-		return (ENXIO);
-	}
-	/* Open DPIO object. */
-	rc = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id, &io_token);
-	if (rc) {
-		dpaa2_mcp_free_command(cmd);
-		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
-		    dinfo->id, rc);
-		return (ENXIO);
-	}
-
-	/* Enable/disable DPIO object. */
-	rc = (enable) ? dpaa2_cmd_io_enable(rcsc->portal, cmd)
-	    : dpaa2_cmd_io_disable(rcsc->portal, cmd);
-	if (rc)
-		device_printf(dev, "Failed to %s DPIO: id=%d, error=%d\n",
-		    enable ? "enable" : "disable", dinfo->id, rc);
-
-	/* Close the DPIO object. */
-	rc = dpaa2_cmd_io_close(rcsc->portal, cmd);
-	if (rc) {
-		dpaa2_mcp_free_command(cmd);
-		device_printf(dev, "Failed to close DPIO: id=%d, error=%d\n",
-		    dinfo->id, rc);
-		return (ENXIO);
-	}
-	/* Close the resource container. */
-	dpaa2_mcp_set_token(cmd, rc_token);
-	rc = dpaa2_cmd_rc_close(rcsc->portal, cmd);
-	if (rc) {
-		dpaa2_mcp_free_command(cmd);
-		device_printf(dev, "Failed to close DPRC: error=%d\n", rc);
-		return (ENXIO);
-	}
-
-	dpaa2_mcp_free_command(cmd);
-
-	return (0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
