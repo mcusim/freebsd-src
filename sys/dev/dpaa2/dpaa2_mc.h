@@ -43,18 +43,18 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
 	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
-	DPAA2_DEV_MCP		/* Management Complex Portal */
+	DPAA2_DEV_MCP		/* MC portal (to configure MC portal) */
 };
 
-/*
- * Software context for the DPAA2 Management Complex (MC) driver.
+/**
+ * @brief Software context for the DPAA2 Management Complex (MC) driver.
  *
- * dev: Device associated with this software context.
- * rcdev: Child device associated with the root resource container.
- * res: Unmapped MC command portal and control registers resources.
- * map: Mapped MC command portal and control registers resources.
- * io_rman: I/O memory resource manager.
- * msi_rman: Message-signalled interrupts resource manager.
+ * dev:		Device associated with this software context.
+ * rcdev:	Child device associated with the root resource container.
+ * res:		Unmapped MC command portal and control registers resources.
+ * map:		Mapped MC command portal and control registers resources.
+ * io_rman:	I/O memory resource manager.
+ * msi_rman:	Message-signalled interrupts resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
@@ -67,13 +67,13 @@ struct dpaa2_mc_softc {
 	bool			 has_msi_rman;
 };
 
-/*
- * Software context for the DPAA2 Resource Container (RC) driver.
+/**
+ * @brief Software context for the DPAA2 Resource Container (RC) driver.
  *
- * dev: Device associated with this software context.
- * portal: Helper object to send commands to the MC portal.
- * unit: Helps to distinguish between root (0) and child DRPCs.
- * cont_id: Container ID.
+ * dev:		Device associated with this software context.
+ * portal:	Helper object to send commands to the MC portal.
+ * unit:	Helps to distinguish between root (0) and child DRPCs.
+ * cont_id:	Container ID.
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
@@ -82,8 +82,8 @@ struct dpaa2_rc_softc {
 	uint32_t		 cont_id;
 };
 
-/*
- * Software context for the DPAA2 I/O driver.
+/**
+ * @brief Software context for the DPAA2 I/O driver.
  */
 struct dpaa2_io_softc {
 	device_t		 dev;
@@ -94,11 +94,11 @@ struct dpaa2_io_softc {
 	void			*intr; /* interrupt handle */
 };
 
-/*
- * Information about MSI messages supported by the DPAA2 object.
+/**
+ * @brief Information about MSI messages supported by the DPAA2 object.
  *
- * msi_msgnum: Number of MSI messages supported by the DPAA2 object.
- * msi_alloc: Number of MSI messages allocated for the DPAA2 object.
+ * msi_msgnum:	 Number of MSI messages supported by the DPAA2 object.
+ * msi_alloc:	 Number of MSI messages allocated for the DPAA2 object.
  * msi_handlers: Number of MSI message handlers configured.
  */
 struct dpaa2_msinfo {
