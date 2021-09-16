@@ -195,7 +195,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 {
 	const int mflags = flags & DPAA2_SWP_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
-	dpaa2_swp_t p;
+	struct dpaa2_swp *p;
 	uint32_t reg;
 	uint32_t mask_size;
 	uint32_t eqcr_pi;
