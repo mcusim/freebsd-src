@@ -29,6 +29,8 @@
 #ifndef	_DPAA2_MC_H
 #define	_DPAA2_MC_H
 
+#include "dpaa2_mcp.h"
+
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
 #define DPAA2_IO_MSI_COUNT	1
 
