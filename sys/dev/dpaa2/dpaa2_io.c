@@ -63,12 +63,12 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 
 /*
- * Interrupts:
- *	0: MSI, should be allocated separately.
  * Memory:
  *	0: cache-enabled part of the QBMan software portal.
  *	1: cache-inhibited part of the QBMan software portal.
  *	2: control registers of the QBMan software portal?
+ *
+ * Note that MSI should be allocated separately using pseudo-PCI interface.
  */
 static struct resource_spec dpaa2_io_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
@@ -190,18 +190,18 @@ dpaa2_io_attach(device_t dev)
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
 	}
-	device_printf(dev,
-	    "\tSoftware portal version: %u\n"
-	    "\tCache-enabled area: %#jx\n"
-	    "\tCache-inhibited area: %#jx\n"
-	    "\tDPIO object ID: %u\n"
-	    "\tSoftware portal ID: %u\n"
-	    "\tNumber of priorities: %u\n"
-	    "\tChannel mode: %s\n",
-	    attr.swp_version, attr.swp_ce_paddr, attr.swp_ci_paddr,
-	    attr.id, attr.swp_id, attr.priors_num,
-	    attr.chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL"
-	);
+	if (bootverbose)
+		device_printf(dev, "\n"
+		    "\tSoftware portal version: %u\n"
+		    "\tCache-enabled area: %#jx\n"
+		    "\tCache-inhibited area: %#jx\n"
+		    "\tDPIO object ID: %u\n"
+		    "\tSoftware portal ID: %u\n"
+		    "\tNumber of priorities: %u\n"
+		    "\tChannel mode: %s\n",
+		    attr.swp_version, attr.swp_ce_paddr, attr.swp_ci_paddr,
+		    attr.id, attr.swp_id, attr.priors_num,
+		    attr.chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL");
 	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
 	if (error) {
 		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
