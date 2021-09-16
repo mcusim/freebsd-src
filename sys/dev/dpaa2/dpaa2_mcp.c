@@ -161,7 +161,7 @@ MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal 
  *			result.
  * cv:			Conditional variable helps to wait for the helper
  *			object's state change.
- * flags:		Current object state.
+ * flags:		Current state of the object.
  * rc_api_major:	Major version of the DPRC API (cached).
  * rc_api_minor:	Minor version of the DPRC API (cached).
  */
@@ -191,7 +191,7 @@ struct dpaa2_cmd {
  * @brief Helper object to access fields of the MC command header.
  *
  * srcid:	The SoC architected source ID of the submitter. This field is
- *		reserved and cannot be written by a GPP processor.
+ *		reserved and cannot be written by the driver.
  * flags_hw:	Bits from 8 to 15 of the command header. Most of them are
  *		reserved at the moment.
  * status:	Command ready/status. This field is used as the handshake field
@@ -276,15 +276,12 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 	dpaa2_mcp_t p;
 
 	if (!portal || !res || !map)
-		return (EINVAL);
+		return (DPAA2_CMD_STAT_EINVAL);
 
 	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
 	if (!p)
-		return (ENOMEM);
+		return (DPAA2_CMD_STAT_NO_MEMORY);
 
-	p->res = res;
-	p->map = map;
-	p->flags = flags;
 	if (flags & DPAA2_PORTAL_ATOMIC) {
 		/*
 		 * NOTE: Do not initialize cv for atomic portal: it's not
@@ -295,6 +292,10 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 		mtx_init(&p->lock, "MC portal sleep lock", NULL, MTX_DEF);
 		cv_init(&p->cv, "MC portal cv");
 	}
+
+	p->res = res;
+	p->map = map;
+	p->flags = flags;
 	/* Reset DPRC API version to cache later. */
 	p->rc_api_major = 0;
 	p->rc_api_minor = 0;
@@ -342,11 +343,11 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 	struct dpaa2_cmd_header *hdr;
 
 	if (!cmd)
-		return (EINVAL);
+		return (DPAA2_CMD_STAT_EINVAL);
 
 	c = malloc(sizeof(struct dpaa2_cmd), M_DPAA2_MCP, mflags);
 	if (!c)
-		return (ENOMEM);
+		return (DPAA2_CMD_STAT_NO_MEMORY);
 
 	hdr = (struct dpaa2_cmd_header *) &c->header;
 	hdr->srcid = 0;
