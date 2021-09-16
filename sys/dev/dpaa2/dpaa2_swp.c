@@ -221,15 +221,15 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->dqrr.next_idx = 0;
 	p->dqrr.valid_bit = QBMAN_VALID_BIT;
 	if ((desc->swp_version & QBMAN_REV_MASK) < QBMAN_REV_4100) {
-		p->dqrr.dqrr_size = 4;
+		p->dqrr.ring_size = 4;
 		p->dqrr.reset_bug = 1;
 	} else {
-		p->dqrr.dqrr_size = 8;
+		p->dqrr.ring_size = 8;
 		p->dqrr.reset_bug = 0;
 	}
 
 	if ((desc->swp_version & QBMAN_REV_MASK) < QBMAN_REV_5000) {
-		reg = swp_set_cfg(p->dqrr.dqrr_size,
+		reg = swp_set_cfg(p->dqrr.ring_size,
 		    1, /* Writes Non-cacheable */
 		    0, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
@@ -243,7 +243,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0); /* EQCR_CI stashing priority enable */
 	} else {
 		bus_set_region_1(p->cena_map, 0, 0, 64 * 1024);
-		reg = swp_set_cfg(p->dqrr.dqrr_size,
+		reg = swp_set_cfg(p->dqrr.ring_size,
 		    1, /* Writes Non-cacheable */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
@@ -278,7 +278,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	 * error. The values that were calculated above will be applied when
 	 * dequeues from a specific channel are enabled.
 	 */
-	qbman_write_register(p, QBMAN_CINH_SWP_SDQCR, 0);
+	swp_write_reg(p, QBMAN_CINH_SWP_SDQCR, 0);
 
 	p->eqcr.pi_ring_size = 8;
 	if ((p->desc->qman_version & QMAN_REV_MASK) >= QMAN_REV_5000) {
@@ -297,10 +297,10 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	for (mask_size = p->eqcr.pi_ring_size; mask_size > 0; mask_size >>= 1)
 		p->eqcr.pi_ci_mask = (p->eqcr.pi_ci_mask << 1) + 1;
 
-	eqcr_pi = qbman_read_register(p, QBMAN_CINH_SWP_EQCR_PI);
+	eqcr_pi = swp_read_reg(p, QBMAN_CINH_SWP_EQCR_PI);
 	p->eqcr.pi = eqcr_pi & p->eqcr.pi_ci_mask;
 	p->eqcr.pi_vb = eqcr_pi & QBMAN_VALID_BIT;
-	p->eqcr.ci = qbman_read_register(p, QBMAN_CINH_SWP_EQCR_CI)
+	p->eqcr.ci = swp_read_reg(p, QBMAN_CINH_SWP_EQCR_CI)
 	    & p->eqcr.pi_ci_mask;
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
