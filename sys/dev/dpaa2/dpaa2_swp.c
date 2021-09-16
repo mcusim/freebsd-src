@@ -281,7 +281,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	swp_write_reg(p, QBMAN_CINH_SWP_SDQCR, 0);
 
 	p->eqcr.pi_ring_size = 8;
-	if ((p->desc->qman_version & QMAN_REV_MASK) >= QMAN_REV_5000) {
+	if ((desc->swp_version & QBMAN_REV_MASK) >= QBMAN_REV_5000) {
 		p->eqcr.pi_ring_size = 32;
 		/* qbman_swp_enqueue_ptr = */
 		/*     qbman_swp_enqueue_mem_back; */
