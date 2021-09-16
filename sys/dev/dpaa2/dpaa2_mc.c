@@ -415,8 +415,15 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 
 	dinfo = device_get_ivars(child);
 	if (dinfo) {
-		error = acpi_iort_map_named_msi("MCE0", dinfo->icid, &xref,
-		    &devid);
+		/*
+		 * The first named components from IORT table with the given
+		 * name (as a substring) will be used.
+		 *
+		 * TODO: Find a way to form a device name based on "mcdev", i.e.
+		 *       dpaa2_mcX -> MCEx?
+		 */
+		error = acpi_iort_map_named_msi(IORT_DEVICE_NAME, dinfo->icid,
+		    &xref, &devid);
 		if (error)
 			return (0);
 		return (xref);
