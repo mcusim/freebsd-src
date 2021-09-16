@@ -218,7 +218,15 @@ dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid
 	dinfo = device_get_ivars(child);
 	rl = &dinfo->resources;
 
-	/* Legacy interrupt is not supported by DPAA2 objects. */
+	/*
+	 * By default, software portal interrupts are message-based, that is,
+	 * they are issued from QMan using a 4 byte write.
+	 *
+	 * TODO: However this default behavior can be changed by programming one
+	 * or more software portals to issue their interrupts via a dedicated
+	 * software portal interrupt wire. See registers SWP_INTW0_CFG to
+	 * SWP_INTW3_CFG for details.
+	 */
 	if (type == SYS_RES_IRQ && *rid == 0)
 		return (NULL);
 
@@ -296,11 +304,6 @@ dpaa2_rc_child_detached(device_t rcdev, device_t child)
 	dinfo = device_get_ivars(child);
 	rl = &dinfo->resources;
 
-	/*
-	 * Have to deallocate IRQs before releasing any MSI messages and
-	 * have to release MSI messages before deallocating any memory
-	 * BARs.
-	 */
 	if (resource_list_release_active(rl, rcdev, child, SYS_RES_IRQ) != 0)
 		device_printf(child, "Leaked IRQ resources!\n");
 	if (dinfo->msi.msi_alloc != 0) {
@@ -340,8 +343,8 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 	rid = rman_get_rid(irq);
 	if (rid == 0) {
 		if (bootverbose)
-			device_printf(rcdev, "Cannot setup interrupt with "
-			    "rid=0: INTx are not supported by DPAA2 objects\n");
+			device_printf(rcdev, "Cannot setup interrupt with rid=0:"
+			    " INTx are not supported by DPAA2 objects yet\n");
 		return (EINVAL);
 	} else {
 		dinfo = device_get_ivars(child);
@@ -891,5 +894,7 @@ static driver_t dpaa2_rc_driver = {
 
 static devclass_t dpaa2_rc_devclass;
 
+/* For root container */
 DRIVER_MODULE(dpaa2_rc, dpaa2_mc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
+/* For child containers */
 DRIVER_MODULE(dpaa2_rc, dpaa2_rc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
