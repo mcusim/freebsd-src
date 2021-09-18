@@ -50,6 +50,13 @@
 #define DPAA2_SWP_STAT_EINVAL		0xFE	/* Invalid argument */
 #define DPAA2_SWP_STAT_ERR		0xFF	/* General error */
 
+/* Interrupt Enable Register bits. */
+#define DPAA2_SWP_INTR_EQRI		0x01
+#define DPAA2_SWP_INTR_EQDI		0x02
+#define DPAA2_SWP_INTR_DQRI		0x04
+#define DPAA2_SWP_INTR_RCRI		0x08
+#define DPAA2_SWP_INTR_RCDI		0x10
+#define DPAA2_SWP_INTR_VDCI		0x20
 
 /*
  * Public types.
@@ -91,8 +98,18 @@ typedef struct dpaa2_swp *dpaa2_swp_t;
 /*
  * Management routines.
  */
-int	dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
-	    const uint16_t flags);
-void	dpaa2_swp_free_portal(dpaa2_swp_t portal);
+int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
+	     const uint16_t flags);
+void	 dpaa2_swp_free_portal(dpaa2_swp_t portal);
+
+/*
+ * Software portal routines.
+ */
+void	 dpaa2_swp_set_intr_trigger(dpaa2_swp_t p, uint32_t mask);
+uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t p);
+uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t p);
+void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t p, uint32_t mask);
+void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t p, uint8_t chan_idx, bool en);
+
 
 #endif /* _DPAA2_SWP_H */
