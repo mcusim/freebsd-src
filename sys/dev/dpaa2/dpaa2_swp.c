@@ -378,7 +378,7 @@ dpaa2_swp_read_intr_status(dpaa2_swp_t p)
 void
 dpaa2_swp_clear_intr_status(dpaa2_swp_t p, uint32_t mask)
 {
-	qbman_write_register(p, QBMAN_CINH_SWP_ISR, mask);
+	swp_write_reg(p, QBMAN_CINH_SWP_ISR, mask);
 }
 
 /**
