@@ -122,7 +122,7 @@ dpaa2_rc_attach(device_t dev)
 		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF);
 		if (error) {
-			device_printf(dev, "Failed to allocate dpaa2_mcp: "
+			device_printf(dev, "Failed to initialize dpaa2_mcp: "
 			    "error=%d\n", error);
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
