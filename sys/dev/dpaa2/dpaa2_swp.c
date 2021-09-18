@@ -125,6 +125,16 @@ __FBSDID("$FreeBSD$");
 #define SWP_CFG_DE_SHIFT	1
 #define SWP_CFG_EP_SHIFT	0
 
+/* Static Dequeue Command Register attribute codes */
+#define SDQCR_FC_SHIFT		29 /* Dequeue Command Frame Count */
+#define SDQCR_FC_MASK		0x1
+#define SDQCR_DCT_SHIFT		24 /* Dequeue Command Type */
+#define SDQCR_DCT_MASK		0x3
+#define SDQCR_TOK_SHIFT		16 /* Dequeue Command Token */
+#define SDQCR_TOK_MASK		0xff
+#define SDQCR_SRC_SHIFT		0  /* Dequeue Source */
+#define SDQCR_SRC_MASK		0xffff
+
 /*
  * Read trigger bit is used to trigger QMan to read an enqueue command from
  * memory, without having software perform a cache flush to force a write of the
@@ -145,6 +155,9 @@ MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp_memory", "DPAA2 QBMan Software Portal "
  * desc:	Descriptor of the QBMan software portal.
  * lock:	Spinlock to guard an access to the portal.
  * flags:	Current state of the object.
+ * sdq:		Push dequeues status.
+ * mc:		Management commands data.
+ * mr:		Management response data.
  * dqrr:	Dequeue Response Ring is used to issue frame dequeue responses
  * 		from the QBMan to the driver.
  * eqcr:	Enqueue Command Ring is used to issue frame enqueue commands
@@ -159,6 +172,15 @@ struct dpaa2_swp {
 	const dpaa2_swp_desc_t	*desc;
 	struct mtx		 lock;
 	uint16_t		 flags;
+	uint32_t		 sdq;
+
+	struct {
+		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+	} mc;
+
+	struct {
+		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+	} mr;
 
 	struct {
 		uint32_t	 next_idx;
@@ -211,6 +233,9 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	p->desc = desc;
 	p->flags = flags;
+	p->mc.valid_bit = QBMAN_VALID_BIT;
+	if ((desc->swp_version & QBMAN_REV_MASK) >= QBMAN_REV_5000)
+		p->mr.valid_bit = QBMAN_VALID_BIT;
 
 	p->cena_res = desc->cena_res;
 	p->cena_map = desc->cena_map;
@@ -309,24 +334,129 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	return (0);
 }
 
+int
+dpaa2_swp_alloc_desc(dpaa2_swp_desc_t *desc[])
+{
+	dpaa2_swp_desc_t *d = malloc(sizeof(dpaa2_swp_desc_t), M_DPAA2_SWP,
+	    M_WAITOK | M_ZERO);
+
+	if (!d)
+		return (DPAA2_SWP_STAT_NO_MEMORY);
+	else
+		desc[0] = d;
+	return (0);
+}
+
 void
 dpaa2_swp_free_portal(dpaa2_swp_t portal)
 {
-	return;
+	if (portal)
+		free(portal, M_DPAA2_SWP);
 }
 
+void
+dpaa2_swp_free_desc(dpaa2_swp_desc_t *desc)
+{
+	if (desc)
+		free(desc, M_DPAA2_SWP);
+}
+
+/*
+ * Software portal routines.
+ */
+
+/**
+ * @brief Enable interrupts for a software portal.
+ */
+void
+dpaa2_swp_set_intr_trigger(dpaa2_swp_t p, uint32_t mask)
+{
+	swp_write_reg(p, QBMAN_CINH_SWP_IER, mask);
+}
+
+/**
+ * @brief Return the value in the SWP_IER register.
+ */
+uint32_t
+dpaa2_swp_get_intr_trigger(dpaa2_swp_t p)
+{
+	return swp_read_reg(p, QBMAN_CINH_SWP_IER);
+}
+
+/**
+ * @brief Return the value in the SWP_ISR register.
+ */
+uint32_t
+dpaa2_swp_read_intr_status(dpaa2_swp_t p)
+{
+	return swp_read_reg(p, QBMAN_CINH_SWP_ISR);
+}
+
+/**
+ * @brief Clear SWP_ISR register according to the given mask.
+ */
+void
+dpaa2_swp_clear_intr_status(dpaa2_swp_t p, uint32_t mask)
+{
+	qbman_write_register(p, QBMAN_CINH_SWP_ISR, mask);
+}
+
+/**
+ * @brief Enable or disable push dequeue.
+ *
+ * p:		the software portal object
+ * chan_idx:	the channel index (0 to 15)
+ * en:		enable or disable push dequeue
+ */
+void
+dpaa2_swp_set_push_dequeue(dpaa2_swp_t p, uint8_t chan_idx, bool en)
+{
+	uint16_t dqsrc;
+
+	if (chan_idx > 15) {
+		printf("%s: channel index should be <= 15: chan_idx=%d\n",
+		    __func__, chan_idx);
+		return;
+	}
+
+	if (en)
+		p->sdq |= 1 << chan_idx;
+	else
+		p->sdq &= ~(1 << chan_idx);
+
+	/*
+	 * Read make the complete src map. If no channels are enabled the SDQCR
+	 * must be 0 or else QMan will assert errors.
+	 */
+	dqsrc = (p->sdq >> SDQCR_SRC_SHIFT) & SDQCR_SRC_MASK;
+	swp_write_reg(p, QBMAN_CINH_SWP_SDQCR, dqscr != 0 ? p->sdq : 0);
+}
+
+/*
+ * Internal functions.
+ */
+
+/**
+ * @internal
+ */
 static inline void
 swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
 {
 	bus_write_4(swp->cinh_map, offset, val);
 }
 
+/**
+ * @internal
+ */
 static inline uint32_t
 swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
 {
 	return (bus_read_4(swp->cinh_map, offset));
 }
 
+/**
+ * @internal
+ */
 static inline uint32_t
 swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm, uint8_t dcm,
     uint8_t epm, int sd, int sp, int se, int dp, int de, int ep)
