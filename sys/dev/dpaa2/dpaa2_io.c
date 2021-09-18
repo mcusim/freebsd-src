@@ -244,7 +244,7 @@ dpaa2_io_attach(device_t dev)
 	/* Enable only DQRR interrupts for now */
 	dpaa2_swp_set_intr_trigger(sc->swp, DPAA2_SWP_INTR_DQRI);
 	dpaa2_swp_clear_intr_status(sc->swp, 0xffffffff);
-	if (desc.has_notif)
+	if (sc->swp_desc.has_notif)
 		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 
 	/* Configure IRQs. */
