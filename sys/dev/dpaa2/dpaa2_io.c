@@ -200,8 +200,8 @@ dpaa2_io_attach(device_t dev)
 		    "\tSoftware portal ID: %u\n"
 		    "\tNumber of priorities: %u\n"
 		    "\tChannel mode: %s\n",
-		    attr.swp_version, attr.swp_ce_paddr, attr.swp_ci_paddr,
-		    attr.id, attr.swp_id, attr.priors_num,
+		    (uintmax_t) attr.swp_version, attr.swp_ce_paddr,
+		    attr.swp_ci_paddr, attr.id, attr.swp_id, attr.priors_num,
 		    attr.chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL");
 	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
 	if (error) {
@@ -230,9 +230,9 @@ dpaa2_io_attach(device_t dev)
 	sc->swp_desc.swp_id = attr.swp_id;
 	sc->swp_desc.has_notif = attr.priors_num ? true : false;
 	sc->swp_desc.has_8prio = attr.priors_num == 8u ? true : false;
-	sc->swp_desc.cena_res = &sc->res[0];
+	sc->swp_desc.cena_res = sc->res[0];
 	sc->swp_desc.cena_map = &sc->map[0];
-	sc->swp_desc.cinh_res = &sc->res[1];
+	sc->swp_desc.cinh_res = sc->res[1];
 	sc->swp_desc.cinh_map = &sc->map[1];
 	error = dpaa2_swp_init_portal(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
 	if (error) {
@@ -267,7 +267,7 @@ dpaa2_io_attach(device_t dev)
 	return (0);
 
  err_free_swp:
-	dpaa2_swp_free_portal(swp_portal);
+	dpaa2_swp_free_portal(sc->swp);
  err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
  err_exit:
