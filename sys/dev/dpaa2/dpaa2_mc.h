@@ -30,6 +30,7 @@
 #define	_DPAA2_MC_H
 
 #include "dpaa2_mcp.h"
+#include "dpaa2_swp.h"
 
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
 #define DPAA2_IO_MSI_COUNT	1
@@ -94,6 +95,8 @@ struct dpaa2_io_softc {
 	int			 irq_rid[DPAA2_IO_MSI_COUNT];
 	struct resource		*irq_resource;
 	void			*intr; /* interrupt handle */
+	dpaa2_swp_desc_t	 swp_desc;
+	dpaa2_swp_t		 swp;
 };
 
 /**

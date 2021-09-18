@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include "pci_if.h"
 
 #include "dpaa2_mcp.h"
+#include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
 
 /*
@@ -192,7 +193,7 @@ dpaa2_io_attach(device_t dev)
 	}
 	if (bootverbose)
 		device_printf(dev, "\n"
-		    "\tSoftware portal version: %u\n"
+		    "\tSoftware portal version: %#jx\n"
 		    "\tCache-enabled area: %#jx\n"
 		    "\tCache-inhibited area: %#jx\n"
 		    "\tDPIO object ID: %u\n"
@@ -223,25 +224,50 @@ dpaa2_io_attach(device_t dev)
 		goto err_free_cmd;
 	}
 
+	/* Prepare helper object to work with the QBMan software portal. */
+	sc->swp_desc.dpio_dev = dev;
+	sc->swp_desc.swp_version = attr.swp_version;
+	sc->swp_desc.swp_id = attr.swp_id;
+	sc->swp_desc.has_notif = attr.priors_num ? true : false;
+	sc->swp_desc.has_8prio = attr.priors_num == 8u ? true : false;
+	sc->swp_desc.cena_res = &sc->res[0];
+	sc->swp_desc.cena_map = &sc->map[0];
+	sc->swp_desc.cinh_res = &sc->res[1];
+	sc->swp_desc.cinh_map = &sc->map[1];
+	error = dpaa2_swp_init_portal(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
+	if (error) {
+		device_printf(dev, "Failed to initialize dpaa2_swp: error=%d\n",
+		    error);
+		goto err_free_cmd;
+	}
+
+	/* Enable only DQRR interrupts for now */
+	dpaa2_swp_set_intr_trigger(sc->swp, DPAA2_SWP_INTR_DQRI);
+	dpaa2_swp_clear_intr_status(sc->swp, 0xffffffff);
+	if (desc.has_notif)
+		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
+
 	/* Configure IRQs. */
 	error = dpaa2_io_setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
-		goto err_free_cmd;
+		goto err_free_swp;
 	}
 	if ((sc->irq_resource = bus_alloc_resource_any(dev, SYS_RES_IRQ,
 	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
 		device_printf(dev, "Failed to allocate IRQ resource\n");
-		goto err_free_cmd;
+		goto err_free_swp;
 	}
 	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_CAM | INTR_MPSAFE,
 	    NULL, dpaa2_io_msi_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
-		goto err_free_cmd;
+		goto err_free_swp;
 	}
 
 	return (0);
 
+ err_free_swp:
+	dpaa2_swp_free_portal(swp_portal);
  err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
  err_exit:
