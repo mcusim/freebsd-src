@@ -334,31 +334,11 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	return (0);
 }
 
-int
-dpaa2_swp_alloc_desc(dpaa2_swp_desc_t *desc[])
-{
-	dpaa2_swp_desc_t *d = malloc(sizeof(dpaa2_swp_desc_t), M_DPAA2_SWP,
-	    M_WAITOK | M_ZERO);
-
-	if (!d)
-		return (DPAA2_SWP_STAT_NO_MEMORY);
-	else
-		desc[0] = d;
-	return (0);
-}
-
 void
 dpaa2_swp_free_portal(dpaa2_swp_t portal)
 {
 	if (portal)
 		free(portal, M_DPAA2_SWP);
-}
-
-void
-dpaa2_swp_free_desc(dpaa2_swp_desc_t *desc)
-{
-	if (desc)
-		free(desc, M_DPAA2_SWP);
 }
 
 /*
@@ -429,7 +409,7 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t p, uint8_t chan_idx, bool en)
 	 * must be 0 or else QMan will assert errors.
 	 */
 	dqsrc = (p->sdq >> SDQCR_SRC_SHIFT) & SDQCR_SRC_MASK;
-	swp_write_reg(p, QBMAN_CINH_SWP_SDQCR, dqscr != 0 ? p->sdq : 0);
+	swp_write_reg(p, QBMAN_CINH_SWP_SDQCR, dqsrc != 0 ? p->sdq : 0);
 }
 
 /*
