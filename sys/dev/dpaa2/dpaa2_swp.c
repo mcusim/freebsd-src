@@ -267,9 +267,8 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* dequeue stashing enable enable */
 		    0); /* EQCR_CI stashing priority enable */
 	} else {
-		/* NOTE: Does it cause a kernel panic? */
-		/* bus_set_region_1(p->cena_map, 0, 0, 64 * 1024); */
-
+		bus_set_region_4(p->cena_map, 0, 0,
+		    rman_get_size(p->cena_res) / 4);
 		reg = swp_set_cfg(p->dqrr.ring_size,
 		    1, /* Writes Non-cacheable */
 		    1, /* EQCR_CI stashing threshold */
