@@ -125,6 +125,21 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_OPEN				CMD_NI(0x801)
 #define CMDID_NI_CLOSE				CMD_NI(0x800)
 
+/* ------------------------- DPBP command IDs ------------------------------- */
+#define CMD_BP_BASE_VERSION	1
+#define CMD_BP_ID_OFFSET	4
+
+#define CMD_BP(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_BP_OPEN				CMD_BP(0x804)
+#define CMDID_BP_CLOSE				CMD_BP(0x800)
+#define CMDID_BP_ENABLE				CMD_BP(0x002)
+#define CMDID_BP_DISABLE			CMD_BP(0x003)
+#define CMDID_BP_GET_ATTR			CMD_BP(0x004)
+#define CMDID_BP_RESET				CMD_BP(0x005)
+
+/* ------------------------- End of command IDs ----------------------------- */
+
 #define LOCK_PORTAL(portal, flags) do {					\
 	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
 		mtx_lock_spin(&(portal)->lock);				\
@@ -254,6 +269,15 @@ struct __packed dpaa2_io_attr {
 	uint32_t		 _reserved1;
 	uint32_t		 clk;
 	uint32_t		 _reserved2[5];
+};
+
+/**
+ * @brief Helper object to access fields of the DPBP attributes response.
+ */
+struct __packed dpaa2_bp_attr {
+	uint16_t	_reserved1;
+	uint16_t	bpid;
+	uint32_t	id;
 };
 
 static int exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
@@ -851,6 +875,87 @@ dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		attr->priors_num = pattr->priors_num;
 		attr->chan_mode = (enum dpaa2_io_chan_mode)
 		    pattr->chan_mode;
+	}
+
+	return (error);
+}
+
+/*
+ * Data Path Buffer Pool (DPBP) commands.
+ */
+
+int
+dpaa2_cmd_bp_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
+    uint16_t *token)
+{
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpbp_id;
+	error = exec_command(portal, cmd, CMDID_BP_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+int
+dpaa2_cmd_bp_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_BP_CLOSE));
+}
+
+int
+dpaa2_cmd_bp_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_BP_ENABLE));
+}
+
+int
+dpaa2_cmd_bp_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_BP_DISABLE));
+}
+
+int
+dpaa2_cmd_bp_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(portal, cmd, CMDID_BP_RESET));
+}
+
+int
+dpaa2_cmd_bp_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+    dpaa2_bp_attr_t *attr)
+{
+	struct dpaa2_bp_attr *pattr;
+	int error;
+
+	if (!portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(portal, cmd, CMDID_BP_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_io_attr *) &cmd->params[0];
+
+		attr->id = pattr->id;
+		attr->bpid = pattr->bpid;
 	}
 
 	return (error);
