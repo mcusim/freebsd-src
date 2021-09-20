@@ -952,7 +952,7 @@ dpaa2_cmd_bp_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 
 	error = exec_command(portal, cmd, CMDID_BP_GET_ATTR);
 	if (!error) {
-		pattr = (struct dpaa2_io_attr *) &cmd->params[0];
+		pattr = (struct dpaa2_bp_attr *) &cmd->params[0];
 
 		attr->id = pattr->id;
 		attr->bpid = pattr->bpid;
