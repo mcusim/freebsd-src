@@ -191,18 +191,6 @@ dpaa2_io_attach(device_t dev)
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
 	}
-	if (bootverbose)
-		device_printf(dev, "\n"
-		    "\tSoftware portal version: %#jx\n"
-		    "\tCache-enabled area: %#jx\n"
-		    "\tCache-inhibited area: %#jx\n"
-		    "\tDPIO object ID: %u\n"
-		    "\tSoftware portal ID: %u\n"
-		    "\tNumber of priorities: %u\n"
-		    "\tChannel mode: %s\n",
-		    (uintmax_t) attr.swp_version, attr.swp_ce_paddr,
-		    attr.swp_ci_paddr, attr.id, attr.swp_id, attr.priors_num,
-		    attr.chan_mode ? "LOCAL_CHANNEL" : "NO_CHANNEL");
 	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
 	if (error) {
 		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
@@ -258,7 +246,7 @@ dpaa2_io_attach(device_t dev)
 		device_printf(dev, "Failed to allocate IRQ resource\n");
 		goto err_free_swp;
 	}
-	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_CAM | INTR_MPSAFE,
+	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
 	    NULL, dpaa2_io_msi_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		goto err_free_swp;

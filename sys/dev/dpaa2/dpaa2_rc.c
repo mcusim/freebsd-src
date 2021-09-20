@@ -449,8 +449,8 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 
 	if (bootverbose)
 		device_printf(rcdev,
-		    "Attempting to allocate %d MSI vectors (%d supported)\n",
-		    *count, dinfo->msi.msi_msgnum);
+		    "Attempting to allocate %d MSI vector%s (%d supported)\n",
+		    *count, *count > 1 ? "s" : "", dinfo->msi.msi_msgnum);
 
 	/* Don't ask for more than the device supports. */
 	actual = min(*count, dinfo->msi.msi_msgnum);
