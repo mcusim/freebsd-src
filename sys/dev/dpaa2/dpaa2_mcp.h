@@ -163,6 +163,18 @@ typedef struct {
 	enum dpaa2_io_chan_mode chan_mode;
 } dpaa2_io_attr_t;
 
+/**
+ * @brief Attributes of the DPBP object.
+ *
+ * id:		 DPBP object ID.
+ * bpid:	 Hardware buffer pool ID; should be used as an argument in
+ *		 acquire/release operations on buffers.
+ */
+typedef struct {
+	uint32_t	id;
+	uint16_t	bpid;
+} dpaa2_bp_attr_t;
+
 /*
  * Opaque pointers.
  */
@@ -233,5 +245,17 @@ int	dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 int	dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 	    dpaa2_io_attr_t *attr);
+
+/*
+ * Data Path Buffer Pool (DPBP) commands.
+ */
+int	dpaa2_cmd_bp_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    const uint32_t dpbp_id, uint16_t *token);
+int	dpaa2_cmd_bp_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_bp_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_bp_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_bp_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+int	dpaa2_cmd_bp_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+	    dpaa2_bp_attr_t *attr);
 
 #endif /* _DPAA2_MCP_H */
