@@ -397,6 +397,8 @@ dpaa2_get_type(enum dpaa2_dev_type dtype)
 		return ("dpni");
 	case DPAA2_DEV_MCP:
 		return ("dpmcp");
+	case DPAA2_DEV_BP:
+		return ("dpbp");
 	default:
 		return ("unknown");
 	}

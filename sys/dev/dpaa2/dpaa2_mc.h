@@ -46,7 +46,8 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
 	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
-	DPAA2_DEV_MCP		/* MC portal (to configure MC portal) */
+	DPAA2_DEV_MCP,		/* MC portal (to configure MC portal) */
+	DPAA2_DEV_BP		/* Buffer Pool */
 };
 
 /**
@@ -97,6 +98,13 @@ struct dpaa2_io_softc {
 	void			*intr; /* interrupt handle */
 	dpaa2_swp_desc_t	 swp_desc;
 	dpaa2_swp_t		 swp;
+};
+
+/**
+ * @brief Software context for the DPAA2 Buffer Pool driver.
+ */
+struct dpaa2_bp_softc {
+	device_t		 dev;
 };
 
 /**
