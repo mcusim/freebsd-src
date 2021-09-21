@@ -9,6 +9,7 @@ SRCS=	bus_if.h \
 	dpaa2_mc.c \
 	dpaa2_rc.c \
 	dpaa2_io.c \
+	dpaa2_bp.c \
 	dpaa2_mcp.c \
 	dpaa2_swp.c
 
