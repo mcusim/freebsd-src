@@ -32,7 +32,7 @@
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 
-#define DPAA2_MCP_MEM_WIDTH	0x40 /* Expected minimal size of the portal. */
+#define DPAA2_MCP_MEM_WIDTH	0x40 /* Minimal size of the MC portal. */
 #define DPAA2_IO_MSI_COUNT	1
 
 /* MC Registers */
@@ -105,6 +105,22 @@ struct dpaa2_io_softc {
  */
 struct dpaa2_bp_softc {
 	device_t		 dev;
+};
+
+/**
+ * @brief Software context for the DPAA2 Network Interface driver.
+ *
+ * dev:		Device associated with this software context.
+ * bpdev:	Device associated with a buffer pool object for this interface.
+ * bpid:	ID of the logical DPBP object.
+ * rx_bufsz:	Size of a buffer to receive frames.
+ */
+struct dpaa2_ni_softc {
+	device_t		 dev;
+
+	device_t		 bpdev;
+	uint32_t		 bpid;
+	uint16_t		 rx_bufsz;
 };
 
 /**

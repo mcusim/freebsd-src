@@ -734,7 +734,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	int rc;
 
 	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
-		/* Add an I/O device. */
+		/* Add a device for DPIO object. */
 		dev = device_add_child(rcdev, "dpaa2_io", -1);
 		if (dev == NULL) {
 			device_printf(rcdev, "Failed to add a child device: "
@@ -788,7 +788,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 			    i, start, end, count);
 		}
 	} else if (strncmp("dpbp", obj->type, strlen("dpbp")) == 0) {
-		/* Add a Buffer Pool device. */
+		/* Add a device for DPBP object. */
 		dev = device_add_child(rcdev, "dpaa2_bp", -1);
 		if (dev == NULL) {
 			device_printf(rcdev, "Failed to add a child device: "
@@ -812,6 +812,41 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		dinfo->dev = dev;
 		dinfo->id = obj->id;
 		dinfo->dtype = DPAA2_DEV_BP;
+		/* Children share their parent container's ICID and portal ID. */
+		dinfo->icid = rcinfo->icid;
+		dinfo->portal_id = rcinfo->portal_id;
+		/* MSI configuration */
+		dinfo->msi.msi_msgnum = obj->irq_count;
+		dinfo->msi.msi_alloc = 0;
+		dinfo->msi.msi_handlers = 0;
+
+		/* Initialize a resource list for the child. */
+		resource_list_init(&dinfo->resources);
+	} else if (strncmp("dpni", obj->type, strlen("dpni")) == 0) {
+		/* Add a device for DPNI object. */
+		dev = device_add_child(rcdev, "dpaa2_ni", -1);
+		if (dev == NULL) {
+			device_printf(rcdev, "Failed to add a child device: "
+			    "type=%s, id=%u\n", (const char *)obj->type,
+			    obj->id);
+			return (ENXIO);
+		}
+
+		/* Allocate devinfo for a child device. */
+		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
+		    M_WAITOK | M_ZERO);
+		if (!dinfo) {
+			device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
+			    "for: type=%s, id=%u\n", (const char *)obj->type,
+			    obj->id);
+			return (ENXIO);
+		}
+		device_set_ivars(dev, dinfo);
+
+		dinfo->pdev = rcdev;
+		dinfo->dev = dev;
+		dinfo->id = obj->id;
+		dinfo->dtype = DPAA2_DEV_NI;
 		/* Children share their parent container's ICID and portal ID. */
 		dinfo->icid = rcinfo->icid;
 		dinfo->portal_id = rcinfo->portal_id;
