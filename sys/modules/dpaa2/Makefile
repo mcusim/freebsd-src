@@ -3,6 +3,7 @@
 .PATH:	${SRCTOP}/sys/dev/dpaa2
 
 KMOD=	dpaa2
+
 SRCS=	bus_if.h \
 	device_if.h \
 	opt_platform.h \
@@ -10,6 +11,7 @@ SRCS=	bus_if.h \
 	dpaa2_rc.c \
 	dpaa2_io.c \
 	dpaa2_bp.c \
+	dpaa2_ni.c \
 	dpaa2_mcp.c \
 	dpaa2_swp.c
 
@@ -28,5 +30,8 @@ SRCS+=	dpaa2_mc_acpi.c \
 SRCS+=	dpaa2_mc_fdt.c \
 	ofw_bus_if.h
 .endif
+
+MFILES=	dev/dpaa2/dpaa2_rc_if.m \
+	dev/dpaa2/dpaa2_cmd_if.m
 
 .include <bsd.kmod.mk>
