@@ -29,6 +29,8 @@
 #ifndef	_DPAA2_MCP_H
 #define	_DPAA2_MCP_H
 
+#include <sys/rman.h>
+
 /*
  * MC command interface and the DPAA2 Management Complex Portal (DPMCP) driver.
  *
