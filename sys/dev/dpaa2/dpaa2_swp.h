@@ -29,6 +29,8 @@
 #ifndef	_DPAA2_SWP_H
 #define	_DPAA2_SWP_H
 
+#include <sys/bus.h>
+
 /*
  * QBMan software portal interface.
  *

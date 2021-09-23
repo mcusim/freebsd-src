@@ -29,6 +29,10 @@
 #ifndef	_DPAA2_MC_H
 #define	_DPAA2_MC_H
 
+#include <sys/rman.h>
+
+#include "pci_if.h"
+
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 
