@@ -84,6 +84,118 @@ CODE {
 				device_get_parent(dev), cmd, cont_id));
 		return (ENXIO);
 	}
+
+	static int
+	bypass_rc_open(device_t dev, dpaa2_cmd_t cmd, uint32_t cont_id,
+		uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_OPEN(
+				device_get_parent(dev), cmd, cont_id, token));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_obj_count(device_t dev, dpaa2_cmd_t cmd,
+		uint32_t *obj_count)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_OBJ_COUNT(
+				device_get_parent(dev), cmd, obj_count));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_obj(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_idx,
+		dpaa2_obj_t *obj)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_OBJ(
+				device_get_parent(dev), cmd, obj_idx, obj));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_obj_descriptor(device_t dev, dpaa2_cmd_t cmd,
+		uint32_t obj_id, const char *type, dpaa2_obj_t *obj)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_OBJ_DESCRIPTOR(
+				device_get_parent(dev), cmd, obj_id, type, obj));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_rc_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_obj_region(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_id,
+		uint8_t reg_idx, const char *type, dpaa2_rc_obj_region_t *reg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_OBJ_REGION(
+				device_get_parent(dev), cmd, obj_id, reg_idx,
+				type, reg));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_get_api_version(device_t dev, dpaa2_cmd_t cmd,
+		uint16_t *major, uint16_t *minor)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_API_VERSION(
+				device_get_parent(dev), cmd, major, minor));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint8_t enable)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_SET_IRQ_ENABLE(
+				device_get_parent(dev), cmd, irq_idx, enable));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_rc_set_obj_irq(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
+		const char *type)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_SET_OBJ_IRQ(
+				device_get_parent(dev), cmd, irq_idx, addr, data,
+				irq_usr, obj_id, type));
+		return (ENXIO);
+	}
 };
 
 /**
@@ -120,25 +232,25 @@ METHOD int rc_open {
 	dpaa2_cmd_t	 cmd;
 	uint32_t	 cont_id;
 	uint16_t	*token;
-};
+} DEFAULT bypass_rc_open;
 
 METHOD int rc_close {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_rc_close;
 
 METHOD int rc_get_obj_count {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint32_t	*obj_count;
-};
+} DEFAULT bypass_rc_get_obj_count;
 
 METHOD int rc_get_obj {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint32_t	 obj_idx;
 	dpaa2_obj_t	*obj;
-};
+} DEFAULT bypass_rc_get_obj;
 
 METHOD int rc_get_obj_descriptor {
 	device_t	 dev;
@@ -146,13 +258,13 @@ METHOD int rc_get_obj_descriptor {
 	uint32_t	 obj_id;
 	const char	*type;
 	dpaa2_obj_t	*obj;
-};
+} DEFAULT bypass_rc_get_obj_descriptor;
 
 METHOD int rc_get_attributes {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	dpaa2_rc_attr_t	*attr;
-};
+} DEFAULT bypass_rc_get_attributes;
 
 METHOD int rc_get_obj_region {
 	device_t	 dev;
@@ -161,21 +273,21 @@ METHOD int rc_get_obj_region {
 	uint8_t		 reg_idx;
 	const char	*type;
 	dpaa2_rc_obj_region_t *reg;
-};
+} DEFAULT bypass_rc_get_obj_region;
 
 METHOD int rc_get_api_version {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint16_t	*major;
 	uint16_t	*minor;
-};
+} DEFAULT bypass_rc_get_api_version;
 
 METHOD int rc_set_irq_enable {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint8_t		 irq_idx;
 	uint8_t		 enable;
-};
+} DEFAULT bypass_rc_set_irq_enable;
 
 METHOD int rc_set_obj_irq {
 	device_t	 dev;
@@ -186,7 +298,7 @@ METHOD int rc_set_obj_irq {
 	uint32_t	 irq_usr;
 	uint32_t	 obj_id;
 	const char	*type;
-};
+} DEFAULT bypass_rc_set_obj_irq;
 
 /**
  * @brief Data Path Network Interface (DPNI) commands.
