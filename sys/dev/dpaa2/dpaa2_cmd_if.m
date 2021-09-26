@@ -39,22 +39,49 @@
 INTERFACE dpaa2_cmd;
 
 #
-# Default implementation of some commands.
+# Default implementation of the commands.
 #
 CODE {
-	static int
-	bypass_mng_get_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *major,
-		uint32_t *minor, uint32_t *rev)
+	static void
+	panic_on_mc(device_t dev)
 	{
 		struct dpaa2_devinfo *dinfo;
 
 		dinfo = device_get_ivars(dev);
 		if (dinfo != NULL && dinfo->dtype == DPAA2_DEV_MC)
-			panic("no one can handle above MC");
+			panic("No one can handle a command above DPAA2 MC");
+	}
+
+	static int
+	bypass_mng_get_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *major,
+		uint32_t *minor, uint32_t *rev)
+	{
+		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_MNG_GET_VERSION(device_get_parent(dev),
 				cmd, major, minor, rev));
+		return (ENXIO);
+	}
 
+	static int
+	bypass_mng_get_soc_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *pvr,
+		uint32_t *svr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MNG_GET_SOC_VERSION(
+				device_get_parent(dev), cmd, pvr, svr));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_mng_get_container_id(device_t dev, dpaa2_cmd_t cmd,
+		uint32_t *cont_id)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MNG_GET_CONTAINER_ID(
+				device_get_parent(dev), cmd, cont_id));
 		return (ENXIO);
 	}
 };
@@ -76,13 +103,13 @@ METHOD int mng_get_soc_version {
 	dpaa2_cmd_t	 cmd;
 	uint32_t	*pvr;
 	uint32_t	*svr;
-};
+} DEFAULT bypass_mng_get_soc_version;
 
 METHOD int mng_get_container_id {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint32_t	*cont_id;
-};
+} DEFAULT bypass_mng_get_container_id;
 
 /**
  * @brief Data Path Resource Containter (DPRC) commands.
