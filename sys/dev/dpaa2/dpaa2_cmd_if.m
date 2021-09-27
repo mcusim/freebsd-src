@@ -62,7 +62,6 @@ CODE {
 				cmd, major, minor, rev));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_mng_get_soc_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *pvr,
 		uint32_t *svr)
@@ -73,7 +72,6 @@ CODE {
 				device_get_parent(dev), cmd, pvr, svr));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_mng_get_container_id(device_t dev, dpaa2_cmd_t cmd,
 		uint32_t *cont_id)
@@ -84,7 +82,6 @@ CODE {
 				device_get_parent(dev), cmd, cont_id));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_open(device_t dev, dpaa2_cmd_t cmd, uint32_t cont_id,
 		uint16_t *token)
@@ -95,7 +92,6 @@ CODE {
 				device_get_parent(dev), cmd, cont_id, token));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_close(device_t dev, dpaa2_cmd_t cmd)
 	{
@@ -105,7 +101,6 @@ CODE {
 				device_get_parent(dev), cmd));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_obj_count(device_t dev, dpaa2_cmd_t cmd,
 		uint32_t *obj_count)
@@ -116,7 +111,6 @@ CODE {
 				device_get_parent(dev), cmd, obj_count));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_obj(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_idx,
 		dpaa2_obj_t *obj)
@@ -127,7 +121,6 @@ CODE {
 				device_get_parent(dev), cmd, obj_idx, obj));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_obj_descriptor(device_t dev, dpaa2_cmd_t cmd,
 		uint32_t obj_id, const char *type, dpaa2_obj_t *obj)
@@ -138,7 +131,6 @@ CODE {
 				device_get_parent(dev), cmd, obj_id, type, obj));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_attributes(device_t dev, dpaa2_cmd_t cmd,
 		dpaa2_rc_attr_t *attr)
@@ -149,7 +141,6 @@ CODE {
 				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_obj_region(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_id,
 		uint8_t reg_idx, const char *type, dpaa2_rc_obj_region_t *reg)
@@ -161,7 +152,6 @@ CODE {
 				type, reg));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_get_api_version(device_t dev, dpaa2_cmd_t cmd,
 		uint16_t *major, uint16_t *minor)
@@ -172,7 +162,6 @@ CODE {
 				device_get_parent(dev), cmd, major, minor));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 		uint8_t enable)
@@ -183,7 +172,6 @@ CODE {
 				device_get_parent(dev), cmd, irq_idx, enable));
 		return (ENXIO);
 	}
-
 	static int
 	bypass_rc_set_obj_irq(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 		uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
@@ -194,6 +182,140 @@ CODE {
 			return (DPAA2_CMD_RC_SET_OBJ_IRQ(
 				device_get_parent(dev), cmd, irq_idx, addr, data,
 				irq_usr, obj_id, type));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_ni_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpni_id,
+		uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_OPEN(
+				device_get_parent(dev), cmd, dpni_id, token));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
+		uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_OPEN(
+				device_get_parent(dev), cmd, dpio_id, token));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_enable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_ENABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_disable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_DISABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_reset(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_RESET(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_io_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_bp_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
+		uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_OPEN(
+				device_get_parent(dev), cmd, dpbp_id, token));
+		return (ENXIO);
+	}
+	static int
+	bypass_bp_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_bp_enable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_ENABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_bp_disable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_DISABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_bp_reset(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_RESET(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_bp_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_bp_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_BP_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
 };
@@ -309,12 +431,12 @@ METHOD int ni_open {
 	dpaa2_cmd_t	 cmd;
 	const uint32_t	 dpni_id;
 	uint16_t	*token;
-};
+} DEFAULT bypass_ni_open;
 
 METHOD int ni_close {
 	device_t dev;
 	dpaa2_cmd_t cmd;
-};
+} DEFAULT bypass_ni_close;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
@@ -325,33 +447,33 @@ METHOD int io_open {
 	dpaa2_cmd_t	 cmd;
 	const uint32_t	 dpio_id;
 	uint16_t	*token;
-};
+} DEFAULT bypass_io_open;
 
 METHOD int io_close {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_io_close;
 
 METHOD int io_enable {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_io_enable;
 
 METHOD int io_disable {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_io_disable;
 
 METHOD int io_reset {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_io_reset;
 
 METHOD int io_get_attributes {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	dpaa2_io_attr_t	*attr;
-};
+} DEFAULT bypass_io_get_attributes;
 
 /**
  * @brief Data Path Buffer Pool (DPBP) commands.
@@ -362,30 +484,30 @@ METHOD int bp_open {
 	dpaa2_cmd_t	 cmd;
 	const uint32_t	 dpbp_id;
 	uint16_t	*token;
-};
+} DEFAULT bypass_bp_open;
 
 METHOD int bp_close {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_bp_close;
 
 METHOD int bp_enable {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_bp_enable;
 
 METHOD int bp_disable {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_bp_disable;
 
 METHOD int bp_reset {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-};
+} DEFAULT bypass_bp_reset;
 
 METHOD int bp_get_attributes {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	dpaa2_bp_attr_t	*attr;
-};
+} DEFAULT bypass_bp_get_attributes;

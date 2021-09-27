@@ -43,6 +43,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/condvar.h>
+#include <sys/lock.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/systm.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -52,16 +57,194 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_cmd_if.h"
+
+#define PORTAL_TIMEOUT		100000	/* us */
+
+#define CMD_PARAMS_N		7u
+#define CMD_SLEEP_TIMEOUT	1u	/* ms */
+#define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
+#define CMD_SPIN_TIMEOUT	10u	/* us */
+#define CMD_SPIN_ATTEMPTS	15u	/* max. 150 us */
+
+#define HW_FLAG_HIGH_PRIO	0x80u
+#define SW_FLAG_INTR_DIS	0x01u
+
+#define TYPE_LEN_MAX		16u
+#define LABEL_LEN_MAX		16u
+
+/* ------------------------- MNG command IDs -------------------------------- */
+#define CMD_MNG_BASE_VERSION	1
+#define CMD_MNG_ID_OFFSET	4
+
+#define CMD_MNG(id)	(((id) << CMD_MNG_ID_OFFSET) | CMD_MNG_BASE_VERSION)
+
+#define CMDID_MNG_GET_VER			CMD_MNG(0x831)
+#define CMDID_MNG_GET_SOC_VER			CMD_MNG(0x832)
+#define CMDID_MNG_GET_CONT_ID			CMD_MNG(0x830)
+
+/* ------------------------- DPRC command IDs ------------------------------- */
+#define CMD_RC_BASE_VERSION	1
+#define CMD_RC_2ND_VERSION	2
+#define CMD_RC_3RD_VERSION	3
+#define CMD_RC_ID_OFFSET	4
+
+#define CMD_RC(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_BASE_VERSION)
+#define CMD_RC_V2(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_2ND_VERSION)
+#define CMD_RC_V3(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_3RD_VERSION)
+
+#define CMDID_RC_OPEN				CMD_RC(0x805)
+#define CMDID_RC_CLOSE				CMD_RC(0x800)
+#define CMDID_RC_GET_API_VERSION		CMD_RC(0xA05)
+#define CMDID_RC_GET_ATTR			CMD_RC(0x004)
+#define CMDID_RC_RESET_CONT			CMD_RC(0x005)
+#define CMDID_RC_RESET_CONT_V2			CMD_RC_V2(0x005)
+#define CMDID_RC_SET_IRQ			CMD_RC(0x010)
+#define CMDID_RC_SET_IRQ_ENABLE			CMD_RC(0x012)
+#define CMDID_RC_SET_IRQ_MASK			CMD_RC(0x014)
+#define CMDID_RC_GET_IRQ_STATUS			CMD_RC(0x016)
+#define CMDID_RC_CLEAR_IRQ_STATUS		CMD_RC(0x017)
+#define CMDID_RC_GET_CONT_ID			CMD_RC(0x830)
+#define CMDID_RC_GET_OBJ_COUNT			CMD_RC(0x159)
+#define CMDID_RC_GET_OBJ			CMD_RC(0x15A)
+#define CMDID_RC_GET_OBJ_DESC			CMD_RC(0x162)
+#define CMDID_RC_GET_OBJ_REG			CMD_RC(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V2			CMD_RC_V2(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V3			CMD_RC_V3(0x15E)
+#define CMDID_RC_SET_OBJ_IRQ			CMD_RC(0x15F)
+#define CMDID_RC_GET_CONNECTION			CMD_RC(0x16C)
+
+/* ------------------------- DPIO command IDs ------------------------------- */
+#define CMD_IO_BASE_VERSION	1
+#define CMD_IO_ID_OFFSET	4
+
+#define CMD_IO(id)	(((id) << CMD_IO_ID_OFFSET) | CMD_IO_BASE_VERSION)
+
+#define CMDID_IO_OPEN				CMD_IO(0x803)
+#define CMDID_IO_CLOSE				CMD_IO(0x800)
+#define CMDID_IO_ENABLE				CMD_IO(0x002)
+#define CMDID_IO_DISABLE			CMD_IO(0x003)
+#define CMDID_IO_GET_ATTR			CMD_IO(0x004)
+#define CMDID_IO_RESET				CMD_IO(0x005)
+
+/* ------------------------- DPNI command IDs ------------------------------- */
+#define CMD_NI_BASE_VERSION	1
+#define CMD_NI_ID_OFFSET	4
+
+#define CMD_NI(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_BASE_VERSION)
+
+#define CMDID_NI_OPEN				CMD_NI(0x801)
+#define CMDID_NI_CLOSE				CMD_NI(0x800)
+
+/* ------------------------- DPBP command IDs ------------------------------- */
+#define CMD_BP_BASE_VERSION	1
+#define CMD_BP_ID_OFFSET	4
+
+#define CMD_BP(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_BP_OPEN				CMD_BP(0x804)
+#define CMDID_BP_CLOSE				CMD_BP(0x800)
+#define CMDID_BP_ENABLE				CMD_BP(0x002)
+#define CMDID_BP_DISABLE			CMD_BP(0x003)
+#define CMDID_BP_GET_ATTR			CMD_BP(0x004)
+#define CMDID_BP_RESET				CMD_BP(0x005)
+
+/* ------------------------- End of command IDs ----------------------------- */
+
+#define LOCK_PORTAL(portal, flags) do {					\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
+		mtx_lock_spin(&(portal)->lock);				\
+		(flags) = (portal)->flags;				\
+	} else {							\
+		mtx_lock(&(portal)->lock);				\
+		while ((portal)->flags & DPAA2_PORTAL_LOCKED)		\
+			cv_wait(&(portal)->cv, &(portal)->lock);	\
+		(flags) = (portal)->flags;				\
+		(portal)->flags |= DPAA2_PORTAL_LOCKED;			\
+		mtx_unlock(&(portal)->lock);				\
+	}								\
+} while (0)
+#define UNLOCK_PORTAL(portal) do {				\
+	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {		\
+		mtx_unlock_spin(&(portal)->lock);		\
+	} else {						\
+		mtx_lock(&(portal)->lock);			\
+		(portal)->flags &= ~DPAA2_PORTAL_LOCKED;	\
+		cv_signal(&(portal)->cv);			\
+		mtx_unlock(&(portal)->lock);			\
+	}							\
+} while (0)
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
+/**
+ * @brief Helper object to access fields of the DPAA2 object information
+ * response.
+ */
+struct __packed dpaa2_obj {
+	uint32_t		 _reserved1;
+	uint32_t		 id;
+	uint16_t		 vendor;
+	uint8_t			 irq_count;
+	uint8_t			 reg_count;
+	uint32_t		 state;
+	uint16_t		 ver_major;
+	uint16_t		 ver_minor;
+	uint16_t		 flags;
+	uint16_t		 _reserved2;
+	uint8_t			 type[16];
+	uint8_t			 label[16];
+};
+
+/**
+ * @brief Helper object to access fields of the DPRC attributes response.
+ */
+struct __packed dpaa2_rc_attr {
+	uint32_t		 cont_id;
+	uint16_t		 icid;
+	uint16_t		 _reserved1;
+	uint32_t		 options;
+	uint32_t		 portal_id;
+};
+
+/**
+ * @brief Helper object to access fields of the DPIO attributes response.
+ */
+struct __packed dpaa2_io_attr {
+	uint32_t		 id;
+	uint16_t		 swp_id;
+	uint8_t			 priors_num;
+	uint8_t			 chan_mode;
+	uint64_t		 swp_ce_paddr;
+	uint64_t		 swp_ci_paddr;
+	uint32_t		 swp_version;
+	uint32_t		 _reserved1;
+	uint32_t		 clk;
+	uint32_t		 _reserved2[5];
+};
+
+/**
+ * @brief Helper object to access fields of the DPBP attributes response.
+ */
+struct __packed dpaa2_bp_attr {
+	uint16_t	_reserved1;
+	uint16_t	bpid;
+	uint32_t	id;
+};
+
 /* Forward declarations. */
-static int dpaa2_rc_detach(device_t dev);
-static int dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc);
-static int dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
-    const dpaa2_obj_t *obj);
-static int dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid,
-    uint64_t addr, uint32_t data);
+static int	discover_objects(struct dpaa2_rc_softc *sc);
+static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+		    const dpaa2_obj_t *obj);
+static int	configure_irq(device_t rcdev, device_t child, int rid,
+		    uint64_t addr, uint32_t data);
+static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		    const uint16_t cmdid);
+static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int	set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		    const uint8_t irq_idx, const uint8_t enable,
+		    const uint16_t cmdid);
 
 /*
  * Device interface.
@@ -73,6 +256,28 @@ dpaa2_rc_probe(device_t dev)
 	/* DPRC device will be added by a parent DPRC or by MC bus itself. */
 	device_set_desc(dev, "DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+dpaa2_rc_detach(device_t dev)
+{
+	struct dpaa2_rc_softc *sc;
+	struct dpaa2_devinfo *dinfo;
+	int error;
+
+	error = bus_generic_detach(dev);
+	if (error)
+		return (error);
+
+	sc = device_get_softc(dev);
+	dinfo = device_get_ivars(dev);
+
+	if (sc->portal)
+		dpaa2_mcp_free_portal(sc->portal);
+	if (dinfo)
+		free(dinfo, M_DPAA2_RC);
+
+	return (device_delete_children(dev));
 }
 
 static int
@@ -133,7 +338,7 @@ dpaa2_rc_attach(device_t dev)
 	}
 
 	/* Create DPAA2 devices for objects in this container. */
-	error = dpaa2_rc_discover_objects(sc);
+	error = discover_objects(sc);
 	if (error) {
 		device_printf(dev, "Failed to discover objects in container: "
 		    "error=%d\n", error);
@@ -142,28 +347,6 @@ dpaa2_rc_attach(device_t dev)
 	}
 
 	return (0);
-}
-
-static int
-dpaa2_rc_detach(device_t dev)
-{
-	struct dpaa2_rc_softc *sc;
-	struct dpaa2_devinfo *dinfo;
-	int error;
-
-	error = bus_generic_detach(dev);
-	if (error)
-		return (error);
-
-	sc = device_get_softc(dev);
-	dinfo = device_get_ivars(dev);
-
-	if (sc->portal)
-		dpaa2_mcp_free_portal(sc->portal);
-	if (dinfo)
-		free(dinfo, M_DPAA2_RC);
-
-	return (device_delete_children(dev));
 }
 
 /*
@@ -367,7 +550,7 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		}
 
 		/* Configure MSI for this DPAA2 object. */
-		error = dpaa2_rc_configure_irq(rcdev, child, rid, addr, data);
+		error = configure_irq(rcdev, child, rid, addr, data);
 		if (error) {
 			device_printf(rcdev, "Failed to configure IRQ for "
 			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
@@ -415,6 +598,28 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 		KASSERT(error == 0,
 		    ("%s: generic teardown failed for MSI", __func__));
 	return (error);
+}
+
+static int
+dpaa2_rc_print_child(device_t rcdev, device_t child)
+{
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	struct resource_list *rl = &dinfo->resources;
+	int retval = 0;
+
+	retval += bus_print_child_header(rcdev, child);
+
+	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
+	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
+	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
+
+	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
+	    dinfo->id);
+
+	retval += bus_print_child_domain(rcdev, child);
+	retval += bus_print_child_footer(rcdev, child);
+
+	return (retval);
 }
 
 /*
@@ -593,34 +798,651 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
 	return (PCIB_GET_ID(device_get_parent(rcdev), child, type, id));
 }
 
+/*
+ * DPAA2 MC command interface.
+ */
+
 static int
-dpaa2_rc_print_child(device_t rcdev, device_t child)
+dpaa2_rc_mng_get_version(device_t rcdev, dpaa2_cmd_t cmd, uint32_t *major,
+    uint32_t *minor, uint32_t *rev)
 {
-	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
-	struct resource_list *rl = &dinfo->resources;
-	int retval = 0;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
 
-	retval += bus_print_child_header(rcdev, child);
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !major || !minor || !rev)
+		return (DPAA2_CMD_STAT_ERR);
 
-	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
-	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
-	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
+	error = exec_command(sc->portal, cmd, CMDID_MNG_GET_VER);
+	if (!error) {
+		*major = cmd->params[0] >> 32;
+		*minor = cmd->params[1] & 0xFFFFFFFF;
+		*rev = cmd->params[0] & 0xFFFFFFFF;
+	}
 
-	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
-	    dinfo->id);
-
-	retval += bus_print_child_domain(rcdev, child);
-	retval += bus_print_child_footer(rcdev, child);
-
-	return (retval);
+	return (error);
 }
+
+static int
+dpaa2_rc_mng_get_soc_version(device_t rcdev, dpaa2_cmd_t cmd, uint32_t *pvr,
+    uint32_t *svr)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !pvr || !svr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_MNG_GET_SOC_VER);
+	if (!error) {
+		*pvr = cmd->params[0] >> 32;
+		*svr = cmd->params[0] & 0xFFFFFFFF;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_mng_get_container_id(device_t portal, dpaa2_cmd_t cmd,
+    uint32_t *cont_id)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cont_id)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_MNG_GET_CONT_ID);
+	if (!error)
+		*cont_id = cmd->params[0] & 0xFFFFFFFF;
+
+	return (error);
+}
+
+static int
+dpaa2_rc_open(device_t rcdev, dpaa2_cmd_t cmd, uint32_t cont_id, uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = cont_id;
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_RC_CLOSE));
+}
+
+static int
+dpaa2_rc_get_obj_count(device_t rcdev, dpaa2_cmd_t cmd, uint32_t *obj_count)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !obj_count)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_OBJ_COUNT);
+	if (!error)
+		*obj_count = (uint32_t)(cmd->params[0] >> 32);
+
+	return (error);
+}
+
+static int
+dpaa2_rc_get_obj(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_idx,
+    dpaa2_obj_t *obj)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_obj *pobj;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !obj)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = obj_idx;
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_OBJ);
+	if (!error) {
+		pobj = (struct dpaa2_obj *) &cmd->params[0];
+		obj->id = pobj->id;
+		obj->vendor = pobj->vendor;
+		obj->irq_count = pobj->irq_count;
+		obj->reg_count = pobj->reg_count;
+		obj->state = pobj->state;
+		obj->ver_major = pobj->ver_major;
+		obj->ver_minor = pobj->ver_minor;
+		obj->flags = pobj->flags;
+		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		memcpy(obj->label, pobj->label, sizeof(pobj->label));
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_get_obj_descriptor(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
+    const char *type, dpaa2_obj_t *obj)
+{
+	struct __packed get_obj_desc_args {
+		uint32_t	obj_id;
+		uint32_t	_reserved1;
+		uint8_t		type[16];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_obj *pobj;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !type || !obj)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct get_obj_desc_args *) &cmd->params[0];
+	args->obj_id = obj_id;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_OBJ_DESC);
+	if (!error) {
+		pobj = (struct dpaa2_obj *) &cmd->params[0];
+		obj->id = pobj->id;
+		obj->vendor = pobj->vendor;
+		obj->irq_count = pobj->irq_count;
+		obj->reg_count = pobj->reg_count;
+		obj->state = pobj->state;
+		obj->ver_major = pobj->ver_major;
+		obj->ver_minor = pobj->ver_minor;
+		obj->flags = pobj->flags;
+		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		memcpy(obj->label, pobj->label, sizeof(pobj->label));
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_get_attributes(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_rc_attr_t *attr)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_rc_attr *pattr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_rc_attr *) &cmd->params[0];
+		attr->cont_id = pattr->cont_id;
+		attr->portal_id = pattr->portal_id;
+		attr->options = pattr->options;
+		attr->icid = pattr->icid;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_get_obj_region(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
+    uint8_t reg_idx, const char *type, dpaa2_rc_obj_region_t *reg)
+{
+	struct __packed obj_region_args {
+		uint32_t	obj_id;
+		uint16_t	_reserved1;
+		uint8_t		reg_idx;
+		uint8_t		_reserved2;
+		uint64_t	_reserved3;
+		uint64_t	_reserved4;
+		uint8_t		type[16];
+	} *args;
+	struct __packed obj_region {
+		uint64_t	_reserved1;
+		uint64_t	base_offset;
+		uint32_t	size;
+		uint32_t	type;
+		uint32_t	flags;
+		uint32_t	_reserved2;
+		uint64_t	base_paddr;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	uint16_t cmdid, api_major, api_minor;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !type || !reg)
+		return (DPAA2_CMD_STAT_ERR);
+
+	/*
+	 * If the DPRC object version was not yet cached, cache it now.
+	 * Otherwise use the already cached value.
+	 */
+	if (!sc->portal->rc_api_major && !sc->portal->rc_api_minor) {
+		error = dpaa2_cmd_rc_get_api_version(sc->portal, cmd, &api_major,
+		    &api_minor);
+		if (error)
+			return (error);
+		sc->portal->rc_api_major = api_major;
+		sc->portal->rc_api_minor = api_minor;
+	} else {
+		api_major = sc->portal->rc_api_major;
+		api_minor = sc->portal->rc_api_minor;
+	}
+
+	if (api_major > 6u || (api_major == 6u && api_minor >= 6u))
+		/*
+		 * MC API version 6.6 changed the size of the MC portals and
+		 * software portals to 64K (as implemented by hardware).
+		 */
+		cmdid = CMDID_RC_GET_OBJ_REG_V3;
+	else if (api_major == 6u && api_minor >= 3u)
+		/*
+		 * MC API version 6.3 introduced a new field to the region
+		 * descriptor: base_address.
+		 */
+		cmdid = CMDID_RC_GET_OBJ_REG_V2;
+	else
+		cmdid = CMDID_RC_GET_OBJ_REG;
+
+	args = (struct obj_region_args *) &cmd->params[0];
+	args->obj_id = obj_id;
+	args->reg_idx = reg_idx;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	error = exec_command(sc->portal, cmd, cmdid);
+	if (!error) {
+		resp = (struct obj_region *) &cmd->params[0];
+		reg->base_paddr = resp->base_paddr;
+		reg->base_offset = resp->base_offset;
+		reg->size = resp->size;
+		reg->flags = resp->flags;
+		reg->type = resp->type & 0xFu;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_get_api_version(device_t rcdev, dpaa2_cmd_t cmd, uint16_t *major,
+    uint16_t *minor)
+{
+	struct __packed rc_api_version {
+		uint16_t	major;
+		uint16_t	minor;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !major || !minor)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_API_VERSION);
+	if (!error) {
+		resp = (struct rc_api_version *) &cmd->params[0];
+		*major = resp->major;
+		*minor = resp->minor;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint8_t enable)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (set_irq_enable(sc->portal, cmd, irq_idx, enable,
+	    CMDID_RC_SET_IRQ_ENABLE));
+}
+
+static int
+dpaa2_rc_set_obj_irq(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
+    const char *type)
+{
+	struct __packed set_obj_irq_args {
+		uint32_t	data;
+		uint8_t		irq_idx;
+		uint8_t		_reserved1[3];
+		uint64_t	addr;
+		uint32_t	irq_usr;
+		uint32_t	obj_id;
+		uint8_t		type[16];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !type)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_obj_irq_args *) &cmd->params[0];
+	args->irq_idx = irq_idx;
+	args->addr = addr;
+	args->data = data;
+	args->irq_usr = irq_usr;
+	args->obj_id = obj_id;
+	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
+
+	return (exec_command(sc->portal, cmd, CMDID_RC_SET_OBJ_IRQ));
+}
+
+static int
+dpaa2_rc_ni_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpni_id,
+    uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpni_id;
+	error = exec_command(sc->portal, cmd, CMDID_NI_OPEN);
+ 	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_ni_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_CLOSE));
+}
+
+static int
+dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
+    uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpio_id;
+	error = exec_command(sc->portal, cmd, CMDID_IO_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_io_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_CLOSE));
+}
+
+static int
+dpaa2_rc_io_enable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_ENABLE));
+}
+
+static int
+dpaa2_rc_io_disable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_DISABLE));
+}
+
+static int
+dpaa2_rc_io_reset(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_RESET));
+}
+
+static int
+dpaa2_rc_io_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_io_attr_t *attr)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_io_attr *pattr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_IO_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_io_attr *) &cmd->params[0];
+
+		attr->swp_ce_paddr = pattr->swp_ce_paddr;
+		attr->swp_ci_paddr = pattr->swp_ci_paddr;
+		attr->swp_version = pattr->swp_version;
+		attr->id = pattr->id;
+		attr->swp_id = pattr->swp_id;
+		attr->priors_num = pattr->priors_num;
+		attr->chan_mode = (enum dpaa2_io_chan_mode)
+		    pattr->chan_mode;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_bp_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
+    uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpbp_id;
+	error = exec_command(sc->portal, cmd, CMDID_BP_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_bp_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_BP_CLOSE));
+}
+
+static int
+dpaa2_rc_bp_enable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_BP_ENABLE));
+}
+
+static int
+dpaa2_rc_bp_disable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_BP_DISABLE));
+}
+
+static int
+dpaa2_rc_bp_reset(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_BP_RESET));
+}
+
+static int
+dpaa2_rc_bp_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_bp_attr_t *attr)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_bp_attr *pattr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_BP_GET_ATTR);
+	if (!error) {
+		pattr = (struct dpaa2_bp_attr *) &cmd->params[0];
+		attr->id = pattr->id;
+		attr->bpid = pattr->bpid;
+	}
+
+	return (error);
+}
+
+
+/*
+ * Internal functions.
+ */
 
 /**
  * @internal
  * @brief Create and add devices for DPAA2 objects in this resource container.
  */
 static int
-dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
+discover_objects(struct dpaa2_rc_softc *sc)
 {
 	device_t rcdev = sc->dev;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -707,7 +1529,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
 			    "error=%d\n", i, rc);
 			continue;
 		}
-		dpaa2_rc_add_child(sc, cmd, &obj);
+		add_child(sc, cmd, &obj);
 	}
 
 	dpaa2_cmd_rc_close(sc->portal, cmd);
@@ -722,7 +1544,7 @@ dpaa2_rc_discover_objects(struct dpaa2_rc_softc *sc)
  * @brief Add a new DPAA2 device to the resource container bus.
  */
 static int
-dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
 	device_t rcdev = sc->dev;
@@ -867,7 +1689,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
  * @brief Configure given IRQ using MC command interface.
  */
 static int
-dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
+configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
     uint32_t data)
 {
 	struct dpaa2_rc_softc *rcsc;
@@ -924,6 +1746,135 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 	return (rc);
 }
 
+/**
+ * @internal
+ * @brief General implementation of the MC command to enable IRQ.
+ */
+static int
+set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, const uint8_t irq_idx,
+    const uint8_t enable, const uint16_t cmdid)
+{
+	struct __packed set_irq_enable_args {
+		uint8_t		enable;
+		uint8_t		_reserved1;
+		uint16_t	_reserved2;
+		uint8_t		irq_idx;
+		uint8_t		_reserved3;
+		uint16_t	_reserved4;
+		uint64_t	_reserved5[6];
+	} *args;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_irq_enable_args *) &cmd->params[0];
+	args->irq_idx = irq_idx;
+	args->enable = enable == 0u ? 0u : 1u;
+
+	return (exec_command(portal, cmd, cmdid));
+}
+
+/**
+ * @internal
+ * @brief Sends a command to MC and waits for response.
+ */
+static int
+exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
+{
+	struct dpaa2_cmd_header *hdr;
+	uint16_t flags;
+	int error;
+
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	/* Prepare a command for the MC hardware. */
+	hdr = (struct dpaa2_cmd_header *) &cmd->header;
+	hdr->cmdid = cmdid;
+	hdr->status = DPAA2_CMD_STAT_READY;
+
+	LOCK_PORTAL(portal, flags);
+	if (flags & DPAA2_PORTAL_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_INVALID_STATE);
+	}
+
+	/* Send a command to MC and wait for the result. */
+	send_command(portal, cmd);
+	error = wait_for_command(portal, cmd);
+	if (error) {
+		UNLOCK_PORTAL(portal);
+		return (DPAA2_CMD_STAT_ERR);
+	}
+	if (hdr->status != DPAA2_CMD_STAT_OK) {
+		UNLOCK_PORTAL(portal);
+		return (int)(hdr->status);
+	}
+	UNLOCK_PORTAL(portal);
+
+	return (DPAA2_CMD_STAT_OK);
+}
+
+/**
+ * @internal
+ * @brief Writes a command to the MC command portal.
+ */
+static void
+send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	/* Write command parameters. */
+	for (uint32_t i = 1; i <= CMD_PARAMS_N; i++)
+		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
+
+	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
+	    BUS_SPACE_BARRIER_WRITE);
+
+	/* Write command header to trigger execution. */
+	bus_write_8(portal->map, 0, cmd->header);
+}
+
+/**
+ * @internal
+ * @brief Polls the MC command portal in order to receive a result of the
+ *        command execution.
+ */
+static int
+wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
+{
+	const uint16_t atomic_portal = portal->flags & DPAA2_PORTAL_ATOMIC;
+	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
+	    : CMD_SLEEP_ATTEMPTS;
+
+	struct dpaa2_cmd_header *hdr;
+	uint64_t val;
+	uint32_t i;
+
+	/* Wait for a command execution result from the MC hardware. */
+	for (i = 1; i <= attempts; i++) {
+		val = bus_read_8(portal->map, 0);
+		hdr = (struct dpaa2_cmd_header *) &val;
+		if (hdr->status != DPAA2_CMD_STAT_READY)
+			break;
+
+		if (atomic_portal)
+			DELAY(CMD_SPIN_TIMEOUT);
+		else
+			pause("mcp_pa", CMD_SLEEP_TIMEOUT);
+	}
+
+	/* Update command results. */
+	cmd->header = val;
+	for (i = 1; i <= CMD_PARAMS_N; i++)
+		cmd->params[i-1] = bus_read_8(portal->map, i * sizeof(uint64_t));
+
+	/* Return an error on expired timeout. */
+	if (i > attempts)
+		return (DPAA2_CMD_STAT_TIMEOUT);
+
+	return (DPAA2_CMD_STAT_OK);
+}
+
 static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_rc_probe),
@@ -952,6 +1903,35 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(pci_release_msi,	dpaa2_rc_release_msi),
 	DEVMETHOD(pci_msi_count,	dpaa2_rc_msi_count),
 	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id),
+
+	/* DPAA2 MC command interface */
+	DEVMETHOD(dpaa2_cmd_mng_get_version,	dpaa2_rc_mng_get_version),
+	DEVMETHOD(dpaa2_cmd_mng_get_soc_version, dpaa2_rc_mng_get_soc_version),
+	DEVMETHOD(dpaa2_cmd_mng_get_container_id, dpaa2_rc_mng_get_container_id),
+	DEVMETHOD(dpaa2_cmd_rc_open,		dpaa2_rc_open),
+	DEVMETHOD(dpaa2_cmd_rc_close,		dpaa2_rc_close),
+	DEVMETHOD(dpaa2_cmd_rc_get_obj_count,	dpaa2_rc_get_obj_count),
+	DEVMETHOD(dpaa2_cmd_rc_get_obj,		dpaa2_rc_get_obj),
+	DEVMETHOD(dpaa2_cmd_rc_get_obj_descriptor, dpaa2_rc_get_obj_descriptor),
+	DEVMETHOD(dpaa2_cmd_rc_get_attributes,	dpaa2_rc_get_attributes),
+	DEVMETHOD(dpaa2_cmd_rc_get_obj_region,	dpaa2_rc_get_obj_region),
+	DEVMETHOD(dpaa2_cmd_rc_get_api_version, dpaa2_rc_get_api_version),
+	DEVMETHOD(dpaa2_cmd_rc_set_irq_enable,	dpaa2_rc_set_irq_enable),
+	DEVMETHOD(dpaa2_cmd_rc_set_obj_irq,	dpaa2_rc_set_obj_irq),
+	DEVMETHOD(dpaa2_cmd_ni_open,		dpaa2_rc_ni_open),
+	DEVMETHOD(dpaa2_cmd_ni_close,		dpaa2_rc_ni_close),
+	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
+	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
+	DEVMETHOD(dpaa2_cmd_io_enable,		dpaa2_rc_io_enable),
+	DEVMETHOD(dpaa2_cmd_io_disable,		dpaa2_rc_io_disable),
+	DEVMETHOD(dpaa2_cmd_io_reset,		dpaa2_rc_io_reset),
+	DEVMETHOD(dpaa2_cmd_io_get_attributes,	dpaa2_rc_io_get_attributes),
+	DEVMETHOD(dpaa2_cmd_bp_open,		dpaa2_rc_bp_open),
+	DEVMETHOD(dpaa2_cmd_bp_close,		dpaa2_rc_bp_close),
+	DEVMETHOD(dpaa2_cmd_bp_enable,		dpaa2_rc_bp_enable),
+	DEVMETHOD(dpaa2_cmd_bp_disable,		dpaa2_rc_bp_disable),
+	DEVMETHOD(dpaa2_cmd_bp_reset,		dpaa2_rc_bp_reset),
+	DEVMETHOD(dpaa2_cmd_bp_get_attributes,	dpaa2_rc_bp_get_attributes),
 
 	DEVMETHOD_END
 };
