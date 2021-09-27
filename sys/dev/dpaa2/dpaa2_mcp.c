@@ -151,7 +151,7 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 		hdr->flags_hw |= HW_FLAG_HIGH_PRIO;
 	if (flags & DPAA2_CMD_INTR_DIS)
 		hdr->flags_sw |= SW_FLAG_INTR_DIS;
-	for (uint32_t i = 0; i < CMD_PARAMS_N; i++)
+	for (uint32_t i = 0; i < DPAA2_CMD_PARAMS_N; i++)
 		c->params[i] = 0;
 	*cmd = c;
 

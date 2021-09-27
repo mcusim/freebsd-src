@@ -30,6 +30,7 @@
 #define	_DPAA2_MCP_H
 
 #include <sys/rman.h>
+#include <sys/condvar.h>
 
 /*
  * DPAA2 MC command interface helper routines.
@@ -42,6 +43,7 @@
 #define DPAA2_PORTAL_LOCKED		0x4000u	/* Wait till portal's unlocked */
 #define DPAA2_PORTAL_DESTROYED		0x8000u /* Terminate any operations */
 
+#define DPAA2_CMD_PARAMS_N		7u
 /* Command flags. */
 #define DPAA2_CMD_DEF			0x0u
 #define DPAA2_CMD_HIGH_PRIO		0x80u	/* High priority command */
@@ -113,7 +115,7 @@ struct dpaa2_mcp {
  */
 struct dpaa2_cmd {
 	uint64_t	header;
-	uint64_t	params[CMD_PARAMS_N];
+	uint64_t	params[DPAA2_CMD_PARAMS_N];
 };
 
 /**

@@ -61,7 +61,6 @@ __FBSDID("$FreeBSD$");
 
 #define PORTAL_TIMEOUT		100000	/* us */
 
-#define CMD_PARAMS_N		7u
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
 #define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
 #define CMD_SPIN_TIMEOUT	10u	/* us */
@@ -1824,7 +1823,7 @@ static void
 send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
 	/* Write command parameters. */
-	for (uint32_t i = 1; i <= CMD_PARAMS_N; i++)
+	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
 
 	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
@@ -1865,7 +1864,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 
 	/* Update command results. */
 	cmd->header = val;
-	for (i = 1; i <= CMD_PARAMS_N; i++)
+	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		cmd->params[i-1] = bus_read_8(portal->map, i * sizeof(uint64_t));
 
 	/* Return an error on expired timeout. */
