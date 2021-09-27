@@ -32,10 +32,7 @@
 #include <sys/rman.h>
 
 /*
- * MC command interface and the DPAA2 Management Complex Portal (DPMCP) driver.
- *
- * DPMCP is an optional object exported by MC to control the MC portal operation
- * mode (polling or interrupt-based).
+ * DPAA2 MC command interface helper routines.
  */
 
 /* Portal flags. */
@@ -82,6 +79,64 @@ enum dpaa2_rc_region_type {
 enum dpaa2_io_chan_mode {
 	DPAA2_IO_NO_CHANNEL		= 0,
 	DPAA2_IO_LOCAL_CHANNEL		= 1
+};
+
+/**
+ * @brief Helper object to send commands to the MC portal.
+ *
+ * res:			Unmapped portal's I/O memory.
+ * map:			Mapped portal's I/O memory.
+ * lock:		Lock to send a command to the portal and wait for the
+ *			result.
+ * cv:			Conditional variable helps to wait for the helper
+ *			object's state change.
+ * flags:		Current state of the object.
+ * rc_api_major:	Major version of the DPRC API (cached).
+ * rc_api_minor:	Minor version of the DPRC API (cached).
+ */
+struct dpaa2_mcp {
+	struct resource *res;
+	struct resource_map *map;
+	struct mtx	lock;
+	struct cv	cv;
+	uint16_t	flags;
+	uint16_t	rc_api_major;
+	uint16_t	rc_api_minor;
+};
+
+/**
+ * @brief Command object holds data to be written to the MC portal.
+ *
+ * header:	8 least significant bytes of the MC portal.
+ * params:	Parameters to pass together with the command to MC. Might keep
+ *		command execution results.
+ */
+struct dpaa2_cmd {
+	uint64_t	header;
+	uint64_t	params[CMD_PARAMS_N];
+};
+
+/**
+ * @brief Helper object to access fields of the MC command header.
+ *
+ * srcid:	The SoC architected source ID of the submitter. This field is
+ *		reserved and cannot be written by the driver.
+ * flags_hw:	Bits from 8 to 15 of the command header. Most of them are
+ *		reserved at the moment.
+ * status:	Command ready/status. This field is used as the handshake field
+ *		between MC and the driver. MC reports command completion with
+ *		success/error codes in this field.
+ * flags_sw:	...
+ * token:	...
+ * cmdid:	...
+ */
+struct __packed dpaa2_cmd_header {
+	uint8_t		srcid;
+	uint8_t		flags_hw;
+	uint8_t		status;
+	uint8_t		flags_sw;
+	uint16_t	token;
+	uint16_t	cmdid;
 };
 
 /**
@@ -177,15 +232,9 @@ typedef struct {
 	uint16_t	bpid;
 } dpaa2_bp_attr_t;
 
-/*
- * Opaque pointers.
- */
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
 
-/*
- * Management routines.
- */
 int	dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 	    struct resource_map *map, const uint16_t flags);
 int	dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
@@ -193,71 +242,5 @@ void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
 void	dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
 void	dpaa2_mcp_set_token(dpaa2_cmd_t cmd, const uint16_t token);
 void	dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags);
-
-/*
- * Data Path Management (DPMNG) commands.
- */
-int	dpaa2_cmd_mng_get_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t *major, uint32_t *minor, uint32_t *rev);
-int	dpaa2_cmd_mng_get_soc_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t *pvr, uint32_t *svr);
-int	dpaa2_cmd_mng_get_container_id(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t *cont_id);
-
-/*
- * Data Path Resource Containter (DPRC) commands.
- */
-int	dpaa2_cmd_rc_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint32_t cont_id,
-	    uint16_t *token);
-int	dpaa2_cmd_rc_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_rc_get_obj_count(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t *obj_count);
-int	dpaa2_cmd_rc_get_obj(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t obj_idx, dpaa2_obj_t *obj);
-int	dpaa2_cmd_rc_get_obj_descriptor(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t obj_id, const char *type, dpaa2_obj_t *obj);
-int	dpaa2_cmd_rc_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    dpaa2_rc_attr_t *attr);
-int	dpaa2_cmd_rc_get_obj_region(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint32_t obj_id, uint8_t reg_idx, const char *type,
-	    dpaa2_rc_obj_region_t *reg);
-int	dpaa2_cmd_rc_get_api_version(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint16_t *major, uint16_t *minor);
-int	dpaa2_cmd_rc_set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint8_t irq_idx, uint8_t enable);
-int	dpaa2_cmd_rc_set_obj_irq(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    uint8_t irq_idx, uint64_t addr, uint32_t data, uint32_t irq_usr,
-	    uint32_t obj_id, const char *type);
-
-/*
- * Data Path Network Interface (DPNI) commands.
- */
-int	dpaa2_cmd_ni_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    const uint32_t dpni_id, uint16_t *token);
-int	dpaa2_cmd_ni_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-
-/*
- * Data Path I/O (DPIO) commands.
- */
-int	dpaa2_cmd_io_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    const uint32_t dpio_id, uint16_t *token);
-int	dpaa2_cmd_io_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_io_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_io_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_io_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_io_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    dpaa2_io_attr_t *attr);
-
-/*
- * Data Path Buffer Pool (DPBP) commands.
- */
-int	dpaa2_cmd_bp_open(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    const uint32_t dpbp_id, uint16_t *token);
-int	dpaa2_cmd_bp_close(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_bp_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_bp_disable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_bp_reset(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-int	dpaa2_cmd_bp_get_attributes(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-	    dpaa2_bp_attr_t *attr);
 
 #endif /* _DPAA2_MCP_H */
