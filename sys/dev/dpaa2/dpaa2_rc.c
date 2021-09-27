@@ -59,15 +59,10 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_cmd_if.h"
 
-#define PORTAL_TIMEOUT		100000	/* us */
-
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
 #define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
 #define CMD_SPIN_TIMEOUT	10u	/* us */
 #define CMD_SPIN_ATTEMPTS	15u	/* max. 150 us */
-
-#define HW_FLAG_HIGH_PRIO	0x80u
-#define SW_FLAG_INTR_DIS	0x01u
 
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
@@ -149,30 +144,6 @@ __FBSDID("$FreeBSD$");
 #define CMDID_BP_RESET				CMD_BP(0x005)
 
 /* ------------------------- End of command IDs ----------------------------- */
-
-#define LOCK_PORTAL(portal, flags) do {					\
-	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {			\
-		mtx_lock_spin(&(portal)->lock);				\
-		(flags) = (portal)->flags;				\
-	} else {							\
-		mtx_lock(&(portal)->lock);				\
-		while ((portal)->flags & DPAA2_PORTAL_LOCKED)		\
-			cv_wait(&(portal)->cv, &(portal)->lock);	\
-		(flags) = (portal)->flags;				\
-		(portal)->flags |= DPAA2_PORTAL_LOCKED;			\
-		mtx_unlock(&(portal)->lock);				\
-	}								\
-} while (0)
-#define UNLOCK_PORTAL(portal) do {				\
-	if ((portal)->flags & DPAA2_PORTAL_ATOMIC) {		\
-		mtx_unlock_spin(&(portal)->lock);		\
-	} else {						\
-		mtx_lock(&(portal)->lock);			\
-		(portal)->flags &= ~DPAA2_PORTAL_LOCKED;	\
-		cv_signal(&(portal)->cv);			\
-		mtx_unlock(&(portal)->lock);			\
-	}							\
-} while (0)
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
 
