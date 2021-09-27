@@ -37,6 +37,7 @@
  * DPAA2 MC command interface helper routines.
  */
 
+#define DPAA2_PORTAL_TIMEOUT		100000	/* us */
 /* Portal flags. */
 #define DPAA2_PORTAL_DEF		0x0u
 #define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
@@ -69,6 +70,9 @@
 
 /* Object's memory region flags. */
 #define DPAA2_RC_REG_CACHEABLE		0x1	/* Cacheable memory mapping */
+
+#define DPAA2_HW_FLAG_HIGH_PRIO		0x80u
+#define DPAA2_SW_FLAG_INTR_DIS		0x01u
 
 /*
  * Public types.
@@ -245,5 +249,7 @@ void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
 void	dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
 void	dpaa2_mcp_set_token(dpaa2_cmd_t cmd, const uint16_t token);
 void	dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags);
+void	dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags);
+void	dpaa2_mcp_unlock(dpaa2_mcp_t portal);
 
 #endif /* _DPAA2_MCP_H */

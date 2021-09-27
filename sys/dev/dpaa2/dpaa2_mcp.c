@@ -110,13 +110,13 @@ dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 			 * Signal all threads sleeping on portal's cv that it's
 			 * going to be destroyed.
 			 */
-			LOCK_PORTAL(portal, flags);
+			dpaa2_mcp_lock(portal, &flags);
 			portal->flags |= DPAA2_PORTAL_DESTROYED;
 			cv_signal(&portal->cv);
-			UNLOCK_PORTAL(portal);
+			dpaa2_mcp_unlock(portal);
 
 			/* Let threads stop using this portal. */
-			DELAY(PORTAL_TIMEOUT);
+			DELAY(DPAA2_PORTAL_TIMEOUT);
 
 			mtx_destroy(&portal->lock);
 			cv_destroy(&portal->cv);
@@ -148,9 +148,9 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 	hdr->flags_hw = DPAA2_CMD_DEF;
 	hdr->flags_sw = DPAA2_CMD_DEF;
 	if (flags & DPAA2_CMD_HIGH_PRIO)
-		hdr->flags_hw |= HW_FLAG_HIGH_PRIO;
+		hdr->flags_hw |= DPAA2_HW_FLAG_HIGH_PRIO;
 	if (flags & DPAA2_CMD_INTR_DIS)
-		hdr->flags_sw |= SW_FLAG_INTR_DIS;
+		hdr->flags_sw |= DPAA2_SW_FLAG_INTR_DIS;
 	for (uint32_t i = 0; i < DPAA2_CMD_PARAMS_N; i++)
 		c->params[i] = 0;
 	*cmd = c;
@@ -187,8 +187,37 @@ dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags)
 		hdr->flags_sw = DPAA2_CMD_DEF;
 
 		if (flags & DPAA2_CMD_HIGH_PRIO)
-			hdr->flags_hw |= HW_FLAG_HIGH_PRIO;
+			hdr->flags_hw |= DPAA2_HW_FLAG_HIGH_PRIO;
 		if (flags & DPAA2_CMD_INTR_DIS)
-			hdr->flags_sw |= SW_FLAG_INTR_DIS;
+			hdr->flags_sw |= DPAA2_SW_FLAG_INTR_DIS;
+	}
+}
+
+void
+dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags)
+{
+	if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+		mtx_lock_spin(&portal->lock);
+		*flags = portal->flags;
+	} else {
+		mtx_lock(&portal->lock);
+		while (portal->flags & DPAA2_PORTAL_LOCKED)
+			cv_wait(&portal->cv, &portal->lock);
+		*flags = portal->flags;
+		portal->flags |= DPAA2_PORTAL_LOCKED;
+		mtx_unlock(&portal->lock);
+	}
+}
+
+void
+dpaa2_mcp_unlock(dpaa2_mcp_t portal)
+{
+	if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+		mtx_unlock_spin(&portal->lock);
+	} else {
+		mtx_lock(&portal->lock);
+		portal->flags &= ~DPAA2_PORTAL_LOCKED;
+		cv_signal(&portal->cv);
+		mtx_unlock(&portal->lock);
 	}
 }
