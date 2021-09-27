@@ -60,8 +60,9 @@ __FBSDID("$FreeBSD$");
 #include "pci_if.h"
 
 #include "dpaa2_mcp.h"
-#include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_swp.h"
+#include "dpaa2_cmd_if.h"
 
 /*
  * Memory:
@@ -166,12 +167,12 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Open resource container and DPIO object. */
-	error = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = dpaa2_cmd_io_open(rcsc->portal, cmd, dinfo->id, &io_token);
+	error = DPAA2_CMD_IO_OPEN(dev, cmd, dinfo->id, &io_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
@@ -179,19 +180,19 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Prepare DPIO object. */
-	error = dpaa2_cmd_io_reset(rcsc->portal, cmd);
+	error = DPAA2_CMD_IO_RESET(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to reset DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
 		goto err_free_cmd;
 	}
-	error = dpaa2_cmd_io_get_attributes(rcsc->portal, cmd, &attr);
+	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, cmd, &attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPIO attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
 	}
-	error = dpaa2_cmd_io_enable(rcsc->portal, cmd);
+	error = DPAA2_CMD_IO_ENABLE(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
@@ -199,14 +200,14 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Close the DPIO object and the resource container. */
-	error = dpaa2_cmd_io_close(rcsc->portal, cmd);
+	error = DPAA2_CMD_IO_CLOSE(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to close DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
 		goto err_free_cmd;
 	}
 	dpaa2_mcp_set_token(cmd, rc_token);
-	error = dpaa2_cmd_rc_close(rcsc->portal, cmd);
+	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
 		goto err_free_cmd;
