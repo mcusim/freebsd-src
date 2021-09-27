@@ -31,6 +31,7 @@
 
 #include <sys/rman.h>
 #include <sys/condvar.h>
+#include <sys/mutex.h>
 
 /*
  * DPAA2 MC command interface helper routines.
