@@ -1763,10 +1763,10 @@ exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
 	hdr->cmdid = cmdid;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
-	LOCK_PORTAL(portal, flags);
+	dpaa2_mcp_lock(portal, &flags);
 	if (flags & DPAA2_PORTAL_DESTROYED) {
 		/* Terminate operation if portal is destroyed. */
-		UNLOCK_PORTAL(portal);
+		dpaa2_mcp_unlock(portal);
 		return (DPAA2_CMD_STAT_INVALID_STATE);
 	}
 
@@ -1774,14 +1774,14 @@ exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd, uint16_t cmdid)
 	send_command(portal, cmd);
 	error = wait_for_command(portal, cmd);
 	if (error) {
-		UNLOCK_PORTAL(portal);
+		dpaa2_mcp_unlock(portal);
 		return (DPAA2_CMD_STAT_ERR);
 	}
 	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		UNLOCK_PORTAL(portal);
+		dpaa2_mcp_unlock(portal);
 		return (int)(hdr->status);
 	}
-	UNLOCK_PORTAL(portal);
+	dpaa2_mcp_unlock(portal);
 
 	return (DPAA2_CMD_STAT_OK);
 }
