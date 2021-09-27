@@ -7,6 +7,8 @@ KMOD=	dpaa2
 SRCS=	bus_if.h \
 	device_if.h \
 	opt_platform.h \
+	dpaa2_rc_if.h \
+	dpaa2_cmd_if.h \
 	dpaa2_mc.c \
 	dpaa2_rc.c \
 	dpaa2_io.c \
