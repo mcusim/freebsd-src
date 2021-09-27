@@ -847,7 +847,7 @@ dpaa2_rc_mng_get_soc_version(device_t rcdev, dpaa2_cmd_t cmd, uint32_t *pvr,
 }
 
 static int
-dpaa2_rc_mng_get_container_id(device_t portal, dpaa2_cmd_t cmd,
+dpaa2_rc_mng_get_container_id(device_t rcdev, dpaa2_cmd_t cmd,
     uint32_t *cont_id)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -1060,7 +1060,7 @@ dpaa2_rc_get_obj_region(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
 	 * Otherwise use the already cached value.
 	 */
 	if (!sc->portal->rc_api_major && !sc->portal->rc_api_minor) {
-		error = dpaa2_cmd_rc_get_api_version(sc->portal, cmd, &api_major,
+		error = DPAA2_CMD_RC_GET_API_VERSION(rcdev, cmd, &api_major,
 		    &api_minor);
 		if (error)
 			return (error);
@@ -1461,7 +1461,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	}
 
 	/* Print MC firmware version. */
-	rc = dpaa2_cmd_mng_get_version(sc->portal, cmd, &major, &minor, &rev);
+	rc = DPAA2_CMD_MNG_GET_VERSION(rcdev, cmd, &major, &minor, &rev);
 	if (rc) {
 		device_printf(rcdev, "Failed to get MC firmware version: "
 		    "error=%d\n", rc);
@@ -1472,7 +1472,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	    rev);
 
 	/* Obtain container ID associated with a given MC portal. */
-	rc = dpaa2_cmd_mng_get_container_id(sc->portal, cmd, &sc->cont_id);
+	rc = DPAA2_CMD_MNG_GET_CONTAINER_ID(rcdev, cmd, &sc->cont_id);
 	if (rc) {
 		device_printf(rcdev, "Failed to get container ID: error=%d\n",
 		    rc);
@@ -1483,7 +1483,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 		device_printf(rcdev, "Resource container ID: %u\n", sc->cont_id);
 
 	/* Open the resource container. */
-	rc = dpaa2_cmd_rc_open(sc->portal, cmd, sc->cont_id, &rc_token);
+	rc = DPAA2_CMD_RC_OPEN(rcdev, cmd, sc->cont_id, &rc_token);
 	if (rc) {
 		device_printf(rcdev, "Failed to open container ID=%u: "
 		    "error=%d\n", sc->cont_id, rc);
@@ -1492,7 +1492,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	}
 
 	/* Obtain a number of objects in this container. */
-	rc = dpaa2_cmd_rc_get_obj_count(sc->portal, cmd, &obj_count);
+	rc = DPAA2_CMD_RC_GET_OBJ_COUNT(rcdev, cmd, &obj_count);
 	if (rc) {
 		device_printf(rcdev, "Failed to count objects in container "
 		    "ID=%u: error=%d\n", sc->cont_id, rc);
@@ -1504,7 +1504,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 		device_printf(rcdev, "Objects in container: %u\n", obj_count);
 
 	/* Obtain container attributes (including ICID). */
-	rc = dpaa2_cmd_rc_get_attributes(sc->portal, cmd, &dprc_attr);
+	rc = DPAA2_CMD_RC_GET_ATTRIBUTES(rcdev, cmd, &dprc_attr);
 	if (rc) {
 		device_printf(rcdev, "Failed to get attributes of the "
 		    "container ID=%u: error=%d\n", sc->cont_id, rc);
@@ -1522,7 +1522,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 
 	/* Add devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
-		rc = dpaa2_cmd_rc_get_obj(sc->portal, cmd, i, &obj);
+		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
 		if (rc) {
 			device_printf(rcdev, "Failed to get object: index=%u, "
 			    "error=%d\n", i, rc);
@@ -1531,7 +1531,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 		add_child(sc, cmd, &obj);
 	}
 
-	dpaa2_cmd_rc_close(sc->portal, cmd);
+	DPAA2_CMD_RC_CLOSE(rcdev, cmd);
 	dpaa2_mcp_free_command(cmd);
 
 	bus_generic_probe(rcdev);
@@ -1592,8 +1592,8 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 
 		/* Add memory regions to the resource list. */
 		for (uint8_t i = 0; i < obj->reg_count; i++) {
-			rc = dpaa2_cmd_rc_get_obj_region(sc->portal, cmd,
-			    obj->id, i, "dpio", &reg);
+			rc = DPAA2_CMD_RC_GET_OBJ_REGION(rcdev, cmd, obj->id, i,
+			    "dpio", &reg);
 			if (rc) {
 				device_printf(rcdev, "Failed to obtain memory "
 				    "region for obj=dpio, id=%u, reg_idx=%u: "
@@ -1712,7 +1712,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		}
 
 		/* Open resource container. */
-		rc = dpaa2_cmd_rc_open(rcsc->portal, cmd, rcinfo->id, &rc_token);
+		rc = DPAA2_CMD_RC_OPEN(rcdev, cmd, rcinfo->id, &rc_token);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to open DPRC: error=%d\n",
@@ -1720,8 +1720,8 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 			return (ENODEV);
 		}
 		/* Set MSI address and value. */
-		rc = dpaa2_cmd_rc_set_obj_irq(rcsc->portal, cmd, rid - 1,
-		    addr, data, rid, dinfo->id, dpaa2_get_type(dinfo->dtype));
+		rc = DPAA2_CMD_RC_SET_OBJ_IRQ(rcdev, cmd, rid - 1, addr, data,
+		    rid, dinfo->id, dpaa2_get_type(dinfo->dtype));
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to setup IRQ: "
@@ -1730,7 +1730,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 			return (ENODEV);
 		}
 		/* Close resource container. */
-		rc = dpaa2_cmd_rc_close(rcsc->portal, cmd);
+		rc = DPAA2_CMD_RC_CLOSE(rcdev, cmd);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to close DPRC: "
