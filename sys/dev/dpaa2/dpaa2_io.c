@@ -342,8 +342,6 @@ dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
 		swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, mask);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
-
-	return (0);
 }
 
 /**
@@ -450,18 +448,18 @@ swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm, uint8_t dcm,
     uint8_t epm, int sd, int sp, int se, int dp, int de, int ep)
 {
 	return (
-	    max_fill	<< SWP_CFG_DQRR_MF_SHIFT |
-	    est		<< SWP_CFG_EST_SHIFT |
-	    wn		<< SWP_CFG_WN_SHIFT |
-	    rpm		<< SWP_CFG_RPM_SHIFT |
-	    dcm		<< SWP_CFG_DCM_SHIFT |
-	    epm		<< SWP_CFG_EPM_SHIFT |
-	    sd		<< SWP_CFG_SD_SHIFT |
-	    sp		<< SWP_CFG_SP_SHIFT |
-	    se		<< SWP_CFG_SE_SHIFT |
-	    dp		<< SWP_CFG_DP_SHIFT |
-	    de		<< SWP_CFG_DE_SHIFT |
-	    ep		<< SWP_CFG_EP_SHIFT
+	    max_fill	<< DPAA2_SWP_CFG_DQRR_MF_SHIFT |
+	    est		<< DPAA2_SWP_CFG_EST_SHIFT |
+	    wn		<< DPAA2_SWP_CFG_WN_SHIFT |
+	    rpm		<< DPAA2_SWP_CFG_RPM_SHIFT |
+	    dcm		<< DPAA2_SWP_CFG_DCM_SHIFT |
+	    epm		<< DPAA2_SWP_CFG_EPM_SHIFT |
+	    sd		<< DPAA2_SWP_CFG_SD_SHIFT |
+	    sp		<< DPAA2_SWP_CFG_SP_SHIFT |
+	    se		<< DPAA2_SWP_CFG_SE_SHIFT |
+	    dp		<< DPAA2_SWP_CFG_DP_SHIFT |
+	    de		<< DPAA2_SWP_CFG_DE_SHIFT |
+	    ep		<< DPAA2_SWP_CFG_EP_SHIFT
 	);
 }
 
