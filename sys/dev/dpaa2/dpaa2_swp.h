@@ -229,6 +229,10 @@ typedef struct dpaa2_swp *dpaa2_swp_t;
 int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	     const uint16_t flags);
 void	 dpaa2_swp_free_portal(dpaa2_swp_t portal);
-
+void	 dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
+uint32_t dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
+uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
+	     uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se,
+	     int dp, int de, int ep);
 
 #endif /* _DPAA2_SWP_H */
