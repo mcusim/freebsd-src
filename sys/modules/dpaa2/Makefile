@@ -9,6 +9,7 @@ SRCS=	bus_if.h \
 	opt_platform.h \
 	dpaa2_rc_if.h \
 	dpaa2_cmd_if.h \
+	dpaa2_swp_if.h \
 	dpaa2_mc.c \
 	dpaa2_rc.c \
 	dpaa2_io.c \
@@ -34,6 +35,7 @@ SRCS+=	dpaa2_mc_fdt.c \
 .endif
 
 MFILES=	dev/dpaa2/dpaa2_rc_if.m \
-	dev/dpaa2/dpaa2_cmd_if.m
+	dev/dpaa2/dpaa2_cmd_if.m \
+	dev/dpaa2/dpaa2_swp_if.m
 
 .include <bsd.kmod.mk>

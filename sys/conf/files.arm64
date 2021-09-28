@@ -319,6 +319,7 @@ dev/dpaa2/dpaa2_mc.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_rc.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_rc_if.m				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_cmd_if.m			optional SOC_NXP_LS
+dev/dpaa2/dpaa2_swp_if.m			optional SOC_NXP_LS
 dev/dpaa2/dpaa2_mcp.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_io.c				optional SOC_NXP_LS
 dev/dpaa2/dpaa2_swp.c				optional SOC_NXP_LS
