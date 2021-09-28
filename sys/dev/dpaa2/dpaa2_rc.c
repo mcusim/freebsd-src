@@ -137,6 +137,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_RESET				CMD_NI(0x005)
 #define CMDID_NI_GET_ATTR			CMD_NI_V4(0x004)
 #define CMDID_NI_SET_BUF_LAYOUT			CMD_NI_V2(0x265)
+#define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1314,13 +1315,36 @@ dpaa2_rc_ni_set_buf_layout(device_t rcdev, dpaa2_cmd_t cmd,
 	args = (struct set_buf_layout_args *) &cmd->params[0];
 	args->queue_type = (uint8_t) bl->queue_type;
 	args->options = bl->options;
-	args->params = (uint8_t)(bl->params & 0x0FU);
+	args->params = 0;
 	args->priv_data_size = bl->pd_size;
 	args->data_align = bl->fd_align;
 	args->head_room = bl->head_size;
 	args->tail_room = bl->tail_size;
 
+	args->params |= bl->pass_timestamp	? 1U : 0U;
+	args->params |= bl->pass_parser_result	? 2U : 0U;
+	args->params |= bl->pass_frame_status	? 4U : 0U;
+	args->params |= bl->pass_sw_opaque	? 8U : 0U;
+
 	return (exec_command(sc->portal, cmd, CMDID_NI_SET_BUF_LAYOUT));
+}
+
+static int
+dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, dpaa2_cmd_t cmd, uint16_t *offset)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !offset)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_TX_DATA_OFF);
+	if (!error)
+		*offset = cmd->params[0] & 0xFFFFU;
+
+	return (error);
 }
 
 static int
@@ -2014,6 +2038,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mng_get_version,	dpaa2_rc_mng_get_version),
 	DEVMETHOD(dpaa2_cmd_mng_get_soc_version, dpaa2_rc_mng_get_soc_version),
 	DEVMETHOD(dpaa2_cmd_mng_get_container_id, dpaa2_rc_mng_get_container_id),
+	/*	DPRC commands */
 	DEVMETHOD(dpaa2_cmd_rc_open,		dpaa2_rc_open),
 	DEVMETHOD(dpaa2_cmd_rc_close,		dpaa2_rc_close),
 	DEVMETHOD(dpaa2_cmd_rc_get_obj_count,	dpaa2_rc_get_obj_count),
@@ -2024,18 +2049,22 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_rc_get_api_version, dpaa2_rc_get_api_version),
 	DEVMETHOD(dpaa2_cmd_rc_set_irq_enable,	dpaa2_rc_set_irq_enable),
 	DEVMETHOD(dpaa2_cmd_rc_set_obj_irq,	dpaa2_rc_set_obj_irq),
+	/*	DPNI commands */
 	DEVMETHOD(dpaa2_cmd_ni_open,		dpaa2_rc_ni_open),
 	DEVMETHOD(dpaa2_cmd_ni_close,		dpaa2_rc_ni_close),
 	DEVMETHOD(dpaa2_cmd_ni_get_api_version,	dpaa2_rc_ni_get_api_version),
 	DEVMETHOD(dpaa2_cmd_ni_reset,		dpaa2_rc_ni_reset),
 	DEVMETHOD(dpaa2_cmd_ni_get_attributes,	dpaa2_rc_ni_get_attributes),
 	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
+	DEVMETHOD(dpaa2_cmd_ni_get_tx_data_off, dpaa2_rc_ni_get_tx_data_offset),
+	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
 	DEVMETHOD(dpaa2_cmd_io_enable,		dpaa2_rc_io_enable),
 	DEVMETHOD(dpaa2_cmd_io_disable,		dpaa2_rc_io_disable),
 	DEVMETHOD(dpaa2_cmd_io_reset,		dpaa2_rc_io_reset),
 	DEVMETHOD(dpaa2_cmd_io_get_attributes,	dpaa2_rc_io_get_attributes),
+	/*	DPBP commands */
 	DEVMETHOD(dpaa2_cmd_bp_open,		dpaa2_rc_bp_open),
 	DEVMETHOD(dpaa2_cmd_bp_close,		dpaa2_rc_bp_close),
 	DEVMETHOD(dpaa2_cmd_bp_enable,		dpaa2_rc_bp_enable),

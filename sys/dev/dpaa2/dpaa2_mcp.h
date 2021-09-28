@@ -277,13 +277,16 @@ typedef struct {
 /**
  * @brief Buffer layout attributes.
  *
- * pd_size:	Size kept for private data (in bytes). Maximum value is 64.
- * fd_align:	Frame data alignment.
- * head_size:	Data head room.
- * tail_size:	Data tail room.
- * options:	...
- * params:	...
- * queue_type:	Type of queue this configuration applies to.
+ * pd_size:		Size kept for private data (in bytes, max. 64)
+ * fd_align:		Frame data alignment.
+ * head_size:		Data head room.
+ * tail_size:		Data tail room.
+ * options:		...
+ * pass_timestamp:	Timestamp is included in the buffer layout.
+ * pass_parser_result:	Parsing results are included in the buffer layout.
+ * pass_frame_status:	Frame status is included in the buffer layout.
+ * pass_sw_opaque:	SW annotation is activated.
+ * queue_type:		Type of queue this configuration applies to.
  */
 typedef struct {
 	uint16_t	pd_size;
@@ -291,7 +294,10 @@ typedef struct {
 	uint16_t	head_size;
 	uint16_t	tail_size;
 	uint16_t	options;
-	uint8_t		params;
+	bool		pass_timestamp;
+	bool		pass_parser_result;
+	bool		pass_frame_status;
+	bool		pass_sw_opaque;
 	enum dpaa2_ni_queue_type queue_type;
 } dpaa2_ni_buf_layout_t;
 
