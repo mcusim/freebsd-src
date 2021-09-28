@@ -59,11 +59,11 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
-#include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
-#include "dpaa2_cmd_if.h"
 #include "dpaa2_swp_if.h"
+#include "dpaa2_cmd_if.h"
 
 /*
  * Memory:

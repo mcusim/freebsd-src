@@ -59,9 +59,21 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
+#include "dpaa2_mc.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
-#include "dpaa2_mc.h"
+#include "dpaa2_swp_if.h"
+#include "dpaa2_cmd_if.h"
+
+static struct resource_spec dpaa2_ni_spec[] = {
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
+	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
+	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
+	RESOURCE_SPEC_END
+};
+
+/* Forward declarations. */
+static int	setup_dpni(device_t dev);
 
 /*
  * Device interface.
@@ -79,15 +91,34 @@ static int
 dpaa2_ni_attach(device_t dev)
 {
 	struct dpaa2_ni_softc *sc;
+	int rc;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+
+	rc = setup_dpni(dev);
+	if (rc)
+		return (rc);
 
 	return (0);
 }
 
 static int
 dpaa2_ni_detach(device_t dev)
+{
+	return (0);
+}
+
+/*
+ * Internal functions.
+ */
+
+/**
+ * @internal
+ * @brief Configure the DPNI object this interface is associated with.
+ */
+static int
+setup_dpni(device_t dev)
 {
 	return (0);
 }
