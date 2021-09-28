@@ -388,20 +388,20 @@ dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
 static int
 setup_msi(struct dpaa2_io_softc *sc)
 {
-    int val;
+	int val;
 
-    val = pci_msi_count(sc->dev);
-    if (val < DPAA2_IO_MSI_COUNT)
-	    device_printf(sc->dev, "Have %d MSI messages\n", val);
-    val = MIN(val, DPAA2_IO_MSI_COUNT);
+	val = pci_msi_count(sc->dev);
+	if (val < DPAA2_IO_MSI_COUNT)
+		device_printf(sc->dev, "Have %d MSI messages\n", val);
+	val = MIN(val, DPAA2_IO_MSI_COUNT);
 
-    if (pci_alloc_msi(sc->dev, &val) != 0)
-	    return (EINVAL);
+	if (pci_alloc_msi(sc->dev, &val) != 0)
+		return (EINVAL);
 
-    for (int i = 0; i < val; i++)
-	sc->irq_rid[i] = i + 1;
+	for (int i = 0; i < val; i++)
+		sc->irq_rid[i] = i + 1;
 
-    return (0);
+	return (0);
 }
 
 /**
