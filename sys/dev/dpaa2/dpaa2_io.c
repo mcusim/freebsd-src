@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_swp.h"
 #include "dpaa2_cmd_if.h"
+#include "dpaa2_swp_if.h"
 
 /*
  * Memory:
@@ -80,8 +81,13 @@ static struct resource_spec dpaa2_io_spec[] = {
 };
 
 /* Forward declarations. */
-static int dpaa2_io_setup_msi(struct dpaa2_io_softc *sc);
-static void dpaa2_io_msi_intr(void *arg);
+static int	setup_msi(struct dpaa2_io_softc *sc);
+static void	msi_intr(void *arg);
+static void	swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
+static uint32_t	swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
+static uint32_t	swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
+		    uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp,
+		    int se, int dp, int de, int ep);
 
 /*
  * Device interface.
@@ -231,13 +237,13 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Enable only DQRR interrupts for now */
-	dpaa2_swp_set_intr_trigger(sc->swp, DPAA2_SWP_INTR_DQRI);
-	dpaa2_swp_clear_intr_status(sc->swp, 0xffffffff);
+	DPAA2_SWP_SET_INTR_TRIGGER(dev, DPAA2_SWP_INTR_DQRI);
+	DPAA2_SWP_CLEAR_INTR_STATUS(dev, 0xffffffff);
 	if (sc->swp_desc.has_notif)
-		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
+		DPAA2_SWP_SET_PUSH_DEQUEUE(dev, 0, true);
 
 	/* Configure IRQs. */
-	error = dpaa2_io_setup_msi(sc);
+	error = setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
 		goto err_free_swp;
@@ -248,7 +254,7 @@ dpaa2_io_attach(device_t dev)
 		goto err_free_swp;
 	}
 	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, dpaa2_io_msi_intr, sc, &sc->intr)) {
+	    NULL, msi_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		goto err_free_swp;
 	}
@@ -270,12 +276,123 @@ dpaa2_io_detach(device_t dev)
 	return (0);
 }
 
+/*
+ * QBMan software portal interface.
+ */
+
+/**
+ * @brief Enable interrupts for a software portal.
+ */
+void
+dpaa2_io_set_intr_trigger(device_t iodev, uint32_t mask)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
+
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
+		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SWP_IER, mask);
+	else
+		device_printf(iodev, "%s failed\n", __func__);
+}
+
+/**
+ * @brief Return the value in the SWP_IER register.
+ */
+uint32_t
+dpaa2_io_get_intr_trigger(device_t iodev)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
+
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
+		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_SWP_IER);
+	else
+		device_printf(iodev, "%s failed\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief Return the value in the SWP_ISR register.
+ */
+uint32_t
+dpaa2_io_read_intr_status(device_t iodev)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
+
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
+		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_SWP_ISR);
+	else
+		device_printf(iodev, "%s failed\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief Clear SWP_ISR register according to the given mask.
+ */
+void
+dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
+
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
+		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SWP_ISR, mask);
+	else
+		device_printf(iodev, "%s failed\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief Enable or disable push dequeue.
+ *
+ * p:		the software portal object
+ * chan_idx:	the channel index (0 to 15)
+ * en:		enable or disable push dequeue
+ */
+void
+dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
+	uint16_t dqsrc;
+
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp) {
+		if (chan_idx > 15) {
+			device_printf(iodev, "%s: channel index should "
+			    "be <= 15: chan_idx=%d\n", __func__, chan_idx);
+			return;
+		}
+
+		if (en)
+			sc->swp->sdq |= 1 << chan_idx;
+		else
+			sc->swp->sdq &= ~(1 << chan_idx);
+
+		/*
+		 * Read make the complete src map. If no channels are enabled
+		 * the SDQCR must be 0 or else QMan will assert errors.
+		 */
+		dqsrc = (sc->swp->sdq >> SDQCR_SRC_SHIFT) & SDQCR_SRC_MASK;
+		swp_write_reg(sc->swp, QBMAN_CINH_SWP_SDQCR,
+		    dqsrc != 0 ? sc->swp->sdq : 0);
+	} else
+		device_printf(iodev, "%s failed\n", __func__);
+}
+
+/*
+ * Internal functions.
+ */
+
 /**
  * @internal
  * @brief Allocate MSI interrupts for this DPAA2 I/O object.
  */
 static int
-dpaa2_io_setup_msi(struct dpaa2_io_softc *sc)
+setup_msi(struct dpaa2_io_softc *sc)
 {
     int val;
 
@@ -298,7 +415,7 @@ dpaa2_io_setup_msi(struct dpaa2_io_softc *sc)
  * @brief DPAA2 I/O interrupt handler.
  */
 static void
-dpaa2_io_msi_intr(void *arg)
+msi_intr(void *arg)
 {
 	/* NOTE: Useless interrupt handler. */
 	volatile uint32_t val = 0;
@@ -306,11 +423,59 @@ dpaa2_io_msi_intr(void *arg)
 		val++;
 }
 
+/**
+ * @internal
+ */
+static void
+swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
+{
+	bus_write_4(swp->cinh_map, offset, val);
+}
+
+/**
+ * @internal
+ */
+static uint32_t
+swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
+{
+	return (bus_read_4(swp->cinh_map, offset));
+}
+
+/**
+ * @internal
+ */
+static uint32_t
+swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm, uint8_t dcm,
+    uint8_t epm, int sd, int sp, int se, int dp, int de, int ep)
+{
+	return (
+	    max_fill	<< SWP_CFG_DQRR_MF_SHIFT |
+	    est		<< SWP_CFG_EST_SHIFT |
+	    wn		<< SWP_CFG_WN_SHIFT |
+	    rpm		<< SWP_CFG_RPM_SHIFT |
+	    dcm		<< SWP_CFG_DCM_SHIFT |
+	    epm		<< SWP_CFG_EPM_SHIFT |
+	    sd		<< SWP_CFG_SD_SHIFT |
+	    sp		<< SWP_CFG_SP_SHIFT |
+	    se		<< SWP_CFG_SE_SHIFT |
+	    dp		<< SWP_CFG_DP_SHIFT |
+	    de		<< SWP_CFG_DE_SHIFT |
+	    ep		<< SWP_CFG_EP_SHIFT
+	);
+}
+
 static device_method_t dpaa2_io_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_io_probe),
 	DEVMETHOD(device_attach,	dpaa2_io_attach),
 	DEVMETHOD(device_detach,	dpaa2_io_detach),
+
+	/* QBMan software portal interface */
+	DEVMETHOD(dpaa2_swp_set_intr_trigger,	dpaa2_io_set_intr_trigger),
+	DEVMETHOD(dpaa2_swp_get_intr_trigger,	dpaa2_io_get_intr_trigger),
+	DEVMETHOD(dpaa2_swp_read_intr_status,	dpaa2_io_read_intr_status),
+	DEVMETHOD(dpaa2_swp_clear_intr_status,	dpaa2_io_clear_intr_status),
+	DEVMETHOD(dpaa2_swp_set_push_dequeue,	dpaa2_io_set_push_dequeue),
 
 	DEVMETHOD_END
 };

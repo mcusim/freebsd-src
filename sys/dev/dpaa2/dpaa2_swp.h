@@ -32,18 +32,96 @@
 #include <sys/bus.h>
 
 /*
- * QBMan software portal interface.
- *
- * Software portals are used by data path software executing on a processor core
- * to communicate with the Queue Manager (QMan) which acts as a central resource
- * in DPAA2, managing the queueing of data between multiple processor cores,
- * network interfaces, and hardware accelerators in a multicore SoC. These
- * portals are memory mapped in the system.
+ * QBMan software portal helper routines.
  */
 
+/* All QBMan command and result structures use this "valid bit" encoding */
+#define DPAA2_SWP_VALID_BIT		((uint32_t)0x80)
+
+/* Versions of the QBMan software portals. */
+#define DPAA2_SWP_REV_4000		0x04000000
+#define DPAA2_SWP_REV_4100		0x04010000
+#define DPAA2_SWP_REV_4101		0x04010001
+#define DPAA2_SWP_REV_5000		0x05000000
+
+#define DPAA2_SWP_REV_MASK		0xFFFF0000
+
+/* Register offsets in the cache-inhibited area */
+#define DPAA2_SWP_CINH_CR		0x600 /* Management Command */
+#define DPAA2_SWP_CINH_EQCR_PI		0x800 /* Enqueue Ring, Producer Index */
+#define DPAA2_SWP_CINH_EQCR_CI		0x840 /* Enqueue Ring, Consumer Index */
+#define DPAA2_SWP_CINH_CR_RT		0x900 /* CR Read Trigger */
+#define DPAA2_SWP_CINH_VDQCR_RT		0x940 /* VDQCR Read Trigger */
+#define DPAA2_SWP_CINH_EQCR_AM_RT	0x980
+#define DPAA2_SWP_CINH_RCR_AM_RT	0x9C0
+#define DPAA2_SWP_CINH_DQPI		0xA00
+#define DPAA2_SWP_CINH_DCAP		0xAC0
+#define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command */
+#define DPAA2_SWP_CINH_EQCR_AM_RT2	0xB40
+#define DPAA2_SWP_CINH_RCR_PI		0xC00 /* Release Ring, Producer Index */
+#define DPAA2_SWP_CINH_RAR		0xCC0
+#define DPAA2_SWP_CINH_ISR		0xE00
+#define DPAA2_SWP_CINH_IER		0xE40
+#define DPAA2_SWP_CINH_ISDR		0xE80
+#define DPAA2_SWP_CINH_IIR		0xEC0
+#define DPAA2_SWP_CINH_CFG		0xD00
+
+/* CENA register offsets */
+#define DPAA2_SWP_CENA_EQCR(n)		(0x000 + ((uint32_t)(n) << 6))
+#define DPAA2_SWP_CENA_DQRR(n)		(0x200 + ((uint32_t)(n) << 6))
+#define DPAA2_SWP_CENA_RCR(n)		(0x400 + ((uint32_t)(n) << 6))
+#define DPAA2_SWP_CENA_CR		(0x600) /* Management Command */
+#define DPAA2_SWP_CENA_RR(vb)		(0x700 + ((uint32_t)(vb) >> 1))
+#define DPAA2_SWP_CENA_VDQCR		(0x780)
+#define DPAA2_SWP_CENA_EQCR_CI		(0x840)
+
+/* CENA register offsets in memory-backed mode */
+#define DPAA2_SWP_CENA_DQRR_MEM(n)	(0x0800 + ((uint32_t)(n) << 6))
+#define DPAA2_SWP_CENA_RCR_MEM(n)	(0x1400 + ((uint32_t)(n) << 6))
+#define DPAA2_SWP_CENA_CR_MEM		(0x1600)
+#define DPAA2_SWP_CENA_RR_MEM		(0x1680)
+#define DPAA2_SWP_CENA_VDQCR_MEM	(0x1780)
+#define DPAA2_SWP_CENA_EQCR_CI_MEMBACK	(0x1840)
+
+/* Shifts in the portal's configuration register. */
+#define DPAA2_SWP_CFG_DQRR_MF_SHIFT	20
+#define DPAA2_SWP_CFG_EST_SHIFT		16
+#define DPAA2_SWP_CFG_CPBS_SHIFT	15
+#define DPAA2_SWP_CFG_WN_SHIFT		14
+#define DPAA2_SWP_CFG_RPM_SHIFT		12
+#define DPAA2_SWP_CFG_DCM_SHIFT		10
+#define DPAA2_SWP_CFG_EPM_SHIFT		8
+#define DPAA2_SWP_CFG_VPM_SHIFT		7
+#define DPAA2_SWP_CFG_CPM_SHIFT		6
+#define DPAA2_SWP_CFG_SD_SHIFT		5
+#define DPAA2_SWP_CFG_SP_SHIFT		4
+#define DPAA2_SWP_CFG_SE_SHIFT		3
+#define DPAA2_SWP_CFG_DP_SHIFT		2
+#define DPAA2_SWP_CFG_DE_SHIFT		1
+#define DPAA2_SWP_CFG_EP_SHIFT		0
+
+/* Static Dequeue Command Register attribute codes */
+#define DPAA2_SDQCR_FC_SHIFT		29 /* Dequeue Command Frame Count */
+#define DPAA2_SDQCR_FC_MASK		0x1
+#define DPAA2_SDQCR_DCT_SHIFT		24 /* Dequeue Command Type */
+#define DPAA2_SDQCR_DCT_MASK		0x3
+#define DPAA2_SDQCR_TOK_SHIFT		16 /* Dequeue Command Token */
+#define DPAA2_SDQCR_TOK_MASK		0xff
+#define DPAA2_SDQCR_SRC_SHIFT		0  /* Dequeue Source */
+#define DPAA2_SDQCR_SRC_MASK		0xffff
+
+/*
+ * Read trigger bit is used to trigger QMan to read an enqueue command from
+ * memory, without having software perform a cache flush to force a write of the
+ * command to QMan.
+ *
+ * NOTE: Implemented in QBMan 5.0 or above.
+ */
+#define DPAA2_SWP_RT_MODE		((uint32_t)0x100)
+
 /* Portal flags. */
-#define DPAA2_SWP_DEF		0x0u
-#define DPAA2_SWP_NOWAIT_ALLOC	0x1u	/* Do not sleep during init */
+#define DPAA2_SWP_DEF			0x0u
+#define DPAA2_SWP_NOWAIT_ALLOC		0x1u	/* Do not sleep during init */
 
 /* Command return codes. */
 #define DPAA2_SWP_STAT_OK		0x0
@@ -92,26 +170,65 @@ typedef struct {
 	bool			 has_8prio;
 } dpaa2_swp_desc_t;
 
-/*
- * Opaque pointers.
+/**
+ * @brief Helper object to interact with the QBMan software portal.
+ *
+ * res:		Unmapped cache-enabled and cache-inhibited parts of the portal.
+ * map:		Mapped cache-enabled and cache-inhibited parts of the portal.
+ * desc:	Descriptor of the QBMan software portal.
+ * lock:	Spinlock to guard an access to the portal.
+ * flags:	Current state of the object.
+ * sdq:		Push dequeues status.
+ * mc:		Management commands data.
+ * mr:		Management response data.
+ * dqrr:	Dequeue Response Ring is used to issue frame dequeue responses
+ * 		from the QBMan to the driver.
+ * eqcr:	Enqueue Command Ring is used to issue frame enqueue commands
+ *		from the driver to the QBMan.
  */
+struct dpaa2_swp {
+	struct resource 	*cena_res;
+	struct resource_map	*cena_map;
+	struct resource		*cinh_res;
+	struct resource_map	*cinh_map;
+
+	const dpaa2_swp_desc_t	*desc;
+	struct mtx		 lock;
+	uint16_t		 flags;
+	uint32_t		 sdq;
+
+	struct {
+		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+	} mc;
+
+	struct {
+		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+	} mr;
+
+	struct {
+		uint32_t	 next_idx;
+		uint32_t	 valid_bit;
+		uint8_t		 ring_size;
+		bool		 reset_bug; /* dqrr reset workaround */
+	} dqrr;
+
+	struct {
+		uint32_t	 pi;
+		uint32_t	 pi_vb;
+		uint32_t	 pi_ring_size;
+		uint32_t	 pi_ci_mask;
+		uint32_t	 ci;
+		int		 available;
+		uint32_t	 pend;
+		uint32_t	 no_pfdr;
+	} eqcr;
+};
+
 typedef struct dpaa2_swp *dpaa2_swp_t;
 
-/*
- * Management routines.
- */
 int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	     const uint16_t flags);
 void	 dpaa2_swp_free_portal(dpaa2_swp_t portal);
-
-/*
- * Software portal routines.
- */
-void	 dpaa2_swp_set_intr_trigger(dpaa2_swp_t p, uint32_t mask);
-uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t p);
-uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t p);
-void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t p, uint32_t mask);
-void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t p, uint8_t chan_idx, bool en);
 
 
 #endif /* _DPAA2_SWP_H */
