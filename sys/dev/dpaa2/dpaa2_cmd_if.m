@@ -204,6 +204,45 @@ CODE {
 				device_get_parent(dev), cmd));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_api_version(device_t dev, dpaa2_cmd_t cmd,
+		uint16_t *major, uint16_t *minor)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_API_VERSION(
+				device_get_parent(dev), cmd, major, minor));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_reset(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_RESET(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_set_buf_layout(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_buf_layout_t *bl)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_BUF_LAYOUT(
+				device_get_parent(dev), cmd, bl));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -434,9 +473,33 @@ METHOD int ni_open {
 } DEFAULT bypass_ni_open;
 
 METHOD int ni_close {
-	device_t dev;
-	dpaa2_cmd_t cmd;
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
 } DEFAULT bypass_ni_close;
+
+METHOD int ni_get_api_version {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint16_t	*major;
+	uint16_t	*minor;
+} DEFAULT bypass_ni_get_api_version;
+
+METHOD int ni_reset {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_ni_reset;
+
+METHOD int ni_get_attributes {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_attr_t	*attr;
+} DEFAULT bypass_ni_get_attributes;
+
+METHOD int ni_set_buf_layout {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_buf_layout_t *bl;
+} DEFAULT bypass_ni_set_buf_layout;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
