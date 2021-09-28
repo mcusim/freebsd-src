@@ -88,6 +88,13 @@ enum dpaa2_io_chan_mode {
 	DPAA2_IO_LOCAL_CHANNEL		= 1
 };
 
+enum dpaa2_ni_queue_type {
+	DPAA2_NI_QUEUE_RX		= 0,
+	DPAA2_NI_QUEUE_TX		= 1,
+	DPAA2_NI_QUEUE_TX_CONF		= 2,
+	DPAA2_NI_QUEUE_RX_ERR		= 3
+};
+
 /**
  * @brief Helper object to send commands to the MC portal.
  *
@@ -238,6 +245,55 @@ typedef struct {
 	uint32_t	id;
 	uint16_t	bpid;
 } dpaa2_bp_attr_t;
+
+/**
+ * @brief Attributes of the DPNI object.
+ *
+ * options:	 ...
+ * wriop_ver:	 Revision of the underlying WRIOP hardware block.
+ */
+typedef struct {
+	uint32_t		options;
+	uint16_t		wriop_ver;
+	struct {
+		uint16_t	fs;
+		uint8_t		mac;
+		uint8_t		vlan;
+		uint8_t		qos;
+	} entries;
+	struct {
+		uint8_t		queues;
+		uint8_t		rx_tcs;
+		uint8_t		tx_tcs;
+		uint8_t		channels;
+		uint8_t		cgs;
+	} num;
+	struct {
+		uint8_t		fs;
+		uint8_t		qos;
+	} key_size;
+} dpaa2_ni_attr_t;
+
+/**
+ * @brief Buffer layout attributes.
+ *
+ * pd_size:	Size kept for private data (in bytes). Maximum value is 64.
+ * fd_align:	Frame data alignment.
+ * head_size:	Data head room.
+ * tail_size:	Data tail room.
+ * options:	...
+ * params:	...
+ * queue_type:	Type of queue this configuration applies to.
+ */
+typedef struct {
+	uint16_t	pd_size;
+	uint16_t	fd_align;
+	uint16_t	head_size;
+	uint16_t	tail_size;
+	uint16_t	options;
+	uint8_t		params;
+	enum dpaa2_ni_queue_type queue_type;
+} dpaa2_ni_buf_layout_t;
 
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;

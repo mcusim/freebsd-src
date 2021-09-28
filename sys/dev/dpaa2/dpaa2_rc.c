@@ -123,12 +123,20 @@ __FBSDID("$FreeBSD$");
 
 /* ------------------------- DPNI command IDs ------------------------------- */
 #define CMD_NI_BASE_VERSION	1
+#define CMD_NI_2ND_VERSION	2
+#define CMD_NI_4TH_VERSION	4
 #define CMD_NI_ID_OFFSET	4
 
 #define CMD_NI(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_BASE_VERSION)
+#define CMD_NI_V2(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_2ND_VERSION)
+#define CMD_NI_V4(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_4TH_VERSION)
 
 #define CMDID_NI_OPEN				CMD_NI(0x801)
 #define CMDID_NI_CLOSE				CMD_NI(0x800)
+#define CMDID_NI_GET_API_VER			CMD_NI(0xA01)
+#define CMDID_NI_RESET				CMD_NI(0x005)
+#define CMDID_NI_GET_ATTR			CMD_NI_V4(0x004)
+#define CMDID_NI_SET_BUF_LAYOUT			CMD_NI_V2(0x265)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1188,6 +1196,133 @@ dpaa2_rc_ni_close(device_t rcdev, dpaa2_cmd_t cmd)
 }
 
 static int
+dpaa2_rc_ni_get_api_version(device_t rcdev, dpaa2_cmd_t cmd, uint16_t *major,
+    uint16_t *minor)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !major || !minor)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_API_VER);
+	if (!error) {
+		*major = cmd->params[0] & 0xFFFFU;
+		*minor = (cmd->params[0] >> 16) & 0xFFFFU;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_ni_reset(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_RESET));
+}
+
+static int
+dpaa2_rc_ni_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_attr_t *attr)
+{
+	struct __packed ni_attr {
+		uint32_t	options;
+		uint8_t		num_queues;
+		uint8_t		num_rx_tcs;
+		uint8_t		mac_entries;
+		uint8_t		num_tx_tcs;
+		uint8_t		vlan_entries;
+		uint8_t		num_channels;
+		uint8_t		qos_entries;
+		uint8_t		_reserved1;
+		uint16_t	fs_entries;
+		uint16_t	_reserved2;
+		uint8_t		qos_key_size;
+		uint8_t		fs_key_size;
+		uint16_t	wriop_ver;
+		uint8_t		num_cgs;
+		uint8_t		_reserved3;
+		uint16_t	_reserved4;
+		uint64_t	_reserved5[4];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_ATTR);
+	if (!error) {
+		resp = (struct ni_attr *) &cmd->params[0];
+
+		attr->options =	     resp->options;
+		attr->wriop_ver =    resp->wriop_ver;
+		attr->entries.fs =   resp->fs_entries;
+		attr->entries.mac =  resp->mac_entries;
+		attr->entries.vlan = resp->vlan_entries;
+		attr->entries.qos =  resp->qos_entries;
+		attr->num.queues =   resp->num_queues;
+		attr->num.rx_tcs =   resp->num_rx_tcs;
+		attr->num.tx_tcs =   resp->num_tx_tcs;
+		attr->num.channels = resp->num_channels;
+		attr->num.cgs =      resp->num_cgs;
+		attr->key_size.fs =  resp->fs_key_size;
+		attr->key_size.qos = resp->qos_key_size;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_ni_set_buf_layout(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_buf_layout_t *bl)
+{
+	struct __packed set_buf_layout_args {
+		uint8_t		queue_type;
+		uint8_t		_reserved1;
+		uint16_t	_reserved2;
+		uint16_t	options;
+		uint8_t		params;
+		uint8_t		_reserved3;
+		uint16_t	priv_data_size;
+		uint16_t	data_align;
+		uint16_t	head_room;
+		uint16_t	tail_room;
+		uint64_t	_reserved4[5];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !bl)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_buf_layout_args *) &cmd->params[0];
+	args->queue_type = (uint8_t) bl->queue_type;
+	args->options = bl->options;
+	args->params = (uint8_t)(bl->params & 0x0FU);
+	args->priv_data_size = bl->pd_size;
+	args->data_align = bl->fd_align;
+	args->head_room = bl->head_size;
+	args->tail_room = bl->tail_size;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_BUF_LAYOUT));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -1890,6 +2025,10 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_rc_set_obj_irq,	dpaa2_rc_set_obj_irq),
 	DEVMETHOD(dpaa2_cmd_ni_open,		dpaa2_rc_ni_open),
 	DEVMETHOD(dpaa2_cmd_ni_close,		dpaa2_rc_ni_close),
+	DEVMETHOD(dpaa2_cmd_ni_get_api_version,	dpaa2_rc_ni_get_api_version),
+	DEVMETHOD(dpaa2_cmd_ni_reset,		dpaa2_rc_ni_reset),
+	DEVMETHOD(dpaa2_cmd_ni_get_attributes,	dpaa2_rc_ni_get_attributes),
+	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
 	DEVMETHOD(dpaa2_cmd_io_enable,		dpaa2_rc_io_enable),
