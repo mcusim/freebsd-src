@@ -501,6 +501,12 @@ METHOD int ni_set_buf_layout {
 	dpaa2_ni_buf_layout_t *bl;
 } DEFAULT bypass_ni_set_buf_layout;
 
+METHOD int ni_get_tx_data_off {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint16_t	*offset;
+};
+
 /**
  * @brief Data Path I/O (DPIO) commands.
  */

@@ -65,6 +65,11 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
+#define DPAA2_WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
+
+#define ALIGN_DOWN(x, a)		((x) & ~((1 << (a)) - 1))
+#define ALIGN_UP(x, a)			ALIGN_DOWN((x) + ((1 << (a)) - 1), (a))
+
 /* static struct resource_spec dpaa2_ni_spec[] = { */
 /* 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED }, */
 /* 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED }, */
