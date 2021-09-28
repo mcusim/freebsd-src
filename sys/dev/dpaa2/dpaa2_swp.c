@@ -101,7 +101,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	}
 
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
-		reg = swp_set_cfg(p->dqrr.ring_size,
+		reg = dpaa2_swp_set_cfg(p->dqrr.ring_size,
 		    1, /* Writes Non-cacheable */
 		    0, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
@@ -116,7 +116,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	} else {
 		bus_set_region_4(p->cena_map, 0, 0,
 		    rman_get_size(p->cena_res) / 4);
-		reg = swp_set_cfg(p->dqrr.ring_size,
+		reg = dpaa2_swp_set_cfg(p->dqrr.ring_size,
 		    1, /* Writes Non-cacheable */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
@@ -132,8 +132,8 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    1 << DPAA2_SWP_CFG_VPM_SHIFT |  /* VDQCR read triggered mode */
 		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read triggered mode */
 	}
-	swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
-	reg = swp_read_reg(p, DPAA2_SWP_CINH_CFG);
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
+	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
 	if (!reg) {
 		free(p, M_DPAA2_SWP);
 		return (DPAA2_SWP_STAT_PORTAL_DISABLED);
@@ -141,8 +141,9 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	/* Enable read trigger mode. */
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI, DPAA2_SWP_RT_MODE);
-		swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
+		    DPAA2_SWP_RT_MODE);
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
 	}
 
 	/*
@@ -151,7 +152,7 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	 * error. The values that were calculated above will be applied when
 	 * dequeues from a specific channel are enabled.
 	 */
-	swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
 
 	p->eqcr.pi_ring_size = 8;
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
@@ -170,10 +171,10 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	for (mask_size = p->eqcr.pi_ring_size; mask_size > 0; mask_size >>= 1)
 		p->eqcr.pi_ci_mask = (p->eqcr.pi_ci_mask << 1) + 1;
 
-	eqcr_pi = swp_read_reg(p, DPAA2_SWP_CINH_EQCR_PI);
+	eqcr_pi = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_EQCR_PI);
 	p->eqcr.pi = eqcr_pi & p->eqcr.pi_ci_mask;
 	p->eqcr.pi_vb = eqcr_pi & DPAA2_SWP_VALID_BIT;
-	p->eqcr.ci = swp_read_reg(p, DPAA2_SWP_CINH_EQCR_CI)
+	p->eqcr.ci = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_EQCR_CI)
 	    & p->eqcr.pi_ci_mask;
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
@@ -187,4 +188,36 @@ dpaa2_swp_free_portal(dpaa2_swp_t portal)
 {
 	if (portal)
 		free(portal, M_DPAA2_SWP);
+}
+
+void
+dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
+{
+	bus_write_4(swp->cinh_map, offset, val);
+}
+
+uint32_t
+dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
+{
+	return (bus_read_4(swp->cinh_map, offset));
+}
+
+uint32_t
+dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm,
+    uint8_t dcm, uint8_t epm, int sd, int sp, int se, int dp, int de, int ep)
+{
+	return (
+	    max_fill	<< DPAA2_SWP_CFG_DQRR_MF_SHIFT |
+	    est		<< DPAA2_SWP_CFG_EST_SHIFT |
+	    wn		<< DPAA2_SWP_CFG_WN_SHIFT |
+	    rpm		<< DPAA2_SWP_CFG_RPM_SHIFT |
+	    dcm		<< DPAA2_SWP_CFG_DCM_SHIFT |
+	    epm		<< DPAA2_SWP_CFG_EPM_SHIFT |
+	    sd		<< DPAA2_SWP_CFG_SD_SHIFT |
+	    sp		<< DPAA2_SWP_CFG_SP_SHIFT |
+	    se		<< DPAA2_SWP_CFG_SE_SHIFT |
+	    dp		<< DPAA2_SWP_CFG_DP_SHIFT |
+	    de		<< DPAA2_SWP_CFG_DE_SHIFT |
+	    ep		<< DPAA2_SWP_CFG_EP_SHIFT
+	);
 }

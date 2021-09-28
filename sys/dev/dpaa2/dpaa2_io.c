@@ -83,11 +83,6 @@ static struct resource_spec dpaa2_io_spec[] = {
 /* Forward declarations. */
 static int	setup_msi(struct dpaa2_io_softc *sc);
 static void	msi_intr(void *arg);
-static void	swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
-static uint32_t	swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
-static uint32_t	swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
-		    uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp,
-		    int se, int dp, int de, int ep);
 
 /*
  * Device interface.
@@ -290,7 +285,7 @@ dpaa2_io_set_intr_trigger(device_t iodev, uint32_t mask)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		swp_write_reg(sc->swp, DPAA2_SWP_CINH_IER, mask);
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IER, mask);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 }
@@ -305,7 +300,7 @@ dpaa2_io_get_intr_trigger(device_t iodev)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_IER);
+		return dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_IER);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 
@@ -322,7 +317,7 @@ dpaa2_io_read_intr_status(device_t iodev)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
+		return dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 
@@ -339,7 +334,7 @@ dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, mask);
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, mask);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 }
@@ -376,7 +371,7 @@ dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
 		 */
 		dqsrc = (sc->swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
 		    DPAA2_SDQCR_SRC_MASK;
-		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
 		    ? sc->swp->sdq : 0);
 	} else
 		device_printf(iodev, "%s failed\n", __func__);
@@ -420,47 +415,6 @@ msi_intr(void *arg)
 	volatile uint32_t val = 0;
 	for (uint32_t i = 0; i < 100; i++)
 		val++;
-}
-
-/**
- * @internal
- */
-static void
-swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
-{
-	bus_write_4(swp->cinh_map, offset, val);
-}
-
-/**
- * @internal
- */
-static uint32_t
-swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
-{
-	return (bus_read_4(swp->cinh_map, offset));
-}
-
-/**
- * @internal
- */
-static uint32_t
-swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm, uint8_t dcm,
-    uint8_t epm, int sd, int sp, int se, int dp, int de, int ep)
-{
-	return (
-	    max_fill	<< DPAA2_SWP_CFG_DQRR_MF_SHIFT |
-	    est		<< DPAA2_SWP_CFG_EST_SHIFT |
-	    wn		<< DPAA2_SWP_CFG_WN_SHIFT |
-	    rpm		<< DPAA2_SWP_CFG_RPM_SHIFT |
-	    dcm		<< DPAA2_SWP_CFG_DCM_SHIFT |
-	    epm		<< DPAA2_SWP_CFG_EPM_SHIFT |
-	    sd		<< DPAA2_SWP_CFG_SD_SHIFT |
-	    sp		<< DPAA2_SWP_CFG_SP_SHIFT |
-	    se		<< DPAA2_SWP_CFG_SE_SHIFT |
-	    dp		<< DPAA2_SWP_CFG_DP_SHIFT |
-	    de		<< DPAA2_SWP_CFG_DE_SHIFT |
-	    ep		<< DPAA2_SWP_CFG_EP_SHIFT
-	);
 }
 
 static device_method_t dpaa2_io_methods[] = {
