@@ -45,6 +45,11 @@
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
 
+/* DPAA2 resources (for allocatable objects like DPBP) */
+#define DPAA2_RES_OFFSET	7500 /* to avoid collision with others */
+#define DPAA2_RES_IO		(01 + DPAA2_RES_OFFSET)
+#define DPAA2_RES_BP		(02 + DPAA2_RES_OFFSET)
+
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */
 	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
