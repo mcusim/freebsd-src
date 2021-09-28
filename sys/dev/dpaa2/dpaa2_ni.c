@@ -65,12 +65,12 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
-static struct resource_spec dpaa2_ni_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
-	RESOURCE_SPEC_END
-};
+/* static struct resource_spec dpaa2_ni_spec[] = { */
+/* 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED }, */
+/* 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED }, */
+/* 	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL }, */
+/* 	RESOURCE_SPEC_END */
+/* }; */
 
 /* Forward declarations. */
 static int	setup_dpni(device_t dev);
