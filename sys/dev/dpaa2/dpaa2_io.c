@@ -283,14 +283,14 @@ dpaa2_io_detach(device_t dev)
 /**
  * @brief Enable interrupts for a software portal.
  */
-void
+static void
 dpaa2_io_set_intr_trigger(device_t iodev, uint32_t mask)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SWP_IER, mask);
+		swp_write_reg(sc->swp, DPAA2_SWP_CINH_IER, mask);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 }
@@ -298,14 +298,14 @@ dpaa2_io_set_intr_trigger(device_t iodev, uint32_t mask)
 /**
  * @brief Return the value in the SWP_IER register.
  */
-uint32_t
+static uint32_t
 dpaa2_io_get_intr_trigger(device_t iodev)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_SWP_IER);
+		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_IER);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 
@@ -315,14 +315,14 @@ dpaa2_io_get_intr_trigger(device_t iodev)
 /**
  * @brief Return the value in the SWP_ISR register.
  */
-uint32_t
+static uint32_t
 dpaa2_io_read_intr_status(device_t iodev)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_SWP_ISR);
+		return swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 
@@ -332,14 +332,14 @@ dpaa2_io_read_intr_status(device_t iodev)
 /**
  * @brief Clear SWP_ISR register according to the given mask.
  */
-void
+static void
 dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
 
 	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SWP_ISR, mask);
+		swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, mask);
 	else
 		device_printf(iodev, "%s failed\n", __func__);
 
@@ -353,7 +353,7 @@ dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
  * chan_idx:	the channel index (0 to 15)
  * en:		enable or disable push dequeue
  */
-void
+static void
 dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
@@ -376,9 +376,10 @@ dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
 		 * Read make the complete src map. If no channels are enabled
 		 * the SDQCR must be 0 or else QMan will assert errors.
 		 */
-		dqsrc = (sc->swp->sdq >> SDQCR_SRC_SHIFT) & SDQCR_SRC_MASK;
-		swp_write_reg(sc->swp, QBMAN_CINH_SWP_SDQCR,
-		    dqsrc != 0 ? sc->swp->sdq : 0);
+		dqsrc = (sc->swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
+		    DPAA2_SDQCR_SRC_MASK;
+		swp_write_reg(sc->swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
+		    ? sc->swp->sdq : 0);
 	} else
 		device_printf(iodev, "%s failed\n", __func__);
 }
