@@ -92,7 +92,7 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_HWA_SIZE		64
 
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
-#define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf), CACHE_LINE_SIZE)
+#define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf))//, CACHE_LINE_SIZE)
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
 
 /* DPNI buffer layout modification options */
@@ -214,10 +214,6 @@ setup_dpni(device_t dev)
 		goto err_free_cmd;
 	}
 	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
-		dev_err(dev, "DPNI version %u.%u not supported, need >= %u.%u\n",
-		    priv->dpni_ver_major, priv->dpni_ver_minor,
-		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
-
 		device_printf(dev, "DPNI API version %u.%u not supported, "
 		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
 		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
@@ -273,8 +269,8 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 * version, this number is not always provided correctly on rev1.
 	 * We need to check for both alternatives in this situation.
 	 */
-	if (sc->attr.wriop_ver == DPAA2_WRIOP_VERSION(0, 0, 0) ||
-	    sc->attr.wriop_ver == DPAA2_WRIOP_VERSION(1, 0, 0))
+	if (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
+	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
 		rx_buf_align = ETH_RX_BUF_ALIGN_REV1;
 	else
 		rx_buf_align = ETH_RX_BUF_ALIGN;
@@ -353,7 +349,7 @@ cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
 {
 	if (sc->api_major == major)
 		return sc->api_minor - minor;
-	return sc->api_major - api_major;
+	return sc->api_major - major;
 }
 
 
