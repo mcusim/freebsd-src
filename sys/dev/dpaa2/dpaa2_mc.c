@@ -138,28 +138,46 @@ dpaa2_mc_attach(device_t dev)
 	/* Initialize resource manager for DPAA2 I/O memory. */
 	sc->io_rman.rm_type = RMAN_ARRAY;
 	sc->io_rman.rm_descr = "DPAA2 I/O memory";
-	sc->has_io_rman = false;
 	error = rman_init(&sc->io_rman);
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
 		    "DPAA2 I/O memory: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
-	} else
-		sc->has_io_rman = true;
+	}
 
 	/* Initialize resource manager for DPAA2 MSI. */
 	sc->msi_rman.rm_type = RMAN_ARRAY;
 	sc->msi_rman.rm_descr = "DPAA2 MSI";
-	sc->has_msi_rman = false;
 	error = rman_init(&sc->msi_rman);
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
 		    "DPAA2 MSI: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
-	} else
-		sc->has_msi_rman = true;
+	}
+
+	/* Initialize resource manager for DPAA2 MSI. */
+	sc->dpio_rman.rm_type = RMAN_ARRAY;
+	sc->dpio_rman.rm_descr = "DPAA2 DPIO objects";
+	error = rman_init(&sc->dpio_rman);
+	if (error) {
+		device_printf(dev, "Failed to initialize a resource manager for "
+		    "DPAA2 DPIO objects: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Initialize resource manager for DPAA2 MSI. */
+	sc->dpbp_rman.rm_type = RMAN_ARRAY;
+	sc->dpbp_rman.rm_descr = "DPAA2 DPBP objects";
+	error = rman_init(&sc->dpbp_rman);
+	if (error) {
+		device_printf(dev, "Failed to initialize a resource manager for "
+		    "DPAA2 DPBP objects: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
 
 	/* Allocate devinfo to keep information about the MC bus itself. */
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
@@ -477,11 +495,13 @@ dpaa2_mc_rman(device_t mcdev, int type)
 
 	switch (type) {
 	case SYS_RES_IRQ:
-		if (sc->has_msi_rman)
-			return (&sc->msi_rman);
+		return (&sc->msi_rman);
 	case SYS_RES_MEMORY:
-		if (sc->has_io_rman)
-			return (&sc->io_rman);
+		return (&sc->io_rman);
+	case DPAA2_RES_IO:
+		return (&sc->dpio_rman);
+	case DPAA2_RES_BP:
+		return (&sc->dpbp_rman);
 	default:
 		break;
 	}
