@@ -157,7 +157,7 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Initialize resource manager for DPAA2 MSI. */
+	/* Initialize resource manager for DPAA2 DPIO. */
 	sc->dpio_rman.rm_type = RMAN_ARRAY;
 	sc->dpio_rman.rm_descr = "DPAA2 DPIO objects";
 	error = rman_init(&sc->dpio_rman);
@@ -168,7 +168,7 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Initialize resource manager for DPAA2 MSI. */
+	/* Initialize resource manager for DPAA2 DPBP. */
 	sc->dpbp_rman.rm_type = RMAN_ARRAY;
 	sc->dpbp_rman.rm_descr = "DPAA2 DPBP objects";
 	error = rman_init(&sc->dpbp_rman);
