@@ -243,6 +243,16 @@ CODE {
 				device_get_parent(dev), cmd, bl));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_tx_data_off(device_t dev, dpaa2_cmd_t cmd,
+		uint16_t *offset)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_TX_DATA_OFF(
+				device_get_parent(dev), cmd, offset));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -505,7 +515,7 @@ METHOD int ni_get_tx_data_off {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint16_t	*offset;
-};
+} DEFAULT bypass_ni_get_tx_data_off;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
