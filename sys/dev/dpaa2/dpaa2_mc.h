@@ -68,16 +68,20 @@ enum dpaa2_dev_type {
  * map:		Mapped MC command portal and control registers resources.
  * io_rman:	I/O memory resource manager.
  * msi_rman:	Message-signalled interrupts resource manager.
+ * dpni_rman:	Data Path I/O objects resource manager.
+ * dpbp_rman:	Data Path Buffer Pools resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
 	device_t		 rcdev;
+
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
+
 	struct rman		 io_rman;
 	struct rman		 msi_rman;
-	bool			 has_io_rman;
-	bool			 has_msi_rman;
+	struct rman		 dpio_rman;
+	struct rman		 dpbp_rman;
 };
 
 /**
