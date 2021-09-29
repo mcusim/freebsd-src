@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/mbuf.h>
 
 #include <vm/vm.h>
 
@@ -65,10 +66,51 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
-#define DPAA2_WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
+#define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
+#define DPNI_VER_MAJOR		7U
+#define DPNI_VER_MINOR		0U
 
-#define ALIGN_DOWN(x, a)		((x) & ~((1 << (a)) - 1))
-#define ALIGN_UP(x, a)			ALIGN_DOWN((x) + ((1 << (a)) - 1), (a))
+#define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
+
+/*
+ * Due to a limitation in WRIOP 1.0.0, the RX buffer data must be aligned
+ * to 256B. For newer revisions, the requirement is only for 64B alignment.
+ */
+#define ETH_RX_BUF_ALIGN_REV1	256
+#define ETH_RX_BUF_ALIGN	64
+
+/*
+ * We are accommodating a skb backpointer and some S/G info in the frame's
+ * software annotation. The hardware options are either 0 or 64, so we choose
+ * the latter.
+ */
+#define ETH_SWA_SIZE		64
+
+/*
+ * Hardware annotation area in RX/TX buffers.
+ */
+#define ETH_RX_HWA_SIZE		64
+
+#define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
+#define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf), CACHE_LINE_SIZE)
+#define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
+
+/* DPNI buffer layout modification options */
+
+/* Select to modify the time-stamp setting */
+#define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
+/* Select to modify the parser-result setting; not applicable for Tx */
+#define DPNI_BUF_LAYOUT_OPT_PARSER_RESULT	0x00000002
+/* Select to modify the frame-status setting */
+#define DPNI_BUF_LAYOUT_OPT_FRAME_STATUS	0x00000004
+/* Select to modify the private-data-size setting */
+#define DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE	0x00000008
+/* Select to modify the data-alignment setting */
+#define DPNI_BUF_LAYOUT_OPT_DATA_ALIGN		0x00000010
+/* Select to modify the data-head-room setting */
+#define DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM	0x00000020
+/* Select to modify the data-tail-room setting */
+#define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
 
 /* static struct resource_spec dpaa2_ni_spec[] = { */
 /* 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED }, */
@@ -79,6 +121,9 @@ __FBSDID("$FreeBSD$");
 
 /* Forward declarations. */
 static int	setup_dpni(device_t dev);
+static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
+static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
+		    uint16_t minor);
 
 /*
  * Device interface.
@@ -125,8 +170,192 @@ dpaa2_ni_detach(device_t dev)
 static int
 setup_dpni(device_t dev)
 {
+	device_t pdev;
+	struct dpaa2_ni_softc *sc;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	uint16_t rc_token, ni_token;
+	int error;
+
+	sc = device_get_softc(dev);
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+	dinfo = device_get_ivars(dev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    error);
+		goto err_exit;
+	}
+
+	/* Open resource container and DPNI object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+
+	/* Check if we can work with this DPNI object. */
+	error = DPAA2_CMD_NI_GET_API_VERSION(dev, cmd, &sc->api_major,
+	    &sc->api_minor);
+	if (error) {
+		device_printf(dev, "Failed to get DPNI API version: error=%d\n",
+		    error);
+		goto err_free_cmd;
+	}
+	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
+		dev_err(dev, "DPNI version %u.%u not supported, need >= %u.%u\n",
+		    priv->dpni_ver_major, priv->dpni_ver_minor,
+		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
+
+		device_printf(dev, "DPNI API version %u.%u not supported, "
+		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
+		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
+		goto err_free_cmd;
+	}
+
+	/* Reset the DPNI object. */
+	error = DPAA2_CMD_NI_RESET(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to reset DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+
+	/* Obtain attributes of the DPNI object. */
+	error = DPAA2_CMD_NI_GET_ATTRIBUTES(dev, cmd, &sc->attr);
+	if (error) {
+		device_printf(dev, "Failed to obtain DPNI attributes: id=%d, "
+		    "error=%d\n", dinfo->id, error);
+		goto err_free_cmd;
+	}
+
+	/* Configure buffer layouts of the DPNI queues. */
+	error = set_buf_layout(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure buffer layout: "
+		    "error=%d\n", error);
+		goto err_free_cmd;
+	}
+
+	return (0);
+
+ err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+ err_exit:
+	return (ENXIO);
+}
+
+/**
+ * @internal
+ * @brief Configure buffer layouts of the different DPNI queues.
+ */
+static int
+set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	dpaa2_ni_buf_layout_t buf_layout = {0};
+	uint16_t rx_buf_align;
+	int error;
+
+	/*
+	 * We need to check for WRIOP version 1.0.0, but depending on the MC
+	 * version, this number is not always provided correctly on rev1.
+	 * We need to check for both alternatives in this situation.
+	 */
+	if (sc->attr.wriop_ver == DPAA2_WRIOP_VERSION(0, 0, 0) ||
+	    sc->attr.wriop_ver == DPAA2_WRIOP_VERSION(1, 0, 0))
+		rx_buf_align = ETH_RX_BUF_ALIGN_REV1;
+	else
+		rx_buf_align = ETH_RX_BUF_ALIGN;
+
+	/*
+	 * We need to ensure that the buffer size seen by WRIOP is a multiple
+	 * of 64 or 256 bytes depending on the WRIOP version.
+	 */
+	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, rx_buf_align);
+
+	/* TX buffer layout */
+	buf_layout.pd_size = ETH_SWA_SIZE;
+	buf_layout.pass_timestamp = true;
+	buf_layout.pass_frame_status = true;
+	buf_layout.options =
+	    DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
+	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP |
+	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	if (error) {
+		device_printf(dev, "Failed to set TX buffer layout\n");
+		return (error);
+	}
+
+	/* TX-confirmation buffer layout */
+	buf_layout.options =
+	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP |
+	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	if (error) {
+		device_printf(dev, "Failed to set TX_CONF buffer layout\n");
+		return (error);
+	}
+
+	/*
+	 * Now that we've set our TX buffer layout, retrieve the minimum
+	 * required TX data offset.
+	 */
+	error = DPAA2_CMD_NI_GET_TX_DATA_OFF(dev, cmd, &sc->tx_data_off);
+	if (error) {
+		device_printf(dev, "Failed to obtain TX data offset\n");
+		return (error);
+	}
+
+	if ((sc->tx_data_off % 64) != 0)
+		device_printf(dev, "TX data offset (%d) not a multiple of 64B\n",
+		    sc->tx_data_off);
+
+	/* RX buffer */
+	buf_layout.pass_frame_status = true;
+	buf_layout.pass_parser_result = true;
+	buf_layout.pd_size = 0;
+	buf_layout.fd_align = rx_buf_align;
+	/*
+	 * Extra headroom space requested to hardware, in order to make sure
+	 * there's no realloc'ing in forwarding scenarios.
+	 */
+	buf_layout.head_size = sc->tx_data_off - ETH_RX_HWA_SIZE;
+	buf_layout.options =
+	    DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
+	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
+	    DPNI_BUF_LAYOUT_OPT_DATA_ALIGN |
+	    DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM |
+	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP;
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	if (error) {
+		device_printf(dev, "Failed to set RX buffer layout\n");
+		return (error);
+	}
+
 	return (0);
 }
+
+static int
+cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
+{
+	if (sc->api_major == major)
+		return sc->api_minor - minor;
+	return sc->api_major - api_major;
+}
+
 
 static device_method_t dpaa2_ni_methods[] = {
 	/* Device interface */

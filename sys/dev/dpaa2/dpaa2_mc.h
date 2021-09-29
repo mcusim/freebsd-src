@@ -124,16 +124,19 @@ struct dpaa2_bp_softc {
  * @brief Software context for the DPAA2 Network Interface driver.
  *
  * dev:		Device associated with this software context.
- * bpdev:	Device associated with a buffer pool object for this interface.
- * bpid:	ID of the logical DPBP object.
+ * api_major:	Major version of the DPNI API.
+ * api_minor:	Minor version of the DPNI API.
  * rx_bufsz:	Size of a buffer to receive frames.
+ * tx_data_off: ...
+ * attr:	Attributes of the DPNI object.
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
-
-	device_t		 bpdev;
-	uint32_t		 bpid;
+	uint16_t		 api_major;
+	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;
+	uint16_t		 tx_data_off;
+	dpaa2_ni_attr_t		 attr;
 };
 
 /**

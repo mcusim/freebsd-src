@@ -105,8 +105,8 @@ enum dpaa2_ni_queue_type {
  * cv:			Conditional variable helps to wait for the helper
  *			object's state change.
  * flags:		Current state of the object.
- * rc_api_major:	Major version of the DPRC API (cached).
- * rc_api_minor:	Minor version of the DPRC API (cached).
+ * rc_api_major:	Major version of the DPRC API.
+ * rc_api_minor:	Minor version of the DPRC API.
  */
 struct dpaa2_mcp {
 	struct resource *res;
