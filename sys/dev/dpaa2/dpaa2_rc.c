@@ -135,8 +135,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_CLOSE				CMD_NI(0x800)
 #define CMDID_NI_GET_API_VER			CMD_NI(0xA01)
 #define CMDID_NI_RESET				CMD_NI(0x005)
-#define CMDID_NI_GET_ATTR			CMD_NI_V4(0x004)
-#define CMDID_NI_SET_BUF_LAYOUT			CMD_NI_V2(0x265)
+#define CMDID_NI_GET_ATTR			CMD_NI(0x004)
+#define CMDID_NI_SET_BUF_LAYOUT			CMD_NI(0x265)
 #define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
