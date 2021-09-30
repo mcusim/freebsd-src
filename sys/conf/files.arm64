@@ -315,18 +315,18 @@ dev/vnic/thunder_mdio_fdt.c			optional soc_cavm_thunderx pci vnic fdt
 dev/vnic/thunder_mdio.c				optional soc_cavm_thunderx pci vnic
 dev/vnic/lmac_if.m				optional inet | inet6 | vnic
 
-dev/dpaa2/dpaa2_mc.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_rc.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_rc_if.m				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_cmd_if.m			optional SOC_NXP_LS
-dev/dpaa2/dpaa2_swp_if.m			optional SOC_NXP_LS
-dev/dpaa2/dpaa2_mcp.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_io.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_swp.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_bp.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_ni.c				optional SOC_NXP_LS
-dev/dpaa2/dpaa2_mc_acpi.c			optional SOC_NXP_LS acpi
-#dev/dpaa2/dpaa2_mc_fdt.c			optional SOC_NXP_LS fdt
+dev/dpaa2/dpaa2_mc.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_rc.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_rc_if.m				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_cmd_if.m			optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_swp_if.m			optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_mcp.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_io.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_swp.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_bp.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_ni.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_mc_acpi.c			optional SOC_NXP_LS dpaa2 acpi
+#dev/dpaa2/dpaa2_mc_fdt.c			optional SOC_NXP_LS dpaa2 fdt
 
 ##
 ## SoC Support
