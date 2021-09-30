@@ -1706,11 +1706,9 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 {
 	device_t rcdev, dev, dpaa2_dev;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
-	dpaa2_rc_obj_region_t reg;
 	enum dpaa2_dev_type devtype;
 	const char *devclass;
 	struct resource *res;
-	uint64_t start, end, count;
 	int rid, error;
 
 	rcdev = sc->dev;
