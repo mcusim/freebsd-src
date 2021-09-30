@@ -55,6 +55,13 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
+#include <net/ethernet.h>
+#include <net/bpf.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <net/if_media.h>
+#include <net/if_types.h>
+
 #include <dev/pci/pcivar.h>
 
 #include "pcib_if.h"
@@ -67,10 +74,12 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_cmd_if.h"
 
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
+#define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
+
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
-
-#define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
+#define DPNI_ENQ_FQID_VER_MAJOR	7U
+#define DPNI_ENQ_FQID_VER_MINOR	9U
 
 /*
  * Due to a limitation in WRIOP 1.0.0, the RX buffer data must be aligned
@@ -244,6 +253,20 @@ setup_dpni(device_t dev)
 		goto err_free_cmd;
 	}
 
+	/* Close the DPNI object and the resource container. */
+	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_free_cmd;
+	}
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
+		goto err_free_cmd;
+	}
+
 	return (0);
 
  err_free_cmd:
@@ -282,6 +305,7 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, rx_buf_align);
 
 	/* TX buffer layout */
+	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
 	buf_layout.pd_size = ETH_SWA_SIZE;
 	buf_layout.pass_timestamp = true;
 	buf_layout.pass_frame_status = true;
@@ -296,6 +320,7 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	}
 
 	/* TX-confirmation buffer layout */
+	buf_layout.queue_type = DPAA2_NI_QUEUE_TX_CONF;
 	buf_layout.options =
 	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP |
 	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
@@ -315,25 +340,29 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 		return (error);
 	}
 
+	if (bootverbose)
+		device_printf(dev, "TX data offset=%d\n", sc->tx_data_off);
 	if ((sc->tx_data_off % 64) != 0)
 		device_printf(dev, "TX data offset (%d) not a multiple of 64B\n",
 		    sc->tx_data_off);
 
 	/* RX buffer */
-	buf_layout.pass_frame_status = true;
-	buf_layout.pass_parser_result = true;
-	buf_layout.pd_size = 0;
-	buf_layout.fd_align = rx_buf_align;
 	/*
 	 * Extra headroom space requested to hardware, in order to make sure
 	 * there's no realloc'ing in forwarding scenarios.
 	 */
+	buf_layout.queue_type = DPAA2_NI_QUEUE_RX;
 	buf_layout.head_size = sc->tx_data_off - ETH_RX_HWA_SIZE;
+	buf_layout.fd_align = rx_buf_align;
+	buf_layout.pass_frame_status = true;
+	buf_layout.pass_parser_result = true;
+	buf_layout.pass_timestamp = true;
+	buf_layout.pd_size = 0;
 	buf_layout.options =
-	    DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
-	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
-	    DPNI_BUF_LAYOUT_OPT_DATA_ALIGN |
 	    DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM |
+	    DPNI_BUF_LAYOUT_OPT_DATA_ALIGN |
+	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
+	    DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
 	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
