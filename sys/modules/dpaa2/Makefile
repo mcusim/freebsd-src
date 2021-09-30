@@ -4,19 +4,19 @@
 
 KMOD=	dpaa2
 
-SRCS=	bus_if.h \
-	device_if.h \
-	opt_platform.h \
-	dpaa2_rc_if.h \
-	dpaa2_cmd_if.h \
-	dpaa2_swp_if.h \
-	dpaa2_mc.c \
-	dpaa2_rc.c \
-	dpaa2_io.c \
-	dpaa2_bp.c \
-	dpaa2_ni.c \
-	dpaa2_mcp.c \
-	dpaa2_swp.c
+SRCS=	dpaa2_mc.c
+SRCS+=	dpaa2_rc.c
+SRCS+=	dpaa2_io.c
+SRCS+=	dpaa2_bp.c
+SRCS+=	dpaa2_ni.c
+SRCS+=	dpaa2_mcp.c
+SRCS+=	dpaa2_swp.c
+
+SRCS+=	dpaa2_rc_if.c dpaa2_rc_if.h
+SRCS+=	dpaa2_cmd_if.c dpaa2_cmd_if.h
+SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
+
+SRCS+=	bus_if.h device_if.h opt_platform.h
 
 .if ${MACHINE_CPUARCH} == "aarch64" || \
     ${MACHINE_CPUARCH} == "amd64" || \
