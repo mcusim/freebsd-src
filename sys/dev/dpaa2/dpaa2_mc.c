@@ -77,6 +77,8 @@ static struct resource_spec dpaa2_mc_spec[] = {
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
 static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
+static struct rman *dpaa2_mc_rman_by_devtype(device_t mcdev,
+    enum dpaa2_dev_type devtype);
 
 /*
  * For device interface.
@@ -175,6 +177,17 @@ dpaa2_mc_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
 		    "DPAA2 DPBP objects: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Initialize resource manager for DPAA2 DPCON. */
+	sc->dpcon_rman.rm_type = RMAN_ARRAY;
+	sc->dpcon_rman.rm_descr = "DPAA2 DPCON objects";
+	error = rman_init(&sc->dpcon_rman);
+	if (error) {
+		device_printf(dev, "Failed to initialize a resource manager for "
+		    "DPAA2 DPCON objects: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
@@ -401,6 +414,120 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 	return (0);
 }
 
+/*
+ * For DPAA2 Management Complex bus driver interface
+ */
+
+int
+dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
+{
+	struct dpaa2_devinfo *mcinfo;
+	struct dpaa2_devinfo *dinfo;
+	struct rman *rm;
+	int error;
+
+	mcinfo = device_get_ivars(mcdev);
+	dinfo = device_get_ivars(dpaa2_dev);
+
+	if (!mcinfo || !dinfo || mcinfo->dtype != DPAA2_DEV_MC)
+		return (EINVAL);
+
+	/* Select resource manager based on a type of the DPAA2 device. */
+	rm = dpaa2_mc_rman_by_devtype(mcdev, dinfo->dtype);
+	if (!rm) {
+		device_printf(mcdev, "No resource manager for %s objects\n",
+		    dpaa2_get_type(dinfo->dtype));
+		return (EINVAL);
+	}
+
+	/* Manage DPAA2 device as an allocatable resource. */
+	error = rman_manage_region(rm, dpaa2_dev, dpaa2_dev);
+	if (error) {
+		device_printf(mcdev, "rman_manage_region() failed for DPAA2 "
+		    "device: type=%s, start=%#jx, end=%#jx, error=%d\n",
+		    dpaa2_get_type(dinfo->dtype), start, end, error);
+		return (error);
+	}
+
+	return (0);
+}
+
+int
+dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	struct rman *rm;
+	rman_res_t start, end;
+	int error;
+
+	mcinfo = device_get_ivars(mcdev);
+
+	if (!mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+		return (EINVAL);
+
+	/* Select resource manager based on a type of the DPAA2 device. */
+	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
+	if (!rm) {
+		device_printf(mcdev, "No resource manager for %s objects\n",
+		    dpaa2_get_type(dinfo->dtype));
+		return (EINVAL);
+	}
+
+	/* Find first free DPAA2 device of the given type. */
+	error = rman_first_free_region(rm, &start, &end);
+	if (error) {
+		device_printf(mcdev, "rman_first_free_region() failed for DPAA2 "
+		    "device: type=%s, error=%d\n", dpaa2_get_type(devtype),
+		    error);
+		return (error);
+	}
+
+	KASSERT(start == end, ("start != end, but should be the same pointer "
+	    "to the DPAA2 device: start=%jx, end=%jx", start, end));
+
+	*dpaa2_dev = (device_t) start;
+
+	return (0);
+}
+
+int
+dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	struct rman *rm;
+	rman_res_t start, end;
+	int error;
+
+	mcinfo = device_get_ivars(mcdev);
+
+	if (!mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+		return (EINVAL);
+
+	/* Select resource manager based on a type of the DPAA2 device. */
+	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
+	if (!rm) {
+		device_printf(mcdev, "No resource manager for %s objects\n",
+		    dpaa2_get_type(dinfo->dtype));
+		return (EINVAL);
+	}
+
+	/* Find last free DPAA2 device of the given type. */
+	error = rman_last_free_region(rm, &start, &end);
+	if (error) {
+		device_printf(mcdev, "rman_last_free_region() failed for DPAA2 "
+		    "device: type=%s, error=%d\n", dpaa2_get_type(devtype),
+		    error);
+		return (error);
+	}
+
+	KASSERT(start == end, ("start != end, but should be the same pointer "
+	    "to the DPAA2 device: start=%jx, end=%jx", start, end));
+
+	*dpaa2_dev = (device_t) start;
+
+	return (0);
+}
+
 const char *
 dpaa2_get_type(enum dpaa2_dev_type dtype)
 {
@@ -417,6 +544,8 @@ dpaa2_get_type(enum dpaa2_dev_type dtype)
 		return ("dpmcp");
 	case DPAA2_DEV_BP:
 		return ("dpbp");
+	case DPAA2_DEV_CON:
+		return ("dpcon");
 	default:
 		return ("unknown");
 	}
@@ -502,6 +631,33 @@ dpaa2_mc_rman(device_t mcdev, int type)
 		return (&sc->dpio_rman);
 	case DPAA2_RES_BP:
 		return (&sc->dpbp_rman);
+	case DPAA2_RES_CON:
+		return (&sc->dpcon_rman);
+	default:
+		break;
+	}
+
+	return (NULL);
+}
+
+/**
+ * @internal
+ * @brief Obtain a resource manager based on the given type of the DPAA2 device.
+ */
+static struct rman *dpaa2_mc_rman_by_devtype(device_t mcdev,
+    enum dpaa2_dev_type devtype)
+{
+	struct dpaa2_mc_softc *sc;
+
+	sc = device_get_softc(mcdev);
+
+	switch (devtype) {
+	case DPAA2_DEV_IO:
+		return (&sc->dpio_rman);
+	case DPAA2_DEV_BP:
+		return (&sc->dpbp_rman);
+	case DPAA2_DEV_CON:
+		return (&sc->dpcon_rman);
 	default:
 		break;
 	}
