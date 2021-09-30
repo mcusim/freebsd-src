@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_mc_if.h"
 #include "dpaa2_cmd_if.h"
 
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
@@ -66,6 +67,8 @@ __FBSDID("$FreeBSD$");
 
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
+
+#define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
 
 /* ------------------------- MNG command IDs -------------------------------- */
 #define CMD_MNG_BASE_VERSION	1
@@ -214,6 +217,8 @@ struct __packed dpaa2_bp_attr {
 /* Forward declarations. */
 static int	discover_objects(struct dpaa2_rc_softc *sc);
 static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+		    const dpaa2_obj_t *obj);
+static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 static int	configure_irq(device_t rcdev, device_t child, int rid,
 		    uint64_t addr, uint32_t data);
@@ -1652,7 +1657,27 @@ discover_objects(struct dpaa2_rc_softc *sc)
 		rcinfo->icid = dprc_attr.icid;
 	}
 
-	/* Add devices to the resource container. */
+	/* Add managed devices to the resource container. */
+	for (uint32_t i = 0; i < obj_count; i++) {
+		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
+		if (rc) {
+			device_printf(rcdev, "Failed to get object: index=%u, "
+			    "error=%d\n", i, rc);
+			continue;
+		}
+		add_managed_child(sc, cmd, &obj);
+	}
+
+	/* Probe and attach managed devices properly. */
+	bus_generic_probe(rcdev);
+	rc = bus_generic_attach(rcdev);
+	if (rc) {
+		DPAA2_CMD_RC_CLOSE(rcdev, cmd);
+		dpaa2_mcp_free_command(cmd);
+		return (rc);
+	}
+
+	/* Add other devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
 		if (rc) {
@@ -1666,6 +1691,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	DPAA2_CMD_RC_CLOSE(rcdev, cmd);
 	dpaa2_mcp_free_command(cmd);
 
+	/* Probe and attach the rest of devices. */
 	bus_generic_probe(rcdev);
 	return (bus_generic_attach(rcdev));
 }
@@ -1678,138 +1704,189 @@ static int
 add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
-	device_t rcdev = sc->dev;
-	device_t dev;
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	struct dpaa2_devinfo *dinfo;
+	device_t rcdev, dev, dpaa2_dev;
+	struct dpaa2_devinfo *rcinfo, *dinfo;
 	dpaa2_rc_obj_region_t reg;
+	enum dpaa2_dev_type devtype;
+	const char *devclass;
+	struct resource *res;
 	uint64_t start, end, count;
-	int rc;
+	int rid, error;
 
-	if (strncmp("dpio", obj->type, strlen("dpio")) == 0) {
-		/* Add a device for DPIO object. */
-		dev = device_add_child(rcdev, "dpaa2_io", -1);
-		if (dev == NULL) {
-			device_printf(rcdev, "Failed to add a child device: "
-			    "type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-			return (ENXIO);
+	rcdev = sc->dev;
+	rcinfo = device_get_ivars(rcdev);
+
+	if (COMPARE_TYPE(obj->type, "dpni")) {
+		devclass = "dpaa2_ni";
+		devtype = DPAA2_DEV_NI;
+	} else
+		return (ENXIO);
+
+	/* Add a device for the DPAA2 object. */
+	dev = device_add_child(rcdev, devclass, -1);
+	if (dev == NULL) {
+		device_printf(rcdev, "Failed to add a child device for DPAA2 "
+		    "object: type=%s, id=%u\n", (const char *)obj->type,
+		    obj->id);
+		return (ENXIO);
+	}
+
+	/* Allocate devinfo for a child. */
+	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
+	    M_WAITOK | M_ZERO);
+	if (!dinfo) {
+		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
+		    "for: type=%s, id=%u\n", (const char *)obj->type,
+		    obj->id);
+		return (ENXIO);
+	}
+	device_set_ivars(dev, dinfo);
+
+	dinfo->pdev = rcdev;
+	dinfo->dev = dev;
+	dinfo->id = obj->id;
+	dinfo->dtype = devtype;
+	/* Children share their parent container's ICID and portal ID. */
+	dinfo->icid = rcinfo->icid;
+	dinfo->portal_id = rcinfo->portal_id;
+	/* MSI configuration */
+	dinfo->msi.msi_msgnum = obj->irq_count;
+	dinfo->msi.msi_alloc = 0;
+	dinfo->msi.msi_handlers = 0;
+
+	/* Initialize a resource list for the child. */
+	resource_list_init(&dinfo->resources);
+
+	/* Add DPAA2-specific resources to the resource list. */
+	switch (devtype) {
+	case DPAA2_DEV_NI:
+		error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev,
+		    DPAA2_DEV_BP);
+		if (error) {
+			device_printf(rcdev, "Failed to obtain a free DPBP "
+			    "device for: type=%s, id=%u\n",
+			    (const char *)obj->type, obj->id);
+			break;
 		}
 
-		/* Allocate devinfo for a child device. */
-		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
-		    M_WAITOK | M_ZERO);
-		if (!dinfo) {
-			device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
+		resource_list_add(&dinfo->resources, DPAA2_RES_BP, 0,
+		    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1);
+
+		res = resource_list_reserve(&dinfo->resources, rcdev, dev,
+		    DPAA2_RES_BP, &rid, (rman_res_t) dpaa2_dev,
+		    (rman_res_t) dpaa2_dev, 1, 0);
+		if (!res)
+			device_printf(rcdev, "Failed to reserve a DPBP device "
 			    "for: type=%s, id=%u\n", (const char *)obj->type,
 			    obj->id);
-			return (ENXIO);
+		break;
+	default:
+		/* Should not reach this point. */
+		break;
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Add a new managed DPAA2 device to the resource container bus.
+ *
+ * There are DPAA2 objects (DPIO, DPBP) which have their own drivers and can be
+ * allocated as resources for the other DPAA2 objects (DPNI). This function is
+ * supposed to discover such managed objects in the resource container and
+ * add them as children to perform a proper initialization.
+ *
+ * NOTE: It must be called together with bus_generic_probe() and
+ *       bus_generic_attach() before add_child().
+ */
+static int
+add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
+    const dpaa2_obj_t *obj)
+{
+	device_t rcdev, dev;
+	struct dpaa2_devinfo *rcinfo, *dinfo;
+	dpaa2_rc_obj_region_t reg;
+	enum dpaa2_dev_type devtype;
+	const char *devclass;
+	uint64_t start, end, count;
+	int error;
+
+	rcdev = sc->dev;
+	rcinfo = device_get_ivars(rcdev);
+
+	if (COMPARE_TYPE(obj->type, "dpio")) {
+		devclass = "dpaa2_io";
+		devtype = DPAA2_DEV_IO;
+	} else if (COMPARE_TYPE(obj->type, "dpbp")) {
+		devclass = "dpaa2_bp";
+		devtype = DPAA2_DEV_BP;
+	} else if (COMPARE_TYPE(obj->type, "dpcon")) {
+		devclass = "dpaa2_con";
+		devtype = DPAA2_DEV_CON;
+	} else
+		return (EINVAL);
+
+	/* Add a device for the DPAA2 object. */
+	dev = device_add_child(rcdev, devclass, -1);
+	if (dev == NULL) {
+		device_printf(rcdev, "Failed to add a child device for "
+		    "managed DPAA2 object: type=%s, id=%u\n",
+		    (const char *)obj->type, obj->id);
+		return (ENXIO);
+	}
+
+	/* Allocate devinfo for a child. */
+	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
+	    M_WAITOK | M_ZERO);
+	if (!dinfo) {
+		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
+		    "for: type=%s, id=%u\n", (const char *)obj->type,
+		    obj->id);
+		return (ENXIO);
+	}
+	device_set_ivars(dev, dinfo);
+
+	dinfo->pdev = rcdev;
+	dinfo->dev = dev;
+	dinfo->id = obj->id;
+	dinfo->dtype = devtype;
+	/* Children share their parent container's ICID and portal ID. */
+	dinfo->icid = rcinfo->icid;
+	dinfo->portal_id = rcinfo->portal_id;
+	/* MSI configuration */
+	dinfo->msi.msi_msgnum = obj->irq_count;
+	dinfo->msi.msi_alloc = 0;
+	dinfo->msi.msi_handlers = 0;
+
+	/* Initialize a resource list for the child. */
+	resource_list_init(&dinfo->resources);
+
+	/* Add memory regions to the resource list. */
+	for (uint8_t i = 0; i < obj->reg_count; i++) {
+		error = DPAA2_CMD_RC_GET_OBJ_REGION(rcdev, cmd, obj->id, i,
+		    obj->type, &reg);
+		if (error) {
+			device_printf(rcdev, "Failed to obtain memory region "
+			    "for type=%s, id=%u, reg_idx=%u: error=%d\n",
+			    (const char *)obj->type, obj->id, i, error);
+			continue;
 		}
-		device_set_ivars(dev, dinfo);
+		count = reg.size;
+		start = reg.base_paddr + reg.base_offset;
+		end = reg.base_paddr + reg.base_offset + reg.size - 1;
 
-		dinfo->pdev = rcdev;
-		dinfo->dev = dev;
-		dinfo->id = obj->id;
-		dinfo->dtype = DPAA2_DEV_IO;
-		/* Children share their parent container's ICID and portal ID. */
-		dinfo->icid = rcinfo->icid;
-		dinfo->portal_id = rcinfo->portal_id;
-		/* MSI configuration */
-		dinfo->msi.msi_msgnum = obj->irq_count;
-		dinfo->msi.msi_alloc = 0;
-		dinfo->msi.msi_handlers = 0;
+		resource_list_add(&dinfo->resources, SYS_RES_MEMORY,
+		    i, start, end, count);
+	}
 
-		/* Initialize a resource list for the child. */
-		resource_list_init(&dinfo->resources);
-
-		/* Add memory regions to the resource list. */
-		for (uint8_t i = 0; i < obj->reg_count; i++) {
-			rc = DPAA2_CMD_RC_GET_OBJ_REGION(rcdev, cmd, obj->id, i,
-			    "dpio", &reg);
-			if (rc) {
-				device_printf(rcdev, "Failed to obtain memory "
-				    "region for obj=dpio, id=%u, reg_idx=%u: "
-				    "error=%d\n", obj->id, i, rc);
-				continue;
-			}
-
-			count = reg.size;
-			start = reg.base_paddr + reg.base_offset;
-			end = reg.base_paddr + reg.base_offset + reg.size - 1;
-
-			resource_list_add(&dinfo->resources, SYS_RES_MEMORY,
-			    i, start, end, count);
-		}
-	} else if (strncmp("dpbp", obj->type, strlen("dpbp")) == 0) {
-		/* Add a device for DPBP object. */
-		dev = device_add_child(rcdev, "dpaa2_bp", -1);
-		if (dev == NULL) {
-			device_printf(rcdev, "Failed to add a child device: "
-			    "type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-			return (ENXIO);
-		}
-
-		/* Allocate devinfo for a child device. */
-		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
-		    M_WAITOK | M_ZERO);
-		if (!dinfo) {
-			device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-			    "for: type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-			return (ENXIO);
-		}
-		device_set_ivars(dev, dinfo);
-
-		dinfo->pdev = rcdev;
-		dinfo->dev = dev;
-		dinfo->id = obj->id;
-		dinfo->dtype = DPAA2_DEV_BP;
-		/* Children share their parent container's ICID and portal ID. */
-		dinfo->icid = rcinfo->icid;
-		dinfo->portal_id = rcinfo->portal_id;
-		/* MSI configuration */
-		dinfo->msi.msi_msgnum = obj->irq_count;
-		dinfo->msi.msi_alloc = 0;
-		dinfo->msi.msi_handlers = 0;
-
-		/* Initialize a resource list for the child. */
-		resource_list_init(&dinfo->resources);
-	} else if (strncmp("dpni", obj->type, strlen("dpni")) == 0) {
-		/* Add a device for DPNI object. */
-		dev = device_add_child(rcdev, "dpaa2_ni", -1);
-		if (dev == NULL) {
-			device_printf(rcdev, "Failed to add a child device: "
-			    "type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-			return (ENXIO);
-		}
-
-		/* Allocate devinfo for a child device. */
-		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
-		    M_WAITOK | M_ZERO);
-		if (!dinfo) {
-			device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-			    "for: type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-			return (ENXIO);
-		}
-		device_set_ivars(dev, dinfo);
-
-		dinfo->pdev = rcdev;
-		dinfo->dev = dev;
-		dinfo->id = obj->id;
-		dinfo->dtype = DPAA2_DEV_NI;
-		/* Children share their parent container's ICID and portal ID. */
-		dinfo->icid = rcinfo->icid;
-		dinfo->portal_id = rcinfo->portal_id;
-		/* MSI configuration */
-		dinfo->msi.msi_msgnum = obj->irq_count;
-		dinfo->msi.msi_alloc = 0;
-		dinfo->msi.msi_handlers = 0;
-
-		/* Initialize a resource list for the child. */
-		resource_list_init(&dinfo->resources);
+	/* Inform MC about a new managed device. */
+	error = DPAA2_MC_MANAGE_DEVICE(rcdev, dev);
+	if (error) {
+		device_printf(rcdev, "Failed to add a managed DPAA2 device: "
+		    "type=%s, id=%u, error=%d\n", (const char *)obj->type,
+		    obj->id, error);
+		return (ENXIO);
 	}
 
 	return (0);
