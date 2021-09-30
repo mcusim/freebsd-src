@@ -56,6 +56,11 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_mc_if.h"
+
+/*
+ * Device interface
+ */
 
 static int
 dpaa2_mc_acpi_probe(device_t dev)
@@ -84,6 +89,10 @@ dpaa2_mc_acpi_detach(device_t dev)
 	return (dpaa2_mc_detach(dev));
 }
 
+/*
+ * Pseudo-PCIB interface
+ */
+
 static int
 dpaa2_mc_acpi_alloc_msi(device_t mcdev, device_t child, int count,
     int maxcount, int *irqs)
@@ -110,6 +119,10 @@ dpaa2_mc_acpi_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 {
 	return (dpaa2_mc_get_id(mcdev, child, type, id));
 }
+
+/*
+ * Bus interface
+ */
 
 static struct resource *
 dpaa2_mc_acpi_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
@@ -147,6 +160,30 @@ dpaa2_mc_acpi_deactivate_resource(device_t mcdev, device_t child, int type,
 	return (dpaa2_mc_deactivate_resource(mcdev, child, type, rid, r));
 }
 
+/*
+ * DPAA2 Management Complex bus driver interface
+ */
+
+static int
+dpaa2_mc_acpi_manage_device(device_t mcdev, device_t dpaa2_dev)
+{
+	return (dpaa2_mc_manage_device(mcdev, dpaa2_dev));
+}
+
+static int
+dpaa2_mc_acpi_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	return (dpaa2_mc_first_free_device(mcdev, dpaa2_dev, devtype));
+}
+
+static int
+dpaa2_mc_acpi_last_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	return (dpaa2_mc_last_free_device(mcdev, dpaa2_dev, devtype));
+}
+
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
@@ -167,6 +204,11 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 	DEVMETHOD(pcib_release_msi,	dpaa2_mc_acpi_release_msi),
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
 	DEVMETHOD(pcib_get_id,		dpaa2_mc_acpi_get_id),
+
+	/* DPAA2 Management Complex bus driver interface */
+	DEVMETHOD(dpaa2_mc_manage_device, dpaa2_mc_acpi_manage_device),
+	DEVMETHOD(dpaa2_mc_first_free_device, dpaa2_mc_acpi_first_free_device),
+	DEVMETHOD(dpaa2_mc_last_free_device, dpaa2_mc_acpi_last_free_device),
 
 	DEVMETHOD_END
 };

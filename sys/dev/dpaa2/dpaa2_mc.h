@@ -46,9 +46,10 @@
 #define MC_REG_FAPR		0x28u
 
 /* DPAA2 resources (for allocatable objects like DPBP) */
-#define DPAA2_RES_OFFSET	7500 /* to avoid collision with others */
+#define DPAA2_RES_OFFSET	7500 /* to avoid collisions with others */
 #define DPAA2_RES_IO		(01 + DPAA2_RES_OFFSET)
 #define DPAA2_RES_BP		(02 + DPAA2_RES_OFFSET)
+#define DPAA2_RES_CON		(03 + DPAA2_RES_OFFSET)
 
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */
@@ -56,7 +57,8 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
 	DPAA2_DEV_MCP,		/* MC portal (to configure MC portal) */
-	DPAA2_DEV_BP		/* Buffer Pool */
+	DPAA2_DEV_BP,		/* Buffer Pool */
+	DPAA2_DEV_CON		/* Concentrator */
 };
 
 /**
@@ -70,6 +72,7 @@ enum dpaa2_dev_type {
  * msi_rman:	Message-signalled interrupts resource manager.
  * dpni_rman:	Data Path I/O objects resource manager.
  * dpbp_rman:	Data Path Buffer Pools resource manager.
+ * dpcon_rman:	Data Path Concentrators resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
@@ -82,6 +85,7 @@ struct dpaa2_mc_softc {
 	struct rman		 msi_rman;
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
+	struct rman		 dpcon_rman;
 };
 
 /**
@@ -203,6 +207,13 @@ int dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
     uint32_t *data);
 int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
+
+/* For DPAA2 Management Complex bus driver interface */
+int dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev);
+int dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype);
+int dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype);
 
 const char *dpaa2_get_type(enum dpaa2_dev_type dtype);
 
