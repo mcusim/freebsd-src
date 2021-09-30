@@ -15,6 +15,7 @@ SRCS+=	dpaa2_swp.c
 SRCS+=	dpaa2_rc_if.c dpaa2_rc_if.h
 SRCS+=	dpaa2_cmd_if.c dpaa2_cmd_if.h
 SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
+SRCS+=	dpaa2_mc_if.c dpaa2_mc_if.h
 
 SRCS+=	bus_if.h device_if.h opt_platform.h
 
