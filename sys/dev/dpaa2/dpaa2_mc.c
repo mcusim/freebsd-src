@@ -441,11 +441,13 @@ dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
 	}
 
 	/* Manage DPAA2 device as an allocatable resource. */
-	error = rman_manage_region(rm, dpaa2_dev, dpaa2_dev);
+	error = rman_manage_region(rm, (rman_res_t) dpaa2_dev,
+	    (rman_res_t) dpaa2_dev);
 	if (error) {
 		device_printf(mcdev, "rman_manage_region() failed for DPAA2 "
 		    "device: type=%s, start=%#jx, end=%#jx, error=%d\n",
-		    dpaa2_get_type(dinfo->dtype), start, end, error);
+		    dpaa2_get_type(dinfo->dtype), (rman_res_t) dpaa2_dev,
+		    (rman_res_t) dpaa2_dev, error);
 		return (error);
 	}
 
@@ -456,6 +458,7 @@ int
 dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
+	struct dpaa2_devinfo *mcinfo;
 	struct rman *rm;
 	rman_res_t start, end;
 	int error;
@@ -469,7 +472,7 @@ dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_get_type(dinfo->dtype));
+		    dpaa2_get_type(devtype));
 		return (EINVAL);
 	}
 
@@ -494,6 +497,7 @@ int
 dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
+	struct dpaa2_devinfo *mcinfo;
 	struct rman *rm;
 	rman_res_t start, end;
 	int error;
@@ -507,7 +511,7 @@ dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
 	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_get_type(dinfo->dtype));
+		    dpaa2_get_type(devtype));
 		return (EINVAL);
 	}
 
