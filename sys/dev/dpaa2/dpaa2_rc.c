@@ -1767,9 +1767,9 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 			break;
 		}
 
-		resource_list_add(&dinfo->resources, DPAA2_RES_BP, 0,
+		rid = 0;
+		resource_list_add(&dinfo->resources, DPAA2_RES_BP, rid,
 		    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1);
-
 		res = resource_list_reserve(&dinfo->resources, rcdev, dev,
 		    DPAA2_RES_BP, &rid, (rman_res_t) dpaa2_dev,
 		    (rman_res_t) dpaa2_dev, 1, 0);
