@@ -263,11 +263,18 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 		return (BUS_ALLOC_RESOURCE(device_get_parent(mcdev), child,
 		    type, rid, start, end, count, flags));
 
-	error = rman_manage_region(rm, start, end);
-	if (error) {
-		device_printf(mcdev, "rman_manage_region() failed: start=%#jx, "
-		    "end=%#jx, error=%d\n", start, end, error);
-		goto fail;
+	/*
+	 * Do not manage DPAA2-specific resource. It should already be added
+	 * to a specific resource manager by dpaa2_mc_manage_device().
+	 */
+	if (type <= DPAA2_RES_OFFSET) {
+		error = rman_manage_region(rm, start, end);
+		if (error) {
+			device_printf(mcdev, "rman_manage_region() failed: "
+			    "start=%#jx, end=%#jx, error=%d\n", start, end,
+			    error);
+			goto fail;
+		}
 	}
 
 	res = rman_reserve_resource(rm, start, end, count, flags, child);
@@ -290,9 +297,9 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 
 	return (res);
  fail:
-	device_printf(mcdev, "%s FAIL: type=%d, rid=%d, start=%#jx, end=%#jx, "
-	    "count=%#jx, flags=%x\n", __func__, type, *rid, start, end, count,
-	    flags);
+	device_printf(mcdev, "%s() failed: type=%d, rid=%d, start=%#jx, "
+	    "end=%#jx, count=%#jx, flags=%x\n", __func__, type, *rid, start, end,
+	    count, flags);
 	return (NULL);
 }
 
