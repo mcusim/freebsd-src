@@ -122,12 +122,13 @@ __FBSDID("$FreeBSD$");
 /* Select to modify the data-tail-room setting */
 #define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
 
-/* static struct resource_spec dpaa2_ni_spec[] = { */
-/* 	{ DPAA2_RES_IO,  0, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL }, */
-/* 	{ DPAA2_RES_BP,  1, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL }, */
-/* 	{ DPAA2_RES_CON, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL }, */
-/* 	RESOURCE_SPEC_END */
-/* }; */
+static struct resource_spec dpaa2_ni_spec[] = {
+	{ DPAA2_RES_IO,  0, RF_ACTIVE | RF_UNMAPPED },
+	{ DPAA2_RES_BP,  1, RF_ACTIVE | RF_UNMAPPED },
+	{ DPAA2_RES_CON, 2, RF_ACTIVE | RF_UNMAPPED },// | RF_OPTIONAL },
+
+	RESOURCE_SPEC_END
+};
 
 /* Forward declarations. */
 static int	setup_dpni(device_t dev);
@@ -151,14 +152,21 @@ static int
 dpaa2_ni_attach(device_t dev)
 {
 	struct dpaa2_ni_softc *sc;
-	int rc;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
-	rc = setup_dpni(dev);
-	if (rc)
-		return (rc);
+	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
+	if (error) {
+		device_printf(dev, "Failed to allocate resources: error=%d\n",
+		    error);
+		return (ENXIO);
+	}
+
+	error = setup_dpni(dev);
+	if (error)
+		return (error);
 
 	return (0);
 }
