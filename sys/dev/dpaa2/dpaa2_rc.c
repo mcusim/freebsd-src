@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #define LABEL_LEN_MAX		16u
 
 /* Mark the end of the DPAA2-specific resource list. */
-#define DPAA2_RESDESC_END	NULL
+#define DPAA2_RESDESC_END	{ DPAA2_RES_OFFSET, DPAA2_DEV_NOTYPE }
 
 #define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
 
@@ -1731,7 +1731,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		DPAA2_RESDESC_END
 	};
 	const dpaa2_res_desc_t *res_desc;
-	device_t rcdev, dev, dpaa2_dev;
+	device_t rcdev, dev;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	enum dpaa2_dev_type devtype;
@@ -1784,7 +1784,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	for (; res_desc != DPAA2_RESDESC_END; res_desc++) {
+	for (; res_desc->type != DPAA2_DEV_NOTYPE; res_desc++) {
 		rid = res_desc->rid;
 		error = add_dpaa2_res(rcdev, dev, res_desc->type, &rid);
 		if (error)
