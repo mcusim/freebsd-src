@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #define LABEL_LEN_MAX		16u
 
 /* Mark the end of the DPAA2-specific resource list. */
-#define DPAA2_RESDESC_END	{ DPAA2_RES_OFFSET, DPAA2_DEV_NOTYPE }
+#define DPAA2_RESDESC_END	NULL
 
 #define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
 
@@ -1730,8 +1730,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		{ 2, DPAA2_DEV_CON },
 		DPAA2_RESDESC_END
 	};
-	const dpaa2_res_desc_t no_desc = DPAA2_RESDESC_END;
-	const dpaa2_res_desc_t *res_desc = &no_desc;
+	const dpaa2_res_desc_t *res_desc;
 	device_t rcdev, dev, dpaa2_dev;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -1785,7 +1784,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	for (; *res_desc != no_desc; res_desc++) {
+	for (; res_desc != DPAA2_RESDESC_END; res_desc++) {
 		rid = res_desc->rid;
 		error = add_dpaa2_res(rcdev, dev, res_desc->type, &rid);
 		if (error)
@@ -2115,8 +2114,8 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1);
 
 	/* Reserve a newly added DPAA2 resource. */
-	res = resource_list_reserve(&dinfo->resources, rcdev, dev, devtype, rid,
-	    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1, flags);
+	res = resource_list_reserve(&dinfo->resources, rcdev, child, devtype,
+	    rid, (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1, flags);
 	if (!res) {
 		device_printf(rcdev, "Failed to reserve a %s device for: "
 		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
