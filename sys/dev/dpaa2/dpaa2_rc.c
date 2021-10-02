@@ -68,6 +68,9 @@ __FBSDID("$FreeBSD$");
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
 
+/* Mark the end of the DPAA2-specific resource list. */
+#define DPAA2_RESDESC_END	{ DPAA2_RES_OFFSET, DPAA2_DEV_NOTYPE }
+
 #define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
 
 /* ------------------------- MNG command IDs -------------------------------- */
@@ -214,12 +217,21 @@ struct __packed dpaa2_bp_attr {
 	uint32_t	id;
 };
 
+/**
+ * @brief Descriptor of a DPAA2-specific resource.
+ */
+typedef struct dpaa2_res_desc {
+	int rid;
+	enum dpaa2_dev_type type;
+} dpaa2_res_desc_t;
+
 /* Forward declarations. */
 static int	discover_objects(struct dpaa2_rc_softc *sc);
 static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
+static int	add_dpaa2_res(void);
 static int	configure_irq(device_t rcdev, device_t child, int rid,
 		    uint64_t addr, uint32_t data);
 static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
@@ -596,6 +608,13 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
+	/* For DPAA-specific resource. */
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_IO),
+	    DPAA2_RES_IO, "%#jx");
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_BP),
+	    DPAA2_RES_BP, "%#jx");
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_CON),
+	    DPAA2_RES_CON, "%#jx");
 
 	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
 	    dinfo->id);
@@ -1704,11 +1723,18 @@ static int
 add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
+	const dpaa2_res_desc_t dpni_res_descriptors[] = {
+		{ 0, DPAA2_DEV_IO },
+		{ 1, DPAA2_DEV_BP },
+		{ 2, DPAA2_DEV_CON },
+		DPAA2_RESDESC_END
+	};
+	const dpaa2_res_desc_t *res_desc;
 	device_t rcdev, dev, dpaa2_dev;
-	struct dpaa2_devinfo *rcinfo, *dinfo;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
 	enum dpaa2_dev_type devtype;
 	const char *devclass;
-	struct resource *res;
 	int rid, error;
 
 	rcdev = sc->dev;
@@ -1717,6 +1743,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	if (COMPARE_TYPE(obj->type, "dpni")) {
 		devclass = "dpaa2_ni";
 		devtype = DPAA2_DEV_NI;
+		res_desc = dpni_res_descriptors;
 	} else
 		return (ENXIO);
 
@@ -1756,31 +1783,12 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	switch (devtype) {
-	case DPAA2_DEV_NI:
-		error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev,
-		    DPAA2_DEV_BP);
-		if (error) {
-			device_printf(rcdev, "Failed to obtain a free DPBP "
-			    "device for: type=%s, id=%u\n",
-			    (const char *)obj->type, obj->id);
-			break;
-		}
-
-		rid = 0;
-		resource_list_add(&dinfo->resources, DPAA2_RES_BP, rid,
-		    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1);
-		res = resource_list_reserve(&dinfo->resources, rcdev, dev,
-		    DPAA2_RES_BP, &rid, (rman_res_t) dpaa2_dev,
-		    (rman_res_t) dpaa2_dev, 1, 0);
-		if (!res)
-			device_printf(rcdev, "Failed to reserve a DPBP device "
-			    "for: type=%s, id=%u\n", (const char *)obj->type,
-			    obj->id);
-		break;
-	default:
-		/* Should not reach this point. */
-		break;
+	for (; *res_desc != DPAA2_RESDESC_END; res_desc++) {
+		rid = res_desc->rid;
+		error = add_dpaa2_res(rcdev, dev, res_desc->type, &rid);
+		if (error)
+			device_printf(rcdev, "add_dpaa2_res() failed: "
+			    "error=%d\n", error);
 	}
 
 	return (0);
@@ -2079,6 +2087,41 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		return (DPAA2_CMD_STAT_TIMEOUT);
 
 	return (DPAA2_CMD_STAT_OK);
+}
+
+static int
+add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
+    int *rid)
+{
+	device_t dpaa2_dev;
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	struct resource *res;
+	uint32_t flags = 0;
+
+	/* Request a free DPAA2 device of the given type from MC. */
+	error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev, devtype);
+	if (error) {
+		device_printf(rcdev, "Failed to obtain a free %s device for: "
+		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
+		    dpaa2_get_type(dinfo->type), obj->id);
+		return (error);
+	}
+
+	/* Add DPAA2 device to the resource list of the child device. */
+	resource_list_add(&dinfo->resources, devtype, *rid,
+	    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1);
+
+	/* Reserve a newly added DPAA2 resource. */
+	res = resource_list_reserve(&dinfo->resources, rcdev, dev, devtype, rid,
+	    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1, flags);
+	if (!res) {
+		device_printf(rcdev, "Failed to reserve a %s device for: "
+		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
+		    dpaa2_get_type(obj->type), obj->id);
+		return (EBUSY);
+	}
+
+	return (0);
 }
 
 static device_method_t dpaa2_rc_methods[] = {

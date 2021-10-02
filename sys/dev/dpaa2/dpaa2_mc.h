@@ -50,6 +50,7 @@
 #define DPAA2_RES_IO		(01 + DPAA2_RES_OFFSET)
 #define DPAA2_RES_BP		(02 + DPAA2_RES_OFFSET)
 #define DPAA2_RES_CON		(03 + DPAA2_RES_OFFSET)
+#define DPAA2_RES_NUM		3
 
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */
@@ -58,7 +59,9 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_NI,		/* Network Interface */
 	DPAA2_DEV_MCP,		/* MC portal (to configure MC portal) */
 	DPAA2_DEV_BP,		/* Buffer Pool */
-	DPAA2_DEV_CON		/* Concentrator */
+	DPAA2_DEV_CON,		/* Concentrator */
+
+	DPAA2_DEV_NOTYPE	/* Shouldn't be assigned to any DPAA2 device. */
 };
 
 /**
@@ -136,6 +139,7 @@ struct dpaa2_bp_softc {
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
+	struct resource 	*res[3];
 	uint16_t		 api_major;
 	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;

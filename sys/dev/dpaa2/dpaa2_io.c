@@ -77,6 +77,7 @@ static struct resource_spec dpaa2_io_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
+
 	RESOURCE_SPEC_END
 };
 
