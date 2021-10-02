@@ -231,7 +231,8 @@ static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
-static int	add_dpaa2_res(void);
+static int	add_dpaa2_res(device_t rcdev, device_t child,
+		    enum dpaa2_dev_type devtype, int *rid);
 static int	configure_irq(device_t rcdev, device_t child, int rid,
 		    uint64_t addr, uint32_t data);
 static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
@@ -609,11 +610,11 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
 	/* For DPAA-specific resource. */
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_IO),
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_IO),
 	    DPAA2_RES_IO, "%#jx");
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_BP),
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_BP),
 	    DPAA2_RES_BP, "%#jx");
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA_DEV_CON),
+	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_CON),
 	    DPAA2_RES_CON, "%#jx");
 
 	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
@@ -1729,7 +1730,8 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		{ 2, DPAA2_DEV_CON },
 		DPAA2_RESDESC_END
 	};
-	const dpaa2_res_desc_t *res_desc;
+	const dpaa2_red_desc_t no_desc = DPAA2_RESDESC_END;
+	const dpaa2_res_desc_t *res_desc = &no_desc;
 	device_t rcdev, dev, dpaa2_dev;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -1783,7 +1785,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	for (; *res_desc != DPAA2_RESDESC_END; res_desc++) {
+	for (; *res_desc != no_desc; res_desc++) {
 		rid = res_desc->rid;
 		error = add_dpaa2_res(rcdev, dev, res_desc->type, &rid);
 		if (error)
