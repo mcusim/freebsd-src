@@ -1730,7 +1730,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		{ 2, DPAA2_DEV_CON },
 		DPAA2_RESDESC_END
 	};
-	const dpaa2_red_desc_t no_desc = DPAA2_RESDESC_END;
+	const dpaa2_res_desc_t no_desc = DPAA2_RESDESC_END;
 	const dpaa2_res_desc_t *res_desc = &no_desc;
 	device_t rcdev, dev, dpaa2_dev;
 	struct dpaa2_devinfo *rcinfo;
@@ -2099,13 +2099,14 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 	struct resource *res;
 	uint32_t flags = 0;
+	int error;
 
 	/* Request a free DPAA2 device of the given type from MC. */
 	error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev, devtype);
 	if (error) {
 		device_printf(rcdev, "Failed to obtain a free %s device for: "
 		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
-		    dpaa2_get_type(dinfo->type), obj->id);
+		    dpaa2_get_type(dinfo->dtype), dinfo->id);
 		return (error);
 	}
 
@@ -2119,7 +2120,7 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	if (!res) {
 		device_printf(rcdev, "Failed to reserve a %s device for: "
 		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
-		    dpaa2_get_type(obj->type), obj->id);
+		    dpaa2_get_type(dinfo->dtype), dinfo->id);
 		return (EBUSY);
 	}
 
