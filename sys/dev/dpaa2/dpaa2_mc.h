@@ -50,7 +50,6 @@
 #define DPAA2_RES_IO		(01 + DPAA2_RES_OFFSET)
 #define DPAA2_RES_BP		(02 + DPAA2_RES_OFFSET)
 #define DPAA2_RES_CON		(03 + DPAA2_RES_OFFSET)
-#define DPAA2_RES_NUM		3
 
 enum dpaa2_dev_type {
 	DPAA2_DEV_MC = 75,	/* Management Complex (firmware bus) */

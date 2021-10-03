@@ -267,8 +267,7 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	 * Skip managing DPAA2-specific resource. It must be provided to MC by
 	 * calling dpaa2_mc_manage_device() beforehand.
 	 */
-	if (type <= DPAA2_RES_OFFSET ||
-	    type > DPAA2_RES_OFFSET + DPAA2_RES_NUM) {
+	if (type <= DPAA2_RES_OFFSET) {
 		error = rman_manage_region(rm, start, end);
 		if (error) {
 			device_printf(mcdev, "rman_manage_region() failed: "
