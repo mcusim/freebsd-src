@@ -2103,8 +2103,8 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	/* Request a free DPAA2 device of the given type from MC. */
 	error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev, devtype);
 	if (error) {
-		device_printf(rcdev, "Failed to obtain a free %s device for: "
-		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
+		device_printf(rcdev, "Failed to obtain a free %s (rid=%d) for: "
+		    "%s (id=%u)\n", dpaa2_get_type(devtype), *rid,
 		    dpaa2_get_type(dinfo->dtype), dinfo->id);
 		return (error);
 	}
@@ -2117,8 +2117,8 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	res = resource_list_reserve(&dinfo->resources, rcdev, child, devtype,
 	    rid, (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1, flags);
 	if (!res) {
-		device_printf(rcdev, "Failed to reserve a %s device for: "
-		    "type=%s, id=%u\n", dpaa2_get_type(devtype),
+		device_printf(rcdev, "Failed to reserve %s (rid=%d) for: %s "
+		    "(id=%u)\n", dpaa2_get_type(devtype), *rid,
 		    dpaa2_get_type(dinfo->dtype), dinfo->id);
 		return (EBUSY);
 	}
