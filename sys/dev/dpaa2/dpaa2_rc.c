@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #define LABEL_LEN_MAX		16u
 
 /* Mark the end of the DPAA2-specific resource list. */
-#define DPAA2_RESDESC_END	{ DPAA2_RES_OFFSET, DPAA2_DEV_NOTYPE }
+#define DPAA2_RESDESC_END	{ DPAA2_DEV_NOTYPE, DPAA2_DEV_NOTYPE }
 
 #define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
 
@@ -611,11 +611,11 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
 	/* For DPAA-specific resource. */
 	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_IO),
-	    DPAA2_RES_IO, "%#jx");
+	    DPAA2_DEV_IO, "%#jx");
 	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_BP),
-	    DPAA2_RES_BP, "%#jx");
+	    DPAA2_DEV_BP, "%#jx");
 	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_CON),
-	    DPAA2_RES_CON, "%#jx");
+	    DPAA2_DEV_CON, "%#jx");
 
 	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
 	    dinfo->id);
