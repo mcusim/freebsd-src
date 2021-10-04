@@ -77,8 +77,6 @@ static struct resource_spec dpaa2_mc_spec[] = {
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
 static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
-static struct rman *dpaa2_mc_rman_by_devtype(device_t mcdev,
-    enum dpaa2_dev_type devtype);
 
 /*
  * For device interface.
@@ -267,7 +265,7 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 	 * Skip managing DPAA2-specific resource. It must be provided to MC by
 	 * calling dpaa2_mc_manage_device() beforehand.
 	 */
-	if (type <= DPAA2_RES_OFFSET) {
+	if (type <= DPAA2_DEV_MC) {
 		error = rman_manage_region(rm, start, end);
 		if (error) {
 			device_printf(mcdev, "rman_manage_region() failed: "
@@ -440,7 +438,7 @@ dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
 		return (EINVAL);
 
 	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman_by_devtype(mcdev, dinfo->dtype);
+	rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
 		    dpaa2_get_type(dinfo->dtype));
@@ -476,7 +474,7 @@ dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 		return (EINVAL);
 
 	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
+	rm = dpaa2_mc_rman(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
 		    dpaa2_get_type(devtype));
@@ -515,7 +513,7 @@ dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
 		return (EINVAL);
 
 	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman_by_devtype(mcdev, devtype);
+	rm = dpaa2_mc_rman(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
 		    dpaa2_get_type(devtype));
@@ -638,31 +636,6 @@ dpaa2_mc_rman(device_t mcdev, int type)
 		return (&sc->msi_rman);
 	case SYS_RES_MEMORY:
 		return (&sc->io_rman);
-	case DPAA2_RES_IO:
-		return (&sc->dpio_rman);
-	case DPAA2_RES_BP:
-		return (&sc->dpbp_rman);
-	case DPAA2_RES_CON:
-		return (&sc->dpcon_rman);
-	default:
-		break;
-	}
-
-	return (NULL);
-}
-
-/**
- * @internal
- * @brief Obtain a resource manager based on the given type of the DPAA2 device.
- */
-static struct rman *dpaa2_mc_rman_by_devtype(device_t mcdev,
-    enum dpaa2_dev_type devtype)
-{
-	struct dpaa2_mc_softc *sc;
-
-	sc = device_get_softc(mcdev);
-
-	switch (devtype) {
 	case DPAA2_DEV_IO:
 		return (&sc->dpio_rman);
 	case DPAA2_DEV_BP:
