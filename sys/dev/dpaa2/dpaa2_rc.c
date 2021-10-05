@@ -242,7 +242,8 @@ static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 static int	set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		    const uint8_t irq_idx, const uint8_t enable,
 		    const uint16_t cmdid);
-
+static int	print_dpaa2_type(struct resource_list *rl,
+		    enum dpaa2_dev_type type);
 /*
  * Device interface.
  */
@@ -609,13 +610,11 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "port", SYS_RES_IOPORT, "%#jx");
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
-	/* For DPAA-specific resource. */
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_IO),
-	    DPAA2_DEV_IO, "%#jx");
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_BP),
-	    DPAA2_DEV_BP, "%#jx");
-	retval += resource_list_print_type(rl, dpaa2_get_type(DPAA2_DEV_CON),
-	    DPAA2_DEV_CON, "%#jx");
+
+	/* Print DPAA-specific resources. */
+	retval += print_dpaa2_type(rl, DPAA2_DEV_IO);
+	retval += print_dpaa2_type(rl, DPAA2_DEV_BP);
+	retval += print_dpaa2_type(rl, DPAA2_DEV_CON);
 
 	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
 	    dinfo->id);
@@ -2124,6 +2123,34 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	}
 
 	return (0);
+}
+
+static int
+print_dpaa2_type(struct resource_list *rl, enum dpaa2_dev_type type)
+{
+	struct dpaa2_devinfo *dinfo;
+	struct resource_list_entry *rle;
+	int printed = 0;
+	int retval = 0;
+
+	STAILQ_FOREACH(rle, rl, link) {
+		if (rle->type == type) {
+			dinfo = device_get_ivars((device_t) rle->start);
+
+			if (printed == 0)
+				retval += printf(" %s (id=",
+				    dpaa2_get_type(dinfo->dtype));
+			else
+				retval += printf(",");
+			printed++;
+
+			retval += printf("%u", dinfo->id);
+		}
+	}
+	if (printed)
+		retval += printf(")");
+
+	return (retval);
 }
 
 static device_method_t dpaa2_rc_methods[] = {
