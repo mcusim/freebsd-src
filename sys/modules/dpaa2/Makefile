@@ -12,7 +12,6 @@ SRCS+=	dpaa2_ni.c
 SRCS+=	dpaa2_mcp.c
 SRCS+=	dpaa2_swp.c
 
-SRCS+=	dpaa2_rc_if.c dpaa2_rc_if.h
 SRCS+=	dpaa2_cmd_if.c dpaa2_cmd_if.h
 SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
 SRCS+=	dpaa2_mc_if.c dpaa2_mc_if.h
@@ -35,8 +34,7 @@ SRCS+=	dpaa2_mc_fdt.c \
 	ofw_bus_if.h
 .endif
 
-MFILES=	dev/dpaa2/dpaa2_rc_if.m \
-	dev/dpaa2/dpaa2_cmd_if.m \
+MFILES=	dev/dpaa2/dpaa2_cmd_if.m \
 	dev/dpaa2/dpaa2_swp_if.m \
 	dev/dpaa2/dpaa2_mc_if.m
 
