@@ -264,7 +264,7 @@ void
 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always)
 {
 	ed->verb &= ~(1 << ENQ_CMD_ORP_ENABLE_SHIFT);
-	if (respond_success)
+	if (response_always)
 		ed->verb |= ENQ_CMD_RESPONSE_ALWAYS;
 	else
 		ed->verb |= ENQ_CMD_REJECTS_TO_FQ;
