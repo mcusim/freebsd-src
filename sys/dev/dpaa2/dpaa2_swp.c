@@ -55,8 +55,28 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
 
+/* Shifts in the VERB byte of the enqueue command descriptor. */
+#define ENQ_CMD_ORP_ENABLE_SHIFT	2
+#define ENQ_CMD_IRQ_ON_DISPATCH_SHIFT	3
+#define ENQ_CMD_TARGET_TYPE_SHIFT	4
+#define ENQ_CMD_DCA_EN_SHIFT		7
+/* VERB byte options of the enqueue command descriptor. */
+#define ENQ_CMD_EMPTY			(0u)
+#define ENQ_CMD_RESPONSE_ALWAYS		(1u)
+#define ENQ_CMD_REJECTS_TO_FQ		(2u)
+
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp_memory", "DPAA2 QBMan Software Portal "
     "memory");
+
+/* Forward declarations. */
+static int	swp_enq_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+		    const dpaa2_fd_t *fd);
+static int	swp_enq_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+		    const dpaa2_fd_t *fd);
+static int	swp_enq_mult_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+		    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
+static int	swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+		    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 
 int
 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
@@ -154,13 +174,15 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	 */
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
 
+	p->enqueue = swp_enq_direct;
+	p->enqueue_mult = swp_enq_mult_direct;
+
 	p->eqcr.pi_ring_size = 8;
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
 		p->eqcr.pi_ring_size = 32;
-		/* qbman_swp_enqueue_ptr = */
-		/*     qbman_swp_enqueue_mem_back; */
-		/* qbman_swp_enqueue_multiple_ptr = */
-		/*     qbman_swp_enqueue_multiple_mem_back; */
+
+		p->enqueue = swp_enq_memback;
+		p->enqueue_mult = swp_enq_mult_memback;
 		/* qbman_swp_enqueue_multiple_desc_ptr = */
 		/*     qbman_swp_enqueue_multiple_desc_mem_back; */
 		/* qbman_swp_pull_ptr = qbman_swp_pull_mem_back; */
@@ -220,4 +242,139 @@ dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm,
 	    de		<< DPAA2_SWP_CFG_DE_SHIFT |
 	    ep		<< DPAA2_SWP_CFG_EP_SHIFT
 	);
+}
+
+/**
+ * @brief Clear enqueue descriptor.
+ */
+void
+dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed)
+{
+	memset(ed, 0, sizeof(*ed));
+}
+
+/**
+ * @brief Set enqueue descriptor without Order Point Record ID.
+ *
+ * ed:			Enqueue descriptor.
+ * response_always:	Enqueue with response always (1); FD from a rejected
+ * 			enqueue will be returned on a FQ (0).
+ */
+void
+dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always)
+{
+	ed->verb &= ~(1 << ENQ_CMD_ORP_ENABLE_SHIFT);
+	if (respond_success)
+		ed->verb |= ENQ_CMD_RESPONSE_ALWAYS;
+	else
+		ed->verb |= ENQ_CMD_REJECTS_TO_FQ;
+}
+
+/**
+ * @brief Set FQ of the enqueue descriptor.
+ */
+void
+dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid)
+{
+	ed->verb &= ~(1 << ENQ_CMD_TARGET_TYPE_SHIFT);
+	ed->tgtid = fqid;
+}
+
+/**
+ * @brief Issue a command to enqueue a frame using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ */
+int
+dpaa2_swp_enq(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed, const dpaa2_fd_t *fd)
+{
+	return (swp->enqueue(swp, ed, fd));
+}
+
+/**
+ * @brief Issue a command to enqueue frames using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ * flags:	Table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL.
+ * frames_n:	Number of FDs to enqueue.
+ */
+int
+dpaa2_swp_enq_mult(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n)
+{
+	return (swp->enqueue_mult(swp, ed, fd, flags, frames_n));
+}
+
+/*
+ * Internal functions.
+ */
+
+/**
+ * @internal
+ * @brief Issue a command to enqueue a frame using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ */
+static int
+swp_enq_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed, const dpaa2_fd_t *fd)
+{
+	/* TBD */
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Issue a command to enqueue a frame using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ */
+static int
+swp_enq_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed, const dpaa2_fd_t *fd)
+{
+	/* TBD */
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Issue a command to enqueue frames using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ * flags:	Table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL.
+ * frames_n:	Number of FDs to enqueue.
+ */
+static int
+swp_enq_mult_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n)
+{
+	/* TBD */
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Issue a command to enqueue frames using one enqueue descriptor.
+ *
+ * swp:		Software portal used to send this command to.
+ * ed:		Enqueue command descriptor.
+ * fd:		Frame descriptor to enqueue.
+ * flags:	Table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL.
+ * frames_n:	Number of FDs to enqueue.
+ */
+static int
+swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n)
+{
+	/* TBD */
+	return (0);
 }

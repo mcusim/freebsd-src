@@ -125,7 +125,7 @@ __FBSDID("$FreeBSD$");
 static struct resource_spec dpaa2_ni_spec[] = {
 	{ DPAA2_DEV_IO,  0, RF_ACTIVE | RF_UNMAPPED },
 	{ DPAA2_DEV_BP,  1, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_CON, 2, RF_ACTIVE | RF_UNMAPPED },// | RF_OPTIONAL },
+	{ DPAA2_DEV_CON, 2, RF_ACTIVE | RF_UNMAPPED },
 
 	RESOURCE_SPEC_END
 };
