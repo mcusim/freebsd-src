@@ -217,6 +217,8 @@ typedef struct {
 	bool			 has_8prio;
 } dpaa2_swp_desc_t;
 
+typedef struct dpaa2_swp *dpaa2_swp_t;
+
 /**
  * @brief Helper object to interact with the QBMan software portal.
  *
@@ -275,8 +277,6 @@ struct dpaa2_swp {
 	int (*enqueue_mult)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 };
-
-typedef struct dpaa2_swp *dpaa2_swp_t;
 
 int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	     const uint16_t flags);
