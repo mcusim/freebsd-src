@@ -143,6 +143,53 @@
  */
 
 /**
+ * @brief Enqueue command descriptor.
+ */
+typedef struct __packed {
+	uint8_t		verb;
+	uint8_t		dca;
+	uint16_t	seqnum;
+	uint16_t	orpid;
+	uint16_t	reserved;
+	uint32_t	tgtid;
+	uint32_t	tag;
+	uint16_t	qdbin;
+	uint8_t		qpri;
+	uint8_t		reserved1[3];
+	uint8_t		wae;
+	uint8_t		rspid;
+	uint64_t	rsp_addr;
+} dpaa2_eq_desc_t;
+
+/**
+ * @brief DPAA2 frame descriptor.
+ *
+ * addr:	Memory address of the start of the buffer holding the frame
+ *		data or the buffer containing the scatter/gather list.
+ * length:	Length of the frame data (in bytes).
+ * bpid:	Buffer pool ID (14 bit + BMT bit + IVP bit)
+ * off_fmt_sl:	Frame data offset, frame format and short-length fields.
+ * frame_ctx:   This field allows the sender of a frame to communicate some
+ *		out-of-band information to the receiver of the frame.
+ * ctrl:	Control bits (DD, SC, DROPP, PTAC, ERR, etc.)
+ * flow_ctx:	Frame flow context.
+ */
+typedef struct {
+	union {
+		uint32_t words[8]; /* for easier copying the whole structure */
+		struct __packed {
+			uint64_t addr;
+			uint32_t length;
+			uint16_t bpid;
+			uint16_t off_fmt_sl;
+			uint32_t frame_ctx;
+			uint32_t ctrl;
+			uint64_t flow_ctx;
+		} fd;
+	};
+} dpaa2_fd_t;
+
+/**
  * @brief Descriptor of the QBMan software portal.
  *
  * cena_res:	Unmapped cache-enabled part of the portal's I/O memory.
@@ -187,13 +234,13 @@ typedef struct {
  *		from the driver to the QBMan.
  */
 struct dpaa2_swp {
-	struct resource 	*cena_res;
+	struct resource		*cena_res;
 	struct resource_map	*cena_map;
 	struct resource		*cinh_res;
 	struct resource_map	*cinh_map;
 
-	const dpaa2_swp_desc_t	*desc;
 	struct mtx		 lock;
+	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
 	uint32_t		 sdq;
 
@@ -222,6 +269,11 @@ struct dpaa2_swp {
 		uint32_t	 pend;
 		uint32_t	 no_pfdr;
 	} eqcr;
+
+	int (*enqueue)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	    const dpaa2_fd_t *fd);
+	int (*enqueue_mult)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 };
 
 typedef struct dpaa2_swp *dpaa2_swp_t;
@@ -234,5 +286,12 @@ uint32_t dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
 uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
 	     uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se,
 	     int dp, int de, int ep);
+void	 dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed);
+void	 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always);
+void	 dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid);
+int	 dpaa2_swp_enq(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	     const dpaa2_fd_t *fd);
+int	 dpaa2_swp_enq_mult(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	     const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 
 #endif /* _DPAA2_SWP_H */

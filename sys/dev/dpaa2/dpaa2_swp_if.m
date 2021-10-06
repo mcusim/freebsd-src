@@ -64,3 +64,18 @@ METHOD void set_push_dequeue {
 	uint8_t chan_idx;
 	bool en;
 };
+
+/**
+ * @brief Enqueue multiple frames to a frame queue using one Frame Queue ID.
+ *
+ * dev:		DPIO device.
+ * fqid:	Frame Queue ID.
+ * fd:		Frame descriptor to enqueue.
+ * frames_n:	Number of frames to enqueue.
+ */
+METHOD int enq_multiple_fq {
+	device_t dev;
+	uint32_t fqid;
+	const dpaa2_fd_t *fd;
+	int frames_n;
+}

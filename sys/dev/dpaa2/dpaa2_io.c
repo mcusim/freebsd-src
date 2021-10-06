@@ -378,6 +378,25 @@ dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
 		device_printf(iodev, "%s failed\n", __func__);
 }
 
+/**
+ * @brief Enqueue multiple frames to a frame queue using one fqid.
+ */
+static int
+dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
+    const dpaa2_fd_t *fd, int frames_n)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	dpaa2_eq_desc_t ed;
+	uint32_t flags = 0;
+
+	/* Setup enqueue descriptor. */
+	dpaa2_swp_clear_ed(&ed);
+	dpaa2_swp_set_ed_norp(&ed, 0);
+	dpaa2_swp_set_ed_fq(&ed, fqid);
+
+	return (dpaa2_swp_enq_mult(sc->swp, &ed, fd, &flags, frames_n));
+}
+
 /*
  * Internal functions.
  */
@@ -430,6 +449,7 @@ static device_method_t dpaa2_io_methods[] = {
 	DEVMETHOD(dpaa2_swp_read_intr_status,	dpaa2_io_read_intr_status),
 	DEVMETHOD(dpaa2_swp_clear_intr_status,	dpaa2_io_clear_intr_status),
 	DEVMETHOD(dpaa2_swp_set_push_dequeue,	dpaa2_io_set_push_dequeue),
+	DEVMETHOD(dpaa2_swp_enq_multiple_fq,	dpaa2_io_enq_multiple_fq),
 
 	DEVMETHOD_END
 };
