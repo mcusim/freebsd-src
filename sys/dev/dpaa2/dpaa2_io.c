@@ -386,6 +386,7 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
     const dpaa2_fd_t *fd, int frames_n)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+	dpaa2_swp_t swp = sc->swp;
 	dpaa2_eq_desc_t ed;
 	uint32_t flags = 0;
 
@@ -394,7 +395,7 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
 	dpaa2_swp_set_ed_norp(&ed, 0);
 	dpaa2_swp_set_ed_fq(&ed, fqid);
 
-	return (dpaa2_swp_enq_mult(sc->swp, &ed, fd, &flags, frames_n));
+	return (swp->enq_mult(swp, &ed, fd, &flags, frames_n));
 }
 
 /*
