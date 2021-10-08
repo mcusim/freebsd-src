@@ -182,15 +182,15 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	 */
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
 
-	p->enqueue =	  swp_enq_direct;
-	p->enqueue_mult = swp_enq_mult_direct;
+	p->enq =	swp_enq_direct;
+	p->enq_mult =	swp_enq_mult_direct;
 
 	p->eqcr.pi_ring_size = 8;
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
 		p->eqcr.pi_ring_size = 32;
 
-		p->enqueue =	  swp_enq_memback;
-		p->enqueue_mult = swp_enq_mult_memback;
+		p->enq =	swp_enq_memback;
+		p->enq_mult =	swp_enq_mult_memback;
 		/* qbman_swp_enqueue_multiple_desc_ptr = */
 		/*     qbman_swp_enqueue_multiple_desc_mem_back; */
 		/* qbman_swp_pull_ptr = qbman_swp_pull_mem_back; */
@@ -417,7 +417,7 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	}
 
 	/* Write the VERB byte of enqueue descriptor. */
-	eqcr_pi = s->eqcr.pi;
+	eqcr_pi = swp->eqcr.pi;
 	for (int i = 0; i < num_enq; i++) {
 		bus_write_1(swp->cena_map,
 		    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask),
