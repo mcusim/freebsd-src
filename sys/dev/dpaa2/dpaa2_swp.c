@@ -318,8 +318,10 @@ swp_enq_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed, const dpaa2_fd_t *fd)
 static int
 swp_enq_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed, const dpaa2_fd_t *fd)
 {
-	/* TBD */
-	return (0);
+	uint32_t flags = 0;
+	int rc = swp_enq_mult_memback(swp, ed, fd, &flags, 1);
+
+	return (rc >= 0 ? 0 : EBUSY);
 }
 
 /**
