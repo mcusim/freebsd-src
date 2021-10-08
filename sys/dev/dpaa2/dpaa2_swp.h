@@ -144,6 +144,8 @@
 
 /**
  * @brief Enqueue command descriptor.
+ *
+ * NOTE: 32 bytes.
  */
 typedef struct __packed {
 	uint8_t		verb;
@@ -173,20 +175,17 @@ typedef struct __packed {
  *		out-of-band information to the receiver of the frame.
  * ctrl:	Control bits (DD, SC, DROPP, PTAC, ERR, etc.)
  * flow_ctx:	Frame flow context.
+ *
+ * NOTE: 32 bytes.
  */
-typedef struct {
-	union {
-		uint32_t words[8]; /* for easier copying the whole structure */
-		struct __packed {
-			uint64_t addr;
-			uint32_t length;
-			uint16_t bpid;
-			uint16_t off_fmt_sl;
-			uint32_t frame_ctx;
-			uint32_t ctrl;
-			uint64_t flow_ctx;
-		} fd;
-	};
+typedef struct __packed {
+	uint64_t	addr;
+	uint32_t	length;
+	uint16_t	bpid;
+	uint16_t	off_fmt_sl;
+	uint32_t	frame_ctx;
+	uint32_t	ctrl;
+	uint64_t	flow_ctx;
 } dpaa2_fd_t;
 
 /**
@@ -241,6 +240,11 @@ struct dpaa2_swp {
 	struct resource		*cinh_res;
 	struct resource_map	*cinh_map;
 
+	int (*enq)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	    const dpaa2_fd_t *fd);
+	int (*enq_mult)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
+	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
+
 	struct mtx		 lock;
 	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
@@ -263,7 +267,7 @@ struct dpaa2_swp {
 
 	struct {
 		uint32_t	 pi;
-		uint32_t	 pi_vb;
+		uint32_t	 pi_vb; /* PI valid bits */
 		uint32_t	 pi_ring_size;
 		uint32_t	 pi_ci_mask;
 		uint32_t	 ci;
@@ -271,11 +275,6 @@ struct dpaa2_swp {
 		uint32_t	 pend;
 		uint32_t	 no_pfdr;
 	} eqcr;
-
-	int (*enqueue)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	    const dpaa2_fd_t *fd);
-	int (*enqueue_mult)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 };
 
 int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
@@ -289,9 +288,5 @@ uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
 void	 dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed);
 void	 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always);
 void	 dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid);
-int	 dpaa2_swp_enq(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	     const dpaa2_fd_t *fd);
-int	 dpaa2_swp_enq_mult(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	     const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 
 #endif /* _DPAA2_SWP_H */
