@@ -161,7 +161,6 @@ iort_entry_lookup(struct iort_node *node, u_int id, u_int *outid)
 
 	id_map = iort_entry_get_id_mapping_index(node);
 	entry = node->entries.mappings;
-
 	for (i = 0; i < node->nentries; i++, entry++) {
 		if (i == id_map)
 			continue;
