@@ -3496,9 +3496,10 @@ resource_list_alloc(struct resource_list *rl, device_t bus, device_t child,
 	int passthrough = (device_get_parent(child) != bus);
 	int isdefault = RMAN_IS_DEFAULT_RANGE(start, end);
 
-	if (passthrough)
+	if (passthrough) {
 		return (BUS_ALLOC_RESOURCE(device_get_parent(bus), child,
 		    type, rid, start, end, count, flags));
+	}
 
 	rle = resource_list_find(rl, type, *rid);
 
