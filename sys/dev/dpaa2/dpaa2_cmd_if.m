@@ -184,6 +184,18 @@ CODE {
 				irq_usr, obj_id, type));
 		return (ENXIO);
 	}
+	static int
+	bypass_rc_get_conn(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ep_desc_t *ep1_desc, dpaa2_ep_desc_t *ep2_desc,
+		uint32_t *link_stat)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_RC_GET_CONN(
+				device_get_parent(dev), cmd, ep1_desc, ep2_desc,
+				link_stat));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_ni_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpni_id,
@@ -558,6 +570,14 @@ METHOD int rc_set_obj_irq {
 	uint32_t	 obj_id;
 	const char	*type;
 } DEFAULT bypass_rc_set_obj_irq;
+
+METHOD int rc_get_conn {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ep_desc_t *ep1_desc;
+	dpaa2_ep_desc_t *ep2_desc;
+	uint32_t	*link_stat;
+} DEFAULT bypass_rc_get_conn;
 
 /**
  * @brief Data Path Network Interface (DPNI) commands.
