@@ -144,6 +144,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_ATTR			CMD_NI(0x004)
 #define CMDID_NI_SET_BUF_LAYOUT			CMD_NI(0x265)
 #define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
+#define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1386,6 +1387,31 @@ dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, dpaa2_cmd_t cmd, uint16_t *offset
 }
 
 static int
+dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !mac)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_PORT_MAC_ADDR);
+	if (!error) {
+		mac[0] = (cmd->params[0] >> 56) & 0xFFU;
+		mac[1] = (cmd->params[0] >> 48) & 0xFFU;
+		mac[2] = (cmd->params[0] >> 40) & 0xFFU;
+		mac[3] = (cmd->params[0] >> 32) & 0xFFU;
+		mac[4] = (cmd->params[0] >> 24) & 0xFFU;
+		mac[5] = (cmd->params[0] >> 16) & 0xFFU;
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2347,6 +2373,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_attributes,	dpaa2_rc_ni_get_attributes),
 	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
 	DEVMETHOD(dpaa2_cmd_ni_get_tx_data_off, dpaa2_rc_ni_get_tx_data_offset),
+	DEVMETHID(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
