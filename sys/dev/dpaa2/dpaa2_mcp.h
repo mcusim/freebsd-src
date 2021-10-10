@@ -301,6 +301,15 @@ typedef struct {
 	enum dpaa2_ni_queue_type queue_type;
 } dpaa2_ni_buf_layout_t;
 
+/**
+ * @brief Link configuration.
+ */
+typedef struct {
+	uint64_t	options;
+	uint64_t	an_speeds;
+	uint32_t	rate;
+} dpaa2_ni_link_cfg_t;
+
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
 
