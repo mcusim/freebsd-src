@@ -158,6 +158,19 @@ __FBSDID("$FreeBSD$");
 #define CMDID_BP_GET_ATTR			CMD_BP(0x004)
 #define CMDID_BP_RESET				CMD_BP(0x005)
 
+/* ------------------------- DPMAC command IDs ------------------------------ */
+#define CMD_MAC_BASE_VERSION	1
+#define CMD_MAC_ID_OFFSET	4
+
+#define CMD_MAC(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_MAC_OPEN				CMD_MAC(0x80C)
+#define CMDID_MAC_CLOSE				CMD_MAC(0x800)
+#define CMDID_MAC_RESET				CMD_MAC(0x005)
+#define CMDID_MAC_MDIO_READ			CMD_MAC(0x0C0)
+#define CMDID_MAC_MDIO_WRITE			CMD_MAC(0x0C1)
+#define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
+
 /* ------------------------- End of command IDs ----------------------------- */
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
@@ -1587,6 +1600,139 @@ dpaa2_rc_bp_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 	return (error);
 }
 
+static int
+dpaa2_rc_mac_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpmac_id,
+    uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpmac_id;
+	error = exec_command(sc->portal, cmd, CMDID_MAC_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_mac_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_CLOSE));
+}
+
+static int
+dpaa2_rc_mac_reset(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_RESET));
+}
+
+static int
+dpaa2_rc_mac_mdio_read(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
+    uint16_t reg, uint16_t *val)
+{
+	struct __packed mdio_read_args {
+		uint8_t		clause; /* set to 0 by default */
+		uint8_t		phy;
+		uint16_t	reg;
+		uint32_t	_reserved1;
+		uint64_t	_reserved2[6];
+	} *args = {0};
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !val)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct mdio_read_args *) &cmd->params[0];
+	args->phy = phy;
+	args->reg = reg;
+
+	error = exec_command(sc->portal, cmd, CMDID_MAC_MDIO_READ);
+	if (!error)
+		*val = cmd->params[0] & 0xFFFF;
+
+	return (error);
+}
+
+static int
+dpaa2_rc_mac_mdio_write(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
+    uint16_t reg, uint16_t val)
+{
+	struct __packed mdio_write_args {
+		uint8_t		clause; /* set to 0 by default */
+		uint8_t		phy;
+		uint16_t	reg;
+		uint16_t	val;
+		uint16_t	_reserved1;
+		uint64_t	_reserved2[6];
+	} *args = {0};
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct mdio_write_args *) &cmd->params[0];
+	args->phy = phy;
+	args->reg = reg;
+	args->val = val;
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_MDIO_WRITE));
+}
+
+static int
+dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint64_t *addr)
+{
+	struct __packed get_addr_resp {
+		uint64_t	mac_addr;
+		uint64_t	_reserved1[6];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !addr)
+		return (DPAA2_CMD_STAT_ERR);
+
+	error = exec_command(sc->portal, cmd, CMDID_MAC_GET_ADDR);
+	if (!error)
+		*addr = cmd->params[0] >> 16;
+
+	return (error);
+}
 
 /*
  * Internal functions.
@@ -2219,6 +2365,13 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_bp_disable,		dpaa2_rc_bp_disable),
 	DEVMETHOD(dpaa2_cmd_bp_reset,		dpaa2_rc_bp_reset),
 	DEVMETHOD(dpaa2_cmd_bp_get_attributes,	dpaa2_rc_bp_get_attributes),
+	/*	DPMAC commands */
+	DEVMETHOD(dpaa2_cmd_mac_open,		dpaa2_rc_mac_open),
+	DEVMETHOD(dpaa2_cmd_mac_close,		dpaa2_rc_mac_close),
+	DEVMETHOD(dpaa2_cmd_mac_reset,		dpaa2_rc_mac_reset),
+	DEVMETHOD(dpaa2_cmd_mac_mdio_read,	dpaa2_rc_mac_mdio_read),
+	DEVMETHOD(dpaa2_cmd_mac_mdio_write,	dpaa2_rc_mac_mdio_write),
+	DEVMETHOD(dpaa2_cmd_mac_get_addr,	dpaa2_rc_mac_get_addr),
 
 	DEVMETHOD_END
 };

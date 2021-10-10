@@ -253,6 +253,26 @@ CODE {
 				device_get_parent(dev), cmd, offset));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_link_cfg(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_link_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_LINK_CFG(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_get_link_cfg(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_link_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_LINK_CFG(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -367,6 +387,65 @@ CODE {
 				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
+
+	static int
+	bypass_mac_open(device_t dev, dpaa2_cmd_t cmd,
+		const uint32_t dpmac_id, uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_OPEN(
+				device_get_parent(dev), cmd, dpmac_id, token));
+		return (ENXIO);
+	}
+	static int
+	bypass_mac_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_mac_reset(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_RESET(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_mac_mdio_read(device_t dev, dpaa2_cmd_t cmd, uint8_t phy,
+		uint16_t reg, uint16_t *val)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_MDIO_READ(
+				device_get_parent(dev), cmd, phy, reg, val));
+		return (ENXIO);
+	}
+	static int
+	bypass_mac_mdio_write(device_t dev, dpaa2_cmd_t cmd, uint8_t phy,
+		uint16_t reg, uint16_t val)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_MDIO_WRITE(
+				device_get_parent(dev), cmd, phy, reg, val));
+		return (ENXIO);
+	}
+	static int
+	bypass_mac_get_addr(device_t dev, dpaa2_cmd_t cmd, uint64_t *addr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_GET_ADDR(
+				device_get_parent(dev), cmd, addr));
+		return (ENXIO);
+	}
+
 };
 
 /**
@@ -517,6 +596,18 @@ METHOD int ni_get_tx_data_off {
 	uint16_t	*offset;
 } DEFAULT bypass_ni_get_tx_data_off;
 
+METHOD int ni_set_link_cfg {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_link_cfg_t *cfg;
+} DEFAULT bypass_ni_set_link_cfg;
+
+METHOD int ni_get_link_cfg {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_link_cfg_t *cfg;
+} DEFAULT bypass_ni_get_link_cfg;
+
 /**
  * @brief Data Path I/O (DPIO) commands.
  */
@@ -590,3 +681,46 @@ METHOD int bp_get_attributes {
 	dpaa2_cmd_t	 cmd;
 	dpaa2_bp_attr_t	*attr;
 } DEFAULT bypass_bp_get_attributes;
+
+/**
+ * @brief Data Path MAC (DPMAC) commands.
+ */
+
+METHOD int mac_open {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	const uint32_t	 dpmac_id;
+	uint16_t	*token;
+} DEFAULT bypass_mac_open;
+
+METHOD int mac_close {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_mac_close;
+
+METHOD int mac_reset {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_mac_reset;
+
+METHOD int mac_mdio_read {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 phy;
+	uint16_t	 reg;
+	uint16_t	*val;
+} DEFAULT bypass_mac_mdio_read;
+
+METHOD int mac_mdio_write {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 phy;
+	uint16_t	 reg;
+	uint16_t	 val;
+} DEFAULT bypass_mac_mdio_write;
+
+METHOD int mac_get_addr {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint64_t	*addr;
+} DEFAULT bypass_mac_get_addr;
