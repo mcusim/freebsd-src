@@ -1714,10 +1714,6 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 static int
 dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint64_t *addr)
 {
-	struct __packed get_addr_resp {
-		uint64_t	mac_addr;
-		uint64_t	_reserved1[6];
-	} *resp;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	int error;
