@@ -276,7 +276,7 @@ dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	dpaa2_cmd_t cmd;
-	uinte16_t rc_token, mac_token;
+	uint16_t rc_token, mac_token;
 	uint16_t val = 0;
 	int error;
 
@@ -336,7 +336,7 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	dpaa2_cmd_t cmd;
-	uinte16_t rc_token, mac_token;
+	uint16_t rc_token, mac_token;
 	int error;
 
 	sc = device_get_softc(dev);
