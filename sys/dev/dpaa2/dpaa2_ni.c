@@ -65,8 +65,13 @@ __FBSDID("$FreeBSD$");
 
 #include <dev/pci/pcivar.h>
 
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
+
 #include "pcib_if.h"
 #include "pci_if.h"
+
+#include "miibus_if.h"
 
 #include "dpaa2_mc.h"
 #include "dpaa2_mcp.h"
@@ -131,7 +136,6 @@ static struct resource_spec dpaa2_ni_spec[] = {
 };
 
 /* Forward declarations. */
-static int	setup_dpni(device_t dev);
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
@@ -151,43 +155,6 @@ dpaa2_ni_probe(device_t dev)
 static int
 dpaa2_ni_attach(device_t dev)
 {
-	struct dpaa2_ni_softc *sc;
-	int error;
-
-	sc = device_get_softc(dev);
-	sc->dev = dev;
-
-	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
-	if (error) {
-		device_printf(dev, "Failed to allocate resources: error=%d\n",
-		    error);
-		return (ENXIO);
-	}
-
-	error = setup_dpni(dev);
-	if (error)
-		return (error);
-
-	return (0);
-}
-
-static int
-dpaa2_ni_detach(device_t dev)
-{
-	return (0);
-}
-
-/*
- * Internal functions.
- */
-
-/**
- * @internal
- * @brief Configure the DPNI object this interface is associated with.
- */
-static int
-setup_dpni(device_t dev)
-{
 	device_t pdev;
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
@@ -196,10 +163,18 @@ setup_dpni(device_t dev)
 	uint16_t rc_token, ni_token;
 	int error;
 
-	sc = device_get_softc(dev);
+ 	sc = device_get_softc(dev);
+	sc->dev = dev;
 	pdev = device_get_parent(dev);
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
+
+	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
+	if (error) {
+		device_printf(dev, "Failed to allocate resources: error=%d\n",
+		    error);
+		return (ENXIO);
+	}
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
@@ -283,6 +258,143 @@ setup_dpni(device_t dev)
  err_exit:
 	return (ENXIO);
 }
+
+static int
+dpaa2_ni_detach(device_t dev)
+{
+	return (0);
+}
+
+/*
+ * MII interface.
+ */
+
+static int
+dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
+{
+	device_t pdev;
+	struct dpaa2_ni_softc *sc;
+	struct dpaa2_devinfo *rcinfo;
+	dpaa2_cmd_t cmd;
+	uinte16_t rc_token, mac_token;
+	uint16_t val = 0;
+	int error;
+
+	sc = device_get_softc(dev);
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    error);
+		return (0);
+	}
+
+	/* Open resource container and DPMAC object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto free_cmd;
+	}
+	error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id, &mac_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
+		    sc->mac.dpmac_id, error);
+		goto close_rc;
+	}
+
+	/* Read PHY register. */
+	error = DPAA2_CMD_MAC_MDIO_READ(dev, cmd, phy, reg, &val);
+	if (error) {
+		device_printf(dev, "Failed to read PHY register: dpmac_id=%d, "
+		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
+		    phy, reg, error);
+		val = 0;
+	}
+
+	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
+	if (error)
+		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
+		    sc->mac.dpmac_id, error);
+ close_rc:
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	if (error)
+		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
+ free_cmd:
+	dpaa2_mcp_free_command(cmd);
+	return (val);
+}
+
+static int
+dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
+{
+	device_t pdev;
+	struct dpaa2_ni_softc *sc;
+	struct dpaa2_devinfo *rcinfo;
+	dpaa2_cmd_t cmd;
+	uinte16_t rc_token, mac_token;
+	int error;
+
+	sc = device_get_softc(dev);
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    error);
+		return (0);
+	}
+
+	/* Open resource container and DPMAC object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto free_cmd;
+	}
+	error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id, &mac_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
+		    sc->mac.dpmac_id, error);
+		goto close_rc;
+	}
+
+	/* Write PHY register. */
+	error = DPAA2_CMD_MAC_MDIO_WRITE(dev, cmd, phy, reg, val);
+	if (error)
+		device_printf(dev, "Failed to write PHY register: dpmac_id=%d, "
+		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
+		    phy, reg, error);
+
+	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
+	if (error)
+		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
+		    sc->mac.dpmac_id, error);
+ close_rc:
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	if (error)
+		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
+ free_cmd:
+	dpaa2_mcp_free_command(cmd);
+	return (0);
+}
+
+static void
+dpaa2_ni_miibus_statchg(device_t dev)
+{
+	/* TBD */
+}
+
+/*
+ * Internal functions.
+ */
 
 /**
  * @internal
@@ -397,6 +509,11 @@ static device_method_t dpaa2_ni_methods[] = {
 	DEVMETHOD(device_attach,	dpaa2_ni_attach),
 	DEVMETHOD(device_detach,	dpaa2_ni_detach),
 
+	/* MII bus interface */
+	DEVMETHOD(miibus_readreg,	dpaa2_ni_miibus_readreg),
+	DEVMETHOD(miibus_writereg,	dpaa2_ni_miibus_writereg),
+	DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg),
+
 	DEVMETHOD_END
 };
 
@@ -409,3 +526,5 @@ static driver_t dpaa2_ni_driver = {
 static devclass_t dpaa2_ni_devclass;
 
 DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, dpaa2_ni_devclass, 0, 0);
+DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, miibus_devclass, 0, 0);
+MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1);

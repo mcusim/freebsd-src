@@ -129,6 +129,7 @@ struct dpaa2_bp_softc {
  * rx_bufsz:	Size of a buffer to receive frames.
  * tx_data_off: ...
  * attr:	Attributes of the DPNI object.
+ * mac:		Details about DPMAC connected to this DPNI object (if exists).
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
@@ -138,6 +139,11 @@ struct dpaa2_ni_softc {
 	uint16_t		 rx_bufsz;
 	uint16_t		 tx_data_off;
 	dpaa2_ni_attr_t		 attr;
+
+	struct {
+		uint32_t	 dpmac_id;
+		uint8_t		 addr[6];
+	} mac;
 };
 
 /**
