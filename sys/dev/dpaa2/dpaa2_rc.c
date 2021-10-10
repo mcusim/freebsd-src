@@ -2373,7 +2373,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_attributes,	dpaa2_rc_ni_get_attributes),
 	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
 	DEVMETHOD(dpaa2_cmd_ni_get_tx_data_off, dpaa2_rc_ni_get_tx_data_offset),
-	DEVMETHID(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
