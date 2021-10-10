@@ -45,7 +45,6 @@
 #define DPAA2_PORTAL_LOCKED		0x4000u	/* Wait till portal's unlocked */
 #define DPAA2_PORTAL_DESTROYED		0x8000u /* Terminate any operations */
 
-#define DPAA2_CMD_PARAMS_N		7u
 /* Command flags. */
 #define DPAA2_CMD_DEF			0x0u
 #define DPAA2_CMD_HIGH_PRIO		0x80u	/* High priority command */
@@ -73,6 +72,10 @@
 
 #define DPAA2_HW_FLAG_HIGH_PRIO		0x80u
 #define DPAA2_SW_FLAG_INTR_DIS		0x01u
+
+#define DPAA2_CMD_PARAMS_N		7u
+#define DPAA2_TYPE_SZ			16
+#define DPAA2_LABEL_SZ			16
 
 /*
  * Public types.
@@ -176,8 +179,8 @@ typedef struct {
 	uint16_t	ver_major;
 	uint16_t	ver_minor;
 	uint16_t	flags;
-	uint8_t		type[16];
-	uint8_t		label[16];
+	uint8_t		type[DPAA2_TYPE_SZ];
+	uint8_t		label[DPAA2_LABEL_SZ];
 } dpaa2_obj_t;
 
 /**
@@ -309,6 +312,20 @@ typedef struct {
 	uint64_t	an_speeds;
 	uint32_t	rate;
 } dpaa2_ni_link_cfg_t;
+
+/**
+ * @brief DPAA2 endpoint descriptor.
+ *
+ * obj_id:	Endpoint object ID.
+ * if_id:	Interface ID; for endpoints with multiple interfaces
+ *		(DPSW, DPDMUX), 0 - otherwise.
+ * type:	Endpoint object type, null-terminated string.
+ */
+typedef struct {
+	uint32_t	obj_id;
+	uint32_t	if_id;
+	char		type[DPAA2_TYPE_SZ];
+} dpaa2_ep_desc_t;
 
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
