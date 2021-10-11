@@ -33,11 +33,14 @@
 #include <sys/condvar.h>
 #include <sys/mutex.h>
 
+#include <dev/dpaa2/dpaa2_mc.h>
+
 /*
  * DPAA2 MC command interface helper routines.
  */
 
 #define DPAA2_PORTAL_TIMEOUT		100000	/* us */
+
 /* Portal flags. */
 #define DPAA2_PORTAL_DEF		0x0u
 #define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
@@ -51,7 +54,7 @@
 #define DPAA2_CMD_INTR_DIS		0x100u	/* Disable cmd finished intr */
 #define DPAA2_CMD_NOWAIT_ALLOC		0x8000u	/* Do not sleep during init */
 
-/* Command return codes. */
+/* DPAA2 command return codes. */
 #define DPAA2_CMD_STAT_OK		0x0	/* Set by MC on success */
 #define DPAA2_CMD_STAT_READY		0x1	/* Ready to be processed */
 #define DPAA2_CMD_STAT_AUTH_ERR		0x3	/* Illegal object-portal-icid */
@@ -64,6 +67,8 @@
 #define DPAA2_CMD_STAT_BUSY		0xA	/* Device is busy */
 #define DPAA2_CMD_STAT_UNSUPPORTED_OP	0xB	/* Unsupported operation */
 #define DPAA2_CMD_STAT_INVALID_STATE	0xC	/* Invalid state */
+/* Driver-specific return codes. */
+#define DPAA2_CMD_STAT_UNKNOWN_OBJ	0xFD	/* Unknown DPAA2 object. */
 #define DPAA2_CMD_STAT_EINVAL		0xFE	/* Invalid argument */
 #define DPAA2_CMD_STAT_ERR		0xFF	/* General error */
 
@@ -74,7 +79,6 @@
 #define DPAA2_SW_FLAG_INTR_DIS		0x01u
 
 #define DPAA2_CMD_PARAMS_N		7u
-#define DPAA2_TYPE_SZ			16
 #define DPAA2_LABEL_SZ			16
 
 /*
@@ -179,8 +183,8 @@ typedef struct {
 	uint16_t	ver_major;
 	uint16_t	ver_minor;
 	uint16_t	flags;
-	uint8_t		type[DPAA2_TYPE_SZ];
 	uint8_t		label[DPAA2_LABEL_SZ];
+	enum dpaa2_dev_type type;
 } dpaa2_obj_t;
 
 /**
@@ -324,7 +328,7 @@ typedef struct {
 typedef struct {
 	uint32_t	obj_id;
 	uint32_t	if_id;
-	char		type[DPAA2_TYPE_SZ];
+	enum dpaa2_dev_type type;
 } dpaa2_ep_desc_t;
 
 typedef struct dpaa2_mcp *dpaa2_mcp_t;

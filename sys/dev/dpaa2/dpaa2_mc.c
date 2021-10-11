@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
 #define	mcreg_write_4(_sc, _r, _v)	bus_write_4(&(_sc)->map[1], (_r), (_v))
 
+#define COMPARE_TYPE(t, v)		(strncmp((v), (t), strlen((v))) == 0)
+
 #define IORT_DEVICE_NAME		"MCE"
 
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex memory");
@@ -441,7 +443,7 @@ dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
 	rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_get_type(dinfo->dtype));
+		    dpaa2_ttos(dinfo->dtype));
 		return (EINVAL);
 	}
 
@@ -451,7 +453,7 @@ dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
 	if (error) {
 		device_printf(mcdev, "rman_manage_region() failed for DPAA2 "
 		    "device: type=%s, start=%#jx, end=%#jx, error=%d\n",
-		    dpaa2_get_type(dinfo->dtype), (rman_res_t) dpaa2_dev,
+		    dpaa2_ttos(dinfo->dtype), (rman_res_t) dpaa2_dev,
 		    (rman_res_t) dpaa2_dev, error);
 		return (error);
 	}
@@ -477,7 +479,7 @@ dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 	rm = dpaa2_mc_rman(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_get_type(devtype));
+		    dpaa2_ttos(devtype));
 		return (EINVAL);
 	}
 
@@ -485,7 +487,7 @@ dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 	error = rman_first_free_region(rm, &start, &end);
 	if (error) {
 		device_printf(mcdev, "rman_first_free_region() failed for DPAA2 "
-		    "device: type=%s, error=%d\n", dpaa2_get_type(devtype),
+		    "device: type=%s, error=%d\n", dpaa2_ttos(devtype),
 		    error);
 		return (error);
 	}
@@ -516,7 +518,7 @@ dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
 	rm = dpaa2_mc_rman(mcdev, devtype);
 	if (!rm) {
 		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_get_type(devtype));
+		    dpaa2_ttos(devtype));
 		return (EINVAL);
 	}
 
@@ -524,7 +526,7 @@ dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
 	error = rman_last_free_region(rm, &start, &end);
 	if (error) {
 		device_printf(mcdev, "rman_last_free_region() failed for DPAA2 "
-		    "device: type=%s, error=%d\n", dpaa2_get_type(devtype),
+		    "device: type=%s, error=%d\n", dpaa2_ttos(devtype),
 		    error);
 		return (error);
 	}
@@ -538,11 +540,11 @@ dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
 }
 
 const char *
-dpaa2_get_type(enum dpaa2_dev_type dtype)
+dpaa2_ttos(enum dpaa2_dev_type type)
 {
-	switch (dtype) {
+	switch (type) {
 	case DPAA2_DEV_MC:
-		return ("mc");
+		return ("mc"); /* NOTE: to print as information only. */
 	case DPAA2_DEV_RC:
 		return ("dprc");
 	case DPAA2_DEV_IO:
@@ -556,9 +558,29 @@ dpaa2_get_type(enum dpaa2_dev_type dtype)
 	case DPAA2_DEV_CON:
 		return ("dpcon");
 	default:
-		return ("unknown");
+		break;
 	}
-	return ("unknown");
+	return ("notype");
+}
+
+enum dpaa2_dev_type
+dpaa2_stot(const char *str)
+{
+	if (COMPARE_TYPE(str, "dprc")) {
+		return (DPAA2_DEV_RC);
+	} else if (COMPARE_TYPE(str, "dpio")) {
+		return (DPAA2_DEV_IO);
+	} else if (COMPARE_TYPE(str, "dpni")) {
+		return (DPAA2_DEV_NI);
+	} else if (COMPARE_TYPE(str, "dpmcp")) {
+		return (DPAA2_DEV_MCP);
+	} else if (COMPARE_TYPE(str, "dpbp")) {
+		return (DPAA2_DEV_BP);
+	} else if (COMPARE_TYPE(str, "dpcon")) {
+		return (DPAA2_DEV_CON);
+	}
+
+	return (DPAA2_DEV_NOTYPE);
 }
 
 /**
