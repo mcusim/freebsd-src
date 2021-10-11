@@ -85,6 +85,9 @@
  * Public types.
  */
 
+/* Forward declaration. */
+enum dpaa2_dev_type;
+
 enum dpaa2_rc_region_type {
 	DPAA2_RC_REG_MC_PORTAL		= 0,
 	DPAA2_RC_REG_QBMAN_PORTAL	= 1
