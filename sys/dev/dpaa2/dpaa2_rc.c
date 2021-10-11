@@ -71,8 +71,6 @@ __FBSDID("$FreeBSD$");
 /* Mark the end of the DPAA2-specific resource list. */
 #define DPAA2_RESDESC_END	{ DPAA2_DEV_NOTYPE, DPAA2_DEV_NOTYPE }
 
-#define COMPARE_TYPE(t, v)	(strncmp((v), (t), strlen((v))) == 0)
-
 /* ------------------------- MNG command IDs -------------------------------- */
 #define CMD_MNG_BASE_VERSION	1
 #define CMD_MNG_ID_OFFSET	4
@@ -566,8 +564,7 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		if (error) {
 			device_printf(rcdev, "Failed to configure IRQ for "
 			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
-			    dpaa2_get_type(dinfo->dtype),
-			    device_get_unit(child));
+			    dpaa2_ttos(dinfo->dtype), device_get_unit(child));
 			return (error);
 		}
 		dinfo->msi.msi_handlers++;
@@ -630,8 +627,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += print_dpaa2_type(rl, DPAA2_DEV_BP);
 	retval += print_dpaa2_type(rl, DPAA2_DEV_CON);
 
-	retval += printf(" at %s (id=%u)", dpaa2_get_type(dinfo->dtype),
-	    dinfo->id);
+	retval += printf(" at %s (id=%u)", dpaa2_ttos(dinfo->dtype), dinfo->id);
 
 	retval += bus_print_child_domain(rcdev, child);
 	retval += bus_print_child_footer(rcdev, child);
@@ -968,9 +964,13 @@ dpaa2_rc_get_obj(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_idx,
 		obj->ver_major = pobj->ver_major;
 		obj->ver_minor = pobj->ver_minor;
 		obj->flags = pobj->flags;
-		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		obj->type = dpaa2_stot((const char *) pobj->type);
 		memcpy(obj->label, pobj->label, sizeof(pobj->label));
 	}
+
+	/* Some DPAA2 objects might not be supported by the driver yet. */
+	if (obj->type == DPAA2_DEV_NOTYPE)
+		error = DPAA2_CMD_STAT_UNKNOWN_OBJ;
 
 	return (error);
 }
@@ -1009,9 +1009,13 @@ dpaa2_rc_get_obj_descriptor(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
 		obj->ver_major = pobj->ver_major;
 		obj->ver_minor = pobj->ver_minor;
 		obj->flags = pobj->flags;
-		memcpy(obj->type, pobj->type, sizeof(pobj->type));
+		obj->type = dpaa2_stot((const char *) pobj->type);
 		memcpy(obj->label, pobj->label, sizeof(pobj->label));
 	}
+
+	/* Some DPAA2 objects might not be supported by the driver yet. */
+	if (obj->type == DPAA2_DEV_NOTYPE)
+		error = DPAA2_CMD_STAT_UNKNOWN_OBJ;
 
 	return (error);
 }
@@ -1908,12 +1912,15 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	rcdev = sc->dev;
 	rcinfo = device_get_ivars(rcdev);
 
-	if (COMPARE_TYPE(obj->type, "dpni")) {
+	switch (obj->type) {
+	case DPAA2_DEV_NI:
 		devclass = "dpaa2_ni";
 		devtype = DPAA2_DEV_NI;
 		res_desc = dpni_res_descriptors;
-	} else
+		break;
+	default:
 		return (ENXIO);
+	}
 
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
@@ -1989,17 +1996,17 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	rcdev = sc->dev;
 	rcinfo = device_get_ivars(rcdev);
 
-	if (COMPARE_TYPE(obj->type, "dpio")) {
-		devclass = "dpaa2_io";
-		devtype = DPAA2_DEV_IO;
-	} else if (COMPARE_TYPE(obj->type, "dpbp")) {
-		devclass = "dpaa2_bp";
-		devtype = DPAA2_DEV_BP;
-	} else if (COMPARE_TYPE(obj->type, "dpcon")) {
-		devclass = "dpaa2_con";
-		devtype = DPAA2_DEV_CON;
-	} else
+	switch (obj->type) {
+	case DPAA2_DEV_IO:
+	case DPAA2_DEV_BP:
+	case DPAA2_DEV_CON:
+		devclass = dpaa2_ttos(obj->type);
+		devtype = obj->type;
+		break;
+	default:
+		/* Only managed devices above are supported. */
 		return (EINVAL);
+	}
 
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
@@ -2104,7 +2111,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		}
 		/* Set MSI address and value. */
 		rc = DPAA2_CMD_RC_SET_OBJ_IRQ(rcdev, cmd, rid - 1, addr, data,
-		    rid, dinfo->id, dpaa2_get_type(dinfo->dtype));
+		    rid, dinfo->id, dpaa2_ttos(dinfo->dtype));
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to setup IRQ: "
@@ -2271,8 +2278,8 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev, devtype);
 	if (error) {
 		device_printf(rcdev, "Failed to obtain a free %s (rid=%d) for: "
-		    "%s (id=%u)\n", dpaa2_get_type(devtype), *rid,
-		    dpaa2_get_type(dinfo->dtype), dinfo->id);
+		    "%s (id=%u)\n", dpaa2_ttos(devtype), *rid,
+		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (error);
 	}
 
@@ -2285,8 +2292,8 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	    rid, (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1, flags);
 	if (!res) {
 		device_printf(rcdev, "Failed to reserve %s (rid=%d) for: %s "
-		    "(id=%u)\n", dpaa2_get_type(devtype), *rid,
-		    dpaa2_get_type(dinfo->dtype), dinfo->id);
+		    "(id=%u)\n", dpaa2_ttos(devtype), *rid,
+		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (EBUSY);
 	}
 
@@ -2307,7 +2314,7 @@ print_dpaa2_type(struct resource_list *rl, enum dpaa2_dev_type type)
 
 			if (printed == 0)
 				retval += printf(" %s (id=",
-				    dpaa2_get_type(dinfo->dtype));
+				    dpaa2_ttos(dinfo->dtype));
 			else
 				retval += printf(",");
 			printed++;

@@ -218,6 +218,8 @@ int dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 int dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
 
-const char *dpaa2_get_type(enum dpaa2_dev_type dtype);
+/* Convert DPAA2 type to/from string. */
+const char *dpaa2_ttos(enum dpaa2_dev_type type);
+enum dpaa2_dev_type dpaa2_stot(const char *str);
 
 #endif /* _DPAA2_MC_H */
