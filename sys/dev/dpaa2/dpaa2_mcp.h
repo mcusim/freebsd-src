@@ -33,7 +33,7 @@
 #include <sys/condvar.h>
 #include <sys/mutex.h>
 
-#include "dpaa2_mc.h"
+#include "dpaa2_types.h"
 
 /*
  * DPAA2 MC command interface helper routines.
@@ -84,9 +84,6 @@
 /*
  * Public types.
  */
-
-/* Forward declaration. */
-enum dpaa2_dev_type;
 
 enum dpaa2_rc_region_type {
 	DPAA2_RC_REG_MC_PORTAL		= 0,

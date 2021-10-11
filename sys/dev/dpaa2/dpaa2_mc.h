@@ -33,6 +33,7 @@
 
 #include "pci_if.h"
 
+#include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 
@@ -44,18 +45,6 @@
 #define GCR1_P1_STOP		0x80000000
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
-
-enum dpaa2_dev_type {
-	DPAA2_DEV_MC = 7500,	/* Management Complex (firmware bus) */
-	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
-	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
-	DPAA2_DEV_NI,		/* Network Interface */
-	DPAA2_DEV_MCP,		/* MC portal (to configure MC portal) */
-	DPAA2_DEV_BP,		/* Buffer Pool */
-	DPAA2_DEV_CON,		/* Concentrator */
-
-	DPAA2_DEV_NOTYPE	/* Shouldn't be assigned to any DPAA2 device. */
-};
 
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.
@@ -217,9 +206,5 @@ int dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
 int dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
-
-/* Convert DPAA2 type to/from string. */
-const char *dpaa2_ttos(enum dpaa2_dev_type type);
-enum dpaa2_dev_type dpaa2_stot(const char *str);
 
 #endif /* _DPAA2_MC_H */
