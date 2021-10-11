@@ -977,7 +977,7 @@ dpaa2_rc_get_obj(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_idx,
 
 static int
 dpaa2_rc_get_obj_descriptor(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
-    const char *type, dpaa2_obj_t *obj)
+    enum dpaa2_dev_type dtype, dpaa2_obj_t *obj)
 {
 	struct __packed get_obj_desc_args {
 		uint32_t	obj_id;
@@ -987,11 +987,12 @@ dpaa2_rc_get_obj_descriptor(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_obj *pobj;
+	const char *type = dpaa2_ttos(dtype);
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !type || !obj)
+	if (!sc->portal || !cmd || !obj)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct get_obj_desc_args *) &cmd->params[0];
@@ -1047,7 +1048,7 @@ dpaa2_rc_get_attributes(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_rc_attr_t *attr)
 
 static int
 dpaa2_rc_get_obj_region(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
-    uint8_t reg_idx, const char *type, dpaa2_rc_obj_region_t *reg)
+    uint8_t reg_idx, enum dpaa2_dev_type dtype, dpaa2_rc_obj_region_t *reg)
 {
 	struct __packed obj_region_args {
 		uint32_t	obj_id;
@@ -1070,11 +1071,12 @@ dpaa2_rc_get_obj_region(device_t rcdev, dpaa2_cmd_t cmd, uint32_t obj_id,
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	uint16_t cmdid, api_major, api_minor;
+	const char *type = dpaa2_ttos(dtype);
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !type || !reg)
+	if (!sc->portal || !cmd || !reg)
 		return (DPAA2_CMD_STAT_ERR);
 
 	/*
@@ -1170,7 +1172,7 @@ dpaa2_rc_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 static int
 dpaa2_rc_set_obj_irq(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
     uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
-    const char *type)
+    enum dpaa2_dev_type dtype)
 {
 	struct __packed set_obj_irq_args {
 		uint32_t	data;
@@ -1183,10 +1185,11 @@ dpaa2_rc_set_obj_irq(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	const char *type = dpaa2_ttos(dtype);
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !type)
+	if (!sc->portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct set_obj_irq_args *) &cmd->params[0];
@@ -2119,7 +2122,7 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		}
 		/* Set MSI address and value. */
 		rc = DPAA2_CMD_RC_SET_OBJ_IRQ(rcdev, cmd, rid - 1, addr, data,
-		    rid, dinfo->id, dpaa2_ttos(dinfo->dtype));
+		    rid, dinfo->id, dinfo->dtype);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
 			device_printf(rcdev, "Failed to setup IRQ: "
