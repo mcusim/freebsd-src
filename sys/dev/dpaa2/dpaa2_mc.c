@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
-#include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
 /* Macros to read/write MC registers */

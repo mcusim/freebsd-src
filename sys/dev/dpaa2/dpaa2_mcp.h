@@ -33,7 +33,7 @@
 #include <sys/condvar.h>
 #include <sys/mutex.h>
 
-#include <dev/dpaa2/dpaa2_mc.h>
+#include "dpaa2_mc.h"
 
 /*
  * DPAA2 MC command interface helper routines.
