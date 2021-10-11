@@ -27,6 +27,7 @@
 #
 
 #include <machine/bus.h>
+#include <dev/dpaa2/dpaa2_types.h>
 #include <dev/dpaa2/dpaa2_mc.h>
 #include <dev/dpaa2/dpaa2_mcp.h>
 
@@ -123,7 +124,7 @@ CODE {
 	}
 	static int
 	bypass_rc_get_obj_descriptor(device_t dev, dpaa2_cmd_t cmd,
-		uint32_t obj_id, const char *type, dpaa2_obj_t *obj)
+		uint32_t obj_id, enum dpaa2_dev_type type, dpaa2_obj_t *obj)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -143,7 +144,8 @@ CODE {
 	}
 	static int
 	bypass_rc_get_obj_region(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_id,
-		uint8_t reg_idx, const char *type, dpaa2_rc_obj_region_t *reg)
+		uint8_t reg_idx, enum dpaa2_dev_type type,
+		dpaa2_rc_obj_region_t *reg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -175,7 +177,7 @@ CODE {
 	static int
 	bypass_rc_set_obj_irq(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 		uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
-		const char *type)
+		dpaa2_dev_type type)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -527,7 +529,7 @@ METHOD int rc_get_obj_descriptor {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	uint32_t	 obj_id;
-	const char	*type;
+	enum dpaa2_dev_type type;
 	dpaa2_obj_t	*obj;
 } DEFAULT bypass_rc_get_obj_descriptor;
 
@@ -542,7 +544,7 @@ METHOD int rc_get_obj_region {
 	dpaa2_cmd_t	 cmd;
 	uint32_t	 obj_id;
 	uint8_t		 reg_idx;
-	const char	*type;
+	enum dpaa2_dev_type type;
 	dpaa2_rc_obj_region_t *reg;
 } DEFAULT bypass_rc_get_obj_region;
 
@@ -568,7 +570,7 @@ METHOD int rc_set_obj_irq {
 	uint32_t	 data;
 	uint32_t	 irq_usr;
 	uint32_t	 obj_id;
-	const char	*type;
+	enum dpaa2_dev_type type;
 } DEFAULT bypass_rc_set_obj_irq;
 
 METHOD int rc_get_conn {
