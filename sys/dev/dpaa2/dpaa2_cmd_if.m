@@ -177,7 +177,7 @@ CODE {
 	static int
 	bypass_rc_set_obj_irq(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 		uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
-		dpaa2_dev_type type)
+		enum dpaa2_dev_type type)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
