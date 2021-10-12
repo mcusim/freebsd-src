@@ -2057,15 +2057,19 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 
 	switch (obj->type) {
 	case DPAA2_DEV_IO:
+		devclass = "dpaa2_io";
+		break;
 	case DPAA2_DEV_BP:
+		devclass = "dpaa2_bp";
+		break;
 	case DPAA2_DEV_CON:
-		devclass = dpaa2_ttos(obj->type);
-		devtype = obj->type;
+		devclass = "dpaa2_con";
 		break;
 	default:
 		/* Only managed devices above are supported. */
 		return (EINVAL);
 	}
+	devtype = obj->type;
 
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
