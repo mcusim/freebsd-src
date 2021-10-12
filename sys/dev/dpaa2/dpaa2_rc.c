@@ -1224,6 +1224,7 @@ dpaa2_rc_get_conn(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ep_desc_t *ep1_desc,
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	const char *type;
+	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
