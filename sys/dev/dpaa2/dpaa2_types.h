@@ -37,6 +37,7 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_MCP,		/* MC portal (to configure MC portal) */
 	DPAA2_DEV_BP,		/* Buffer Pool */
 	DPAA2_DEV_CON,		/* Concentrator */
+	DPAA2_DEV_MAC,		/* MAC object */
 
 	DPAA2_DEV_NOTYPE	/* Shouldn't be assigned to any DPAA2 device. */
 };

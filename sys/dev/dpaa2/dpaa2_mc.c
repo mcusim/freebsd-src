@@ -556,6 +556,8 @@ dpaa2_ttos(enum dpaa2_dev_type type)
 		return ("dpbp");
 	case DPAA2_DEV_CON:
 		return ("dpcon");
+	case DPAA2_DEV_MAC:
+		return ("dpmac");
 	default:
 		break;
 	}
@@ -577,6 +579,8 @@ dpaa2_stot(const char *str)
 		return (DPAA2_DEV_BP);
 	} else if (COMPARE_TYPE(str, "dpcon")) {
 		return (DPAA2_DEV_CON);
+	} else if (COMPARE_TYPE(str, "dpmac")) {
+		return (DPAA2_DEV_MAC);
 	}
 
 	return (DPAA2_DEV_NOTYPE);
