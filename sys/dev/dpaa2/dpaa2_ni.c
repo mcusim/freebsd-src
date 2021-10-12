@@ -160,6 +160,8 @@ dpaa2_ni_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
+	dpaa2_ep_desc_t ep1_desc, ep2_desc;
+	uint32_t link_stat;
 	uint16_t rc_token, ni_token;
 	int error;
 
@@ -237,7 +239,22 @@ dpaa2_ni_attach(device_t dev)
 		goto err_free_cmd;
 	}
 
+	ep1_desc.obj_id = dinfo->id;
+	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
+	ep1_desc.type = dinfo->dtype;
+
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = DPAA2_CMD_RC_GET_CONN(dev, cmd, &ep1_desc, &ep2_desc,
+	    &link_stat);
+	if (error)
+		device_printf(dev, "Failed to obtain an object DPNI is "
+		    "connected to: error=%d\n", error);
+	else
+		device_printf(dev, "Connected to: %s (id=%d)\n",
+		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id);
+
 	/* Close the DPNI object and the resource container. */
+	dpaa2_mcp_set_token(cmd, ni_token);
 	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
@@ -502,7 +519,6 @@ cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
 	return sc->api_major - major;
 }
 
-
 static device_method_t dpaa2_ni_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_ni_probe),
@@ -526,5 +542,5 @@ static driver_t dpaa2_ni_driver = {
 static devclass_t dpaa2_ni_devclass;
 
 DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, dpaa2_ni_devclass, 0, 0);
-DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, miibus_devclass, 0, 0);
-MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1);
+/* DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, miibus_devclass, 0, 0); */
+/* MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1); */
