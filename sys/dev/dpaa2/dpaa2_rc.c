@@ -110,7 +110,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_RC_GET_OBJ_REG_V2			CMD_RC_V2(0x15E)
 #define CMDID_RC_GET_OBJ_REG_V3			CMD_RC_V3(0x15E)
 #define CMDID_RC_SET_OBJ_IRQ			CMD_RC(0x15F)
-#define CMDID_RC_GET_CONNECTION			CMD_RC(0x16C)
+#define CMDID_RC_GET_CONN			CMD_RC(0x16C)
 
 /* ------------------------- DPIO command IDs ------------------------------- */
 #define CMD_IO_BASE_VERSION	1
@@ -1201,6 +1201,53 @@ dpaa2_rc_set_obj_irq(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
 	return (exec_command(sc->portal, cmd, CMDID_RC_SET_OBJ_IRQ));
+}
+
+static int
+dpaa2_rc_get_conn(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ep_desc_t *ep1_desc,
+    dpaa2_ep_desc_t *ep2_desc, uint32_t *link_stat)
+{
+	struct __packed get_conn_args {
+		uint32_t ep1_id;
+		uint32_t ep1_ifid;
+		uint8_t  ep1_type[16];
+		uint64_t _reserved[4];
+	} *args;
+	struct __packed get_conn_resp {
+		uint64_t _reserved1[3];
+		uint32_t ep2_id;
+		uint32_t ep2_ifid;
+		uint8_t  ep2_type[16];
+		uint32_t link_stat;
+		uint32_t _reserved2;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	const char *type;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !ep1_desc || !ep2_desc)
+		return (DPAA2_CMD_STAT_ERR);
+
+	type = dpaa2_ttos(ep1_desc->type);
+
+	args = (struct get_conn_args *) &cmd->params[0];
+	args->ep1_id = ep1_desc->obj_id;
+	args->ep1_ifid = ep1_desc->if_id;;
+	memcpy(args->ep1_type, type, strlen(type));
+
+	error = exec_command(sc->portal, cmd, CMDID_RC_GET_CONN);
+	if (!error) {
+		resp = (struct get_conn_resp *) &cmd->params[0];
+		ep2_desc->obj_id = resp->ep2_id;
+		ep2_desc->if_id = resp->ep2_ifid;
+		ep2_desc->type = dpaa2_stot((const char *) resp->ep2_type);
+		if (link_stat)
+			*link_stat = resp->link_stat;
+	}
+
+	return (error);
 }
 
 static int
@@ -2383,6 +2430,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_rc_get_api_version, dpaa2_rc_get_api_version),
 	DEVMETHOD(dpaa2_cmd_rc_set_irq_enable,	dpaa2_rc_set_irq_enable),
 	DEVMETHOD(dpaa2_cmd_rc_set_obj_irq,	dpaa2_rc_set_obj_irq),
+	DEVMETHOD(dpaa2_cmd_rc_get_conn,	dpaa2_rc_get_conn),
 	/*	DPNI commands */
 	DEVMETHOD(dpaa2_cmd_ni_open,		dpaa2_rc_ni_open),
 	DEVMETHOD(dpaa2_cmd_ni_close,		dpaa2_rc_ni_close),
