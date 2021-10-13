@@ -259,6 +259,7 @@ dpaa2_ni_attach(device_t dev)
 			 * This is the simplest case when DPNI is connected to
 			 * DPMAC directly. Let's obtain physical address then.
 			 */
+			dpaa2_mcp_set_token(cmd, ni_token);
 			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd, mac);
 			if (error)
 				device_printf(dev, "Failed to obtain a MAC "
