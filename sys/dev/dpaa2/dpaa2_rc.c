@@ -1223,7 +1223,6 @@ dpaa2_rc_get_conn(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ep_desc_t *ep1_desc,
 	} *resp;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	const char *type;
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
@@ -1231,12 +1230,10 @@ dpaa2_rc_get_conn(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ep_desc_t *ep1_desc,
 	if (!sc->portal || !cmd || !ep1_desc || !ep2_desc)
 		return (DPAA2_CMD_STAT_ERR);
 
-	type = dpaa2_ttos(ep1_desc->type);
-
 	args = (struct get_conn_args *) &cmd->params[0];
 	args->ep1_id = ep1_desc->obj_id;
 	args->ep1_ifid = ep1_desc->if_id;;
-	memcpy(args->ep1_type, type, strlen(type));
+	strncpy(args->ep1_type, dpaa2_ttos(ep1_desc->type), 16);
 
 	error = exec_command(sc->portal, cmd, CMDID_RC_GET_CONN);
 	if (!error) {
