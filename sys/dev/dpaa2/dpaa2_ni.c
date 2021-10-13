@@ -163,6 +163,7 @@ dpaa2_ni_attach(device_t dev)
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
 	uint32_t link_stat;
 	uint16_t rc_token, ni_token;
+	uint8_t mac[6];
 	int error;
 
  	sc = device_get_softc(dev);
@@ -249,9 +250,28 @@ dpaa2_ni_attach(device_t dev)
 	if (error)
 		device_printf(dev, "Failed to obtain an object DPNI is "
 		    "connected to: error=%d\n", error);
-	else
+	else {
 		device_printf(dev, "Connected to: %s (id=%d)\n",
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id);
+
+		if (ep2_desc.type == DPAA2_DEV_MAC) {
+			/*
+			 * This is the simplest case when DPNI is connected to
+			 * DPMAC directly. Let's obtain physical address then.
+			 */
+			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd, mac);
+			if (error)
+				device_printf(dev, "Failed to obtain a MAC "
+				    "address of the connected DPMAC: error=%d\n",
+				    error);
+			else {
+				device_printf(dev, "ether %.2x", mac[0]);
+				for (int i = 1; i < 6; i++)
+					printf(":%.2x", mac[i]);
+				printf("\n");
+			}
+		}
+	}
 
 	/* Close the DPNI object and the resource container. */
 	dpaa2_mcp_set_token(cmd, ni_token);
