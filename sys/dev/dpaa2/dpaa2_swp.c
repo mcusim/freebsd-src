@@ -369,6 +369,7 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	int num_enq = 0;
 	uint32_t val;
 
+	mtx_assert(&swp->lock, MA_NOTOWNED);
 	mtx_lock(&swp->lock);
 
 	half_mask = swp->eqcr.pi_ci_mask >> 1;
