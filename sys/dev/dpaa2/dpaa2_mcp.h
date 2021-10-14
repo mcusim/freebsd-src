@@ -293,7 +293,7 @@ typedef struct {
  * pass_parser_result:	Parsing results are included in the buffer layout.
  * pass_frame_status:	Frame status is included in the buffer layout.
  * pass_sw_opaque:	SW annotation is activated.
- * queue_type:		Type of queue this configuration applies to.
+ * queue_type:		Type of a queue this configuration applies to.
  */
 typedef struct {
 	uint16_t	pd_size;
