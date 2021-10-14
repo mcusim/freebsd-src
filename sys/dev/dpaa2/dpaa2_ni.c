@@ -129,8 +129,9 @@ __FBSDID("$FreeBSD$");
 
 static struct resource_spec dpaa2_ni_spec[] = {
 	{ DPAA2_DEV_IO,  0, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_BP,  1, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_CON, 2, RF_ACTIVE | RF_UNMAPPED },
+	{ DPAA2_DEV_IO,  1, RF_ACTIVE | RF_UNMAPPED },
+	{ DPAA2_DEV_BP,  2, RF_ACTIVE | RF_UNMAPPED },
+	{ DPAA2_DEV_CON, 3, RF_ACTIVE | RF_UNMAPPED },
 
 	RESOURCE_SPEC_END
 };
@@ -231,6 +232,23 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to obtain DPNI attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
+	}
+	if (bootverbose) {
+		device_printf(dev,
+		    "options=%#x\n"
+		    "\t queues=%d, tx_channels=%d\n"
+		    "\t rx_tcs=%d, tx_tcs=%d, cgs_groups=%d\n"
+		    "\t tables mac=%d, vlan=%d, qos=%d, fs=%d\n"
+		    "\t key sizes qos=%d, fs=%d\n"
+		    "\t wriop_ver=%#x\n",
+		    sc->attr.options,
+		    sc->attr.num.queues, sc->attr.num.channels,
+		    sc->attr.num.rx_tcs + 1, sc->attr.tx_tcs + 8, sc->attr.cgs,
+		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
+		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
+		    sc->attr.key_size.qos, sc->attr.key_size.fs,
+		    sc->attr.wriop_ver
+		);
 	}
 
 	/* Configure buffer layouts of the DPNI queues. */

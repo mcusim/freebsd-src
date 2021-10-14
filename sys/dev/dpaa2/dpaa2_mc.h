@@ -120,6 +120,7 @@ struct dpaa2_bp_softc {
  * tx_data_off: ...
  * attr:	Attributes of the DPNI object.
  * mac:		Details about DPMAC connected to this DPNI object (if exists).
+ * link_state:	Link state of the network interface.
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;

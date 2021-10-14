@@ -2015,8 +2015,9 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 {
 	const dpaa2_res_desc_t dpni_res_descriptors[] = {
 		{ 0, DPAA2_DEV_IO },
-		{ 1, DPAA2_DEV_BP },
-		{ 2, DPAA2_DEV_CON },
+		{ 1, DPAA2_DEV_IO },
+		{ 2, DPAA2_DEV_BP },
+		{ 3, DPAA2_DEV_CON },
 		DPAA2_RESDESC_END
 	};
 	const dpaa2_res_desc_t *res_desc;
