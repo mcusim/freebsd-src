@@ -30,6 +30,7 @@
 #define	_DPAA2_MC_H
 
 #include <sys/rman.h>
+#include <net/ethernet.h>
 
 #include "pci_if.h"
 
