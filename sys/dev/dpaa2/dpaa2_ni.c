@@ -136,9 +136,11 @@ static struct resource_spec dpaa2_ni_spec[] = {
 };
 
 /* Forward declarations. */
-static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
+
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
+static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
+static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
 
 /*
  * Device interface.
@@ -242,10 +244,10 @@ dpaa2_ni_attach(device_t dev)
 	sc->mac.dpmac_id = 0;
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
+	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
 	ep1_desc.obj_id = dinfo->id;
 	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
 	ep1_desc.type = dinfo->dtype;
-
 	dpaa2_mcp_set_token(cmd, rc_token);
 	error = DPAA2_CMD_RC_GET_CONN(dev, cmd, &ep1_desc, &ep2_desc,
 	    &link_stat);
@@ -271,10 +273,29 @@ dpaa2_ni_attach(device_t dev)
 				device_printf(dev, "Failed to obtain a MAC "
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
-			else
+			else {
 				device_printf(dev, "ether %6D\n", sc->mac.addr,
 				    ":");
+				/* mii_attach(...); */
+			}
 		}
+	}
+
+	/* Select mode to enqueue frames. */
+	/* ... */
+
+	/*
+	 * Update link configuration to enable Rx/Tx pause frames support.
+	 *
+	 * NOTE: MC may generate an interrupt to the DPMAC and request changes
+	 *       in link configuration. It might be necessary to attach miibus
+	 *       and PHY before this point.
+	 */
+	error = set_pause_frame(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
+		    "error=%d\n", error);
+		goto err_free_cmd;
 	}
 
 	/* Close the DPNI object and the resource container. */
@@ -535,6 +556,46 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	return (0);
 }
 
+/**
+ * @internal
+ * @brief Enable Rx/Tx pause frames.
+ *
+ * NOTE: DPNI stops sending when a pause frame is received (Rx frame) or DPNI
+ *       itself generates pause frames (Tx frame).
+ */
+static int
+set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	dpaa2_ni_link_cfg_t link_cfg = {0};
+	int error;
+
+	error = DPAA2_CMD_NI_GET_LINK_CFG(dev, cmd, &link_cfg);
+	if (error) {
+		device_printf(dev, "Failed to obtain link configuration: "
+		    "error=%d\n", error);
+		return (error);
+	}
+
+	/* Enable both Rx and Tx pause frames by default. */
+	link_cfg.options |= DPAA2_NI_LINK_OPT_PAUSE;
+	link_cfg.options &= ~DPAA2_NI_LINK_OPT_ASYM_PAUSE;
+
+	error = DPAA2_CMD_NI_SET_LINK_CFG(dev, cmd, &link_cfg);
+	if (error) {
+		device_printf(dev, "Failed to set link configuration: "
+		    "error=%d\n", error);
+		return (error);
+	}
+
+	sc->link_state.options = link_cfg.options;
+
+	return (0);
+}
+
+/**
+ * @internal
+ */
 static int
 cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
 {

@@ -143,6 +143,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_BUF_LAYOUT			CMD_NI(0x265)
 #define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
 #define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
+#define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
+#define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1464,6 +1466,66 @@ dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
 }
 
 static int
+dpaa2_rc_ni_set_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_link_cfg_t *cfg)
+{
+	struct __packed link_cfg_args {
+		uint64_t	_reserved1;
+		uint32_t	rate;
+		uint32_t	_reserved2;
+		uint64_t	options;
+		uint64_t	adv_speeds;
+		uint64_t	_reserved3[3];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cfg)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	args = (struct link_cfg_args *) &cmd->params[0];
+	args->rate = cfg->rate;
+	args->options = cfg->options;
+	args->adv_speeds = cfg->adv_speeds;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_LINK_CFG));
+}
+
+static int
+dpaa2_rc_ni_get_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_link_cfg_t *cfg)
+{
+	struct __packed link_cfg_resp {
+		uint64_t	_reserved1;
+		uint32_t	rate;
+		uint32_t	_reserved2;
+		uint64_t	options;
+		uint64_t	adv_speeds;
+		uint64_t	_reserved3[3];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cfg)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_LINK_CFG);
+	if (!error) {
+		resp = (struct link_cfg_resp *) &cmd->params[0];
+		cfg->rate = resp->rate;
+		cfg->options = resp->options;
+		cfg->adv_speeds = resp->adv_speeds;
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2442,6 +2504,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
 	DEVMETHOD(dpaa2_cmd_ni_get_tx_data_off, dpaa2_rc_ni_get_tx_data_offset),
 	DEVMETHOD(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_set_link_cfg,	dpaa2_rc_ni_set_link_cfg),
+	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

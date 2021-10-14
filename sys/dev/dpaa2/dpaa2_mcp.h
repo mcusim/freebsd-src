@@ -81,6 +81,13 @@
 #define DPAA2_CMD_PARAMS_N		7u
 #define DPAA2_LABEL_SZ			16
 
+/* DPNI link configuration options. */
+#define DPAA2_NI_LINK_OPT_AUTONEG	((uint64_t) 0x01u)
+#define DPAA2_NI_LINK_OPT_HALF_DUPLEX	((uint64_t) 0x02u)
+#define DPAA2_NI_LINK_OPT_PAUSE		((uint64_t) 0x04u)
+#define DPAA2_NI_LINK_OPT_ASYM_PAUSE	((uint64_t) 0x08u)
+#define DPAA2_NI_LINK_OPT_PFC_PAUSE	((uint64_t) 0x10u)
+
 /*
  * Public types.
  */
@@ -310,10 +317,14 @@ typedef struct {
 
 /**
  * @brief Link configuration.
+ *
+ * options:	Mask of available options.
+ * adv_speeds:	Speeds that are advertised for autoneg.
+ * rate:	Rate in Mbps.
  */
 typedef struct {
 	uint64_t	options;
-	uint64_t	an_speeds;
+	uint64_t	adv_speeds;
 	uint32_t	rate;
 } dpaa2_ni_link_cfg_t;
 
