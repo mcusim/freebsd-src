@@ -134,6 +134,12 @@ struct dpaa2_ni_softc {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
 	} mac;
+
+	struct {
+		uint32_t	rate;
+		uint64_t	options;
+		bool		up;
+	} link_state;
 };
 
 /**
