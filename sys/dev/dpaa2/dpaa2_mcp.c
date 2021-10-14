@@ -196,12 +196,12 @@ dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags)
 void
 dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags)
 {
+	mtx_assert(&portal->lock, MA_NOTOWNED);
+
 	if (portal->flags & DPAA2_PORTAL_ATOMIC) {
-		mtx_assert(&portal->lock, MA_NOTOWNED);
 		mtx_lock_spin(&portal->lock);
 		*flags = portal->flags;
 	} else {
-		mtx_assert(&portal->lock, MA_NOTOWNED);
 		mtx_lock(&portal->lock);
 		while (portal->flags & DPAA2_PORTAL_LOCKED)
 			cv_wait(&portal->cv, &portal->lock);
