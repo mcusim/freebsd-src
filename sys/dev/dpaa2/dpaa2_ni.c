@@ -255,7 +255,7 @@ dpaa2_ni_attach(device_t dev)
 	else {
 		device_printf(dev, "connected to %s (id=%d), link %s\n",
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
-		    link_stat ? "up", "down");
+		    link_stat ? "up" : "down");
 
 		if (ep2_desc.type == DPAA2_DEV_MAC) {
 			/*
