@@ -163,7 +163,6 @@ dpaa2_ni_attach(device_t dev)
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
 	uint32_t link_stat;
 	uint16_t rc_token, ni_token;
-	uint8_t mac[ETHER_ADDR_LEN];
 	int error;
 
  	sc = device_get_softc(dev);
@@ -240,6 +239,9 @@ dpaa2_ni_attach(device_t dev)
 		goto err_free_cmd;
 	}
 
+	sc->mac.dpmac_id = 0;
+	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
+
 	ep1_desc.obj_id = dinfo->id;
 	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
 	ep1_desc.type = dinfo->dtype;
@@ -260,14 +262,18 @@ dpaa2_ni_attach(device_t dev)
 			 * This is the simplest case when DPNI is connected to
 			 * DPMAC directly. Let's obtain physical address then.
 			 */
+			sc->mac.dpmac_id = ep2_desc.obj_id;
+
 			dpaa2_mcp_set_token(cmd, ni_token);
-			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd, mac);
+			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd,
+			    sc->mac.addr);
 			if (error)
 				device_printf(dev, "Failed to obtain a MAC "
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
 			else
-				device_printf(dev, "ether %6D\n", mac, ":");
+				device_printf(dev, "ether %6D\n", sc->mac.addr,
+				    ":");
 		}
 	}
 
