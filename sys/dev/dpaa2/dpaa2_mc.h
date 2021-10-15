@@ -124,7 +124,7 @@ struct dpaa2_bp_softc {
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
-	struct resource 	*res[3];
+	struct resource 	*res[4];
 	uint16_t		 api_major;
 	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;
