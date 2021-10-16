@@ -49,6 +49,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/socket.h>
+#include <sys/sockio.h>
+#include <sys/sysctl.h>
 #include <sys/mbuf.h>
 
 #include <vm/vm.h>
@@ -797,7 +799,7 @@ dpni_ifmedia_tick(void *arg)
 static void
 dpni_if_init(void *arg)
 {
-	struct dpaa_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	struct ifnet *ifp = sc->ifp;
 
 	DPNI_LOCK(sc);
@@ -821,8 +823,6 @@ dpni_if_init(void *arg)
 static void
 dpni_if_start(struct ifnet *ifp)
 {
-	struct dpaa2_ni_softc *sc = ifp->if_softc;
-
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 		return;
 	/* ... enqueue frames here ... */
