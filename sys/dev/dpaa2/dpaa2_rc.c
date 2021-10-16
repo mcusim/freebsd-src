@@ -1524,7 +1524,6 @@ dpaa2_rc_ni_clear_qos_table(device_t rcdev, dpaa2_cmd_t cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
