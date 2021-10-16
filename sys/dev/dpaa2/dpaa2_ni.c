@@ -84,15 +84,19 @@ __FBSDID("$FreeBSD$");
 #define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
 
 /* Macros to calculate DPAA2 resource IDs. */
-
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
-
 #define BP_RID_OFF		(4u)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
-
 #define CON_RID_OFF		(5u)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
+
+/* Macros to lock/unlock DPNI. */
+#define DPNI_LOCK(sc) do {			\
+	mtx_assert(&(sc)->lock, MA_NOTOWNED);	\
+	mtx_lock(&(sc)->lock);			\
+} while (0)
+#define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
 /* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
@@ -124,7 +128,7 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf))//, CACHE_LINE_SIZE)
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
 
-/* DPNI buffer layout modification options */
+/* DPNI buffer layout options. */
 
 /* Select to modify the time-stamp setting */
 #define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
@@ -166,6 +170,14 @@ static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
 static int	set_qos_table(device_t dev, dpaa2_cmd_t cmd);
 
+static int	dpni_ifmedia_change(struct ifnet *ifp);
+static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
+static void	dpni_ifmedia_tick(void *arg);
+
+static void	dpni_if_init(void *arg);
+static void	dpni_if_start(struct ifnet *ifp);
+static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 /*
@@ -188,6 +200,7 @@ dpaa2_ni_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
+	struct ifnet *ifp;
 	uint16_t rc_token;
 	int error;
 
@@ -203,6 +216,31 @@ dpaa2_ni_attach(device_t dev)
 		    error);
 		return (ENXIO);
 	}
+
+	mtx_init(&sc->lock, device_get_nameunit(dev), "dpni lock", MTX_DEF);
+
+	/* Allocate network interface */
+	ifp = if_alloc(IFT_ETHER);
+	if (ifp == NULL) {
+		device_printf(dev, "Failed to allocate network interface\n");
+		return (ENXIO);
+	}
+
+	sc->ifp = ifp;
+
+	if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
+	ifp->if_softc = sc;
+	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
+	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM;
+	ifp->if_capenable = ifp->if_capabilities;
+
+	ifp->if_init =	dpni_if_init;
+	ifp->if_start = dpni_if_start;
+	ifp->if_ioctl = dpni_if_ioctl;
+
+	ifp->if_snd.ifq_drv_maxlen = 64; /* arbitrary length for now */
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
@@ -232,6 +270,9 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
+
+	ether_ifattach(sc->ifp, sc->mac.addr);
+	callout_init(&sc->mii_callout, 0);
 
 	return (0);
 
@@ -487,7 +528,15 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
 			else {
-				/* mii_attach(...); */
+				error = mii_attach(dev, &sc->miibus, sc->ifp,
+				    dpni_ifmedia_change, dpni_ifmedia_status,
+				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
+				if (error) {
+					device_printf(dev, "Failed to attach "
+					    "miibus: error=%d\n", error);
+					goto err_close_ni;
+				}
+				sc->mii = device_get_softc(sc->miibus);
 			}
 		}
 	}
@@ -682,6 +731,142 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 {
 	/* Classify all received frames to the default class (TC_ID = 0). */
 	return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd));
+}
+
+/**
+ * @internal
+ * @brief Callback function to process media change request.
+ */
+static int
+dpni_ifmedia_change(struct ifnet *ifp)
+{
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+
+	DPNI_LOCK(sc);
+
+	mii_mediachg(sc->mii);
+	sc->media_status = sc->mii->mii_media.ifm_media;
+
+	DPNI_UNLOCK(sc);
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Callback function to process media status request.
+ */
+static void
+dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
+{
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+
+	DPNI_LOCK(sc);
+
+	mii_pollstat(sc->mii);
+	ifmr->ifm_active = sc->mii->mii_media_active;
+	ifmr->ifm_status = sc->mii->mii_media_status;
+
+	DPNI_UNLOCK(sc);
+}
+
+/**
+ * @internal
+ * @brief Callout function to check and update media status.
+ */
+static void
+dpni_ifmedia_tick(void *arg)
+{
+	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+
+	/* Check for media type change */
+	mii_tick(sc->mii);
+	if (sc->media_status != sc->mii->mii_media.ifm_media) {
+		printf("%s: media type changed (ifm_media=%x)\n", __func__,
+			sc->mii->mii_media.ifm_media);
+		dpni_ifmedia_change(sc->ifp);
+	}
+
+	/* Schedule another timeout one second from now */
+	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_if_init(void *arg)
+{
+	struct dpaa_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+	struct ifnet *ifp = sc->ifp;
+
+	DPNI_LOCK(sc);
+
+	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
+		DPNI_UNLOCK(sc);
+		return;
+	}
+
+	mii_mediachg(sc->mii);
+	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
+	ifp->if_drv_flags |= IFF_DRV_RUNNING;
+	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
+
+	DPNI_UNLOCK(sc);
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_if_start(struct ifnet *ifp)
+{
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+
+	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+		return;
+	/* ... enqueue frames here ... */
+}
+
+/**
+ * @internal
+ */
+static int
+dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+{
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+	struct ifreq *ifr = (struct ifreq *) data;
+	uint32_t changed = 0;
+	int error = 0;
+
+	switch (command) {
+	case SIOCSIFCAP:
+		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
+		if (changed & IFCAP_HWCSUM) {
+			if ((ifr->ifr_reqcap & changed) & IFCAP_HWCSUM)
+				ifp->if_capenable |= IFCAP_HWCSUM;
+			else
+				ifp->if_capenable &= ~IFCAP_HWCSUM;
+		}
+		break;
+	case SIOCSIFFLAGS:
+		/* TBD */
+		break;
+	case SIOCADDMULTI:
+		/* TBD */
+		break;
+	case SIOCDELMULTI:
+		/* TBD */
+		break;
+	case SIOCGIFMEDIA:
+	case SIOCSIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, command);
+		break;
+	default:
+		error = ether_ioctl(ifp, command, data);
+	}
+
+	return (error);
 }
 
 /**
