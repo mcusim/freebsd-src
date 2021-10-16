@@ -160,12 +160,14 @@ struct resource_spec dpaa2_ni_spec[] = {
 
 /* Forward declarations. */
 
-static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
-		    uint16_t minor);
+static int	setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
+
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
 static int	set_qos_table(device_t dev, dpaa2_cmd_t cmd);
 
+static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
+		    uint16_t minor);
 /*
  * Device interface.
  */
@@ -186,9 +188,7 @@ dpaa2_ni_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
-	dpaa2_ep_desc_t ep1_desc, ep2_desc;
-	uint32_t link_stat;
-	uint16_t rc_token, ni_token;
+	uint16_t rc_token;
 	int error;
 
  	sc = device_get_softc(dev);
@@ -212,150 +212,20 @@ dpaa2_ni_attach(device_t dev)
 		goto err_exit;
 	}
 
-	/* Open resource container and DPNI object. */
+	/* Open resource container. */
 	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
 		    rcinfo->id, error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
-	if (error) {
-		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
 
-	/* Check if we can work with this DPNI object. */
-	error = DPAA2_CMD_NI_GET_API_VERSION(dev, cmd, &sc->api_major,
-	    &sc->api_minor);
-	if (error) {
-		device_printf(dev, "Failed to get DPNI API version: error=%d\n",
-		    error);
-		goto err_free_cmd;
-	}
-	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
-		device_printf(dev, "DPNI API version %u.%u not supported, "
-		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
-		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
-		goto err_free_cmd;
-	}
-
-	/* Reset the DPNI object. */
-	error = DPAA2_CMD_NI_RESET(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to reset DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-
-	/* Obtain attributes of the DPNI object. */
-	error = DPAA2_CMD_NI_GET_ATTRIBUTES(dev, cmd, &sc->attr);
-	if (error) {
-		device_printf(dev, "Failed to obtain DPNI attributes: id=%d, "
-		    "error=%d\n", dinfo->id, error);
-		goto err_free_cmd;
-	}
-	if (bootverbose) {
-		device_printf(dev,
-		    "options=%#x\n"
-		    "\t queues=%d, tx_channels=%d\n"
-		    "\t rx_tcs=%d, tx_tcs=%d, cgs_groups=%d\n"
-		    "\t tables mac=%d, vlan=%d, qos=%d, fs=%d\n"
-		    "\t key sizes qos=%d, fs=%d\n"
-		    "\t wriop_ver=%#x\n",
-		    sc->attr.options,
-		    sc->attr.num.queues, sc->attr.num.channels,
-		    sc->attr.num.rx_tcs + 1, sc->attr.num.tx_tcs + 8,
-		    sc->attr.num.cgs,
-		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
-		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
-		    sc->attr.key_size.qos, sc->attr.key_size.fs,
-		    sc->attr.wriop_ver
-		);
-	}
-
-	/* Configure buffer layouts of the DPNI queues. */
-	error = set_buf_layout(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to configure buffer layout: "
-		    "error=%d\n", error);
-		goto err_free_cmd;
-	}
-
-	sc->mac.dpmac_id = 0;
-	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
-
-	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
-	ep1_desc.obj_id = dinfo->id;
-	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
-	ep1_desc.type = dinfo->dtype;
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_GET_CONN(dev, cmd, &ep1_desc, &ep2_desc,
-	    &link_stat);
+	/* Setup network interface object. */
+	error = setup_dpni(dev, cmd, rc_token);
 	if (error)
-		device_printf(dev, "Failed to obtain an object DPNI is "
-		    "connected to: error=%d\n", error);
-	else {
-		device_printf(dev, "connected to %s (id=%d), link %s\n",
-		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
-		    link_stat ? "up" : "down");
-
-		if (ep2_desc.type == DPAA2_DEV_MAC) {
-			/*
-			 * This is the simplest case when DPNI is connected to
-			 * DPMAC directly. Let's obtain physical address then.
-			 */
-			sc->mac.dpmac_id = ep2_desc.obj_id;
-
-			dpaa2_mcp_set_token(cmd, ni_token);
-			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd,
-			    sc->mac.addr);
-			if (error)
-				device_printf(dev, "Failed to obtain a MAC "
-				    "address of the connected DPMAC: error=%d\n",
-				    error);
-			else {
-				device_printf(dev, "ether %6D\n", sc->mac.addr,
-				    ":");
-				/* mii_attach(...); */
-			}
-		}
-	}
-
-	/* Select mode to enqueue frames. */
-	/* ... */
-
-	/*
-	 * Update link configuration to enable Rx/Tx pause frames support.
-	 *
-	 * NOTE: MC may generate an interrupt to the DPMAC and request changes
-	 *       in link configuration. It might be necessary to attach miibus
-	 *       and PHY before this point.
-	 */
-	error = set_pause_frame(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
-		    "error=%d\n", error);
 		goto err_free_cmd;
-	}
 
-	/* Configure ingress traffic classification. */
-	error = set_qos_table(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to configure QoS table: error=%d\n",
-		    error);
-		goto err_free_cmd;
-	}
-
-	/* Close the DPNI object and the resource container. */
-	dpaa2_mcp_set_token(cmd, ni_token);
-	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
+	/* Close resource container. */
 	dpaa2_mcp_set_token(cmd, rc_token);
 	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
 	if (error) {
@@ -498,15 +368,174 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 	return (0);
 }
 
-static void
-dpaa2_ni_miibus_statchg(device_t dev)
-{
-	/* TBD */
-}
-
 /*
  * Internal functions.
  */
+
+/**
+ * @internal
+ * @brief Configure DPAA2 network interface object.
+ */
+static int
+setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
+{
+	struct dpaa2_ni_softc *sc;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_ep_desc_t ep1_desc, ep2_desc;
+	uint16_t ni_token;
+	uint32_t link;
+	int error;
+
+	sc = device_get_softc(dev);
+	dinfo = device_get_ivars(dev);
+
+	/* Open network interface object. */
+	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		return (ENXIO);
+	}
+
+	/* Check if we can work with this DPNI object. */
+	error = DPAA2_CMD_NI_GET_API_VERSION(dev, cmd, &sc->api_major,
+	    &sc->api_minor);
+	if (error) {
+		device_printf(dev, "Failed to get DPNI API version: error=%d\n",
+		    error);
+		goto err_close_ni;
+	}
+	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
+		device_printf(dev, "DPNI API version %u.%u not supported, "
+		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
+		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
+		goto err_close_ni;
+	}
+
+	/* Reset the DPNI object. */
+	error = DPAA2_CMD_NI_RESET(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to reset DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_close_ni;
+	}
+
+	/* Obtain attributes of the DPNI object. */
+	error = DPAA2_CMD_NI_GET_ATTRIBUTES(dev, cmd, &sc->attr);
+	if (error) {
+		device_printf(dev, "Failed to obtain DPNI attributes: id=%d, "
+		    "error=%d\n", dinfo->id, error);
+		goto err_close_ni;
+	}
+	if (bootverbose) {
+		device_printf(dev,
+		    "options=%#x\n"
+		    "\t queues=%d, tx_channels=%d\n"
+		    "\t rx_tcs=%d, tx_tcs=%d, cgs_groups=%d\n"
+		    "\t tables mac=%d, vlan=%d, qos=%d, fs=%d\n"
+		    "\t key sizes qos=%d, fs=%d\n"
+		    "\t wriop_ver=%#x\n",
+		    sc->attr.options,
+		    sc->attr.num.queues, sc->attr.num.channels,
+		    sc->attr.num.rx_tcs + 1, sc->attr.num.tx_tcs + 8,
+		    sc->attr.num.cgs,
+		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
+		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
+		    sc->attr.key_size.qos, sc->attr.key_size.fs,
+		    sc->attr.wriop_ver
+		);
+	}
+
+	/* Configure buffer layouts of the DPNI queues. */
+	error = set_buf_layout(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure buffer layout: "
+		    "error=%d\n", error);
+		goto err_close_ni;
+	}
+
+	sc->mac.dpmac_id = 0;
+	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
+
+	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
+	ep1_desc.obj_id = dinfo->id;
+	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
+	ep1_desc.type = dinfo->dtype;
+
+	dpaa2_mcp_set_token(cmd, rc_token);
+	error = DPAA2_CMD_RC_GET_CONN(dev, cmd, &ep1_desc, &ep2_desc, &link);
+	if (error)
+		device_printf(dev, "Failed to obtain an object DPNI is "
+		    "connected to: error=%d\n", error);
+	else {
+		device_printf(dev, "connected to %s (id=%d), link is %s\n",
+		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
+		    link ? "up" : "down");
+
+		if (ep2_desc.type == DPAA2_DEV_MAC) {
+			/*
+			 * This is the simplest case when DPNI is connected to
+			 * DPMAC directly. Let's attach miibus then.
+			 */
+			sc->mac.dpmac_id = ep2_desc.obj_id;
+
+			dpaa2_mcp_set_token(cmd, ni_token);
+			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd,
+			    sc->mac.addr);
+			if (error)
+				device_printf(dev, "Failed to obtain a MAC "
+				    "address of the connected DPMAC: error=%d\n",
+				    error);
+			else {
+				/* mii_attach(...); */
+			}
+		}
+	}
+
+	/* Select mode to enqueue frames. */
+	/* ... TBD ... */
+
+	/*
+	 * Update link configuration to enable Rx/Tx pause frames support.
+	 *
+	 * NOTE: MC may generate an interrupt to the DPMAC and request changes
+	 *       in link configuration. It might be necessary to attach miibus
+	 *       and PHY before this point.
+	 */
+	error = set_pause_frame(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
+		    "error=%d\n", error);
+		goto err_close_ni;
+	}
+
+	/* Configure ingress traffic classification. */
+	error = set_qos_table(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure QoS table: error=%d\n",
+		    error);
+		goto err_close_ni;
+	}
+
+	dpaa2_mcp_set_token(cmd, ni_token);
+	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		return (ENXIO);
+	}
+
+	return (0);
+
+ err_close_ni:
+	dpaa2_mcp_set_token(cmd, ni_token);
+	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
+	if (error)
+		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+
+	return (ENXIO);
+}
 
 /**
  * @internal
@@ -651,12 +680,8 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
 static int
 set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 {
-	/*
-	 * Classify all received frames to the default traffic class (TC_ID = 0)
-	 * for now.
-	 */
-	/* return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd)); */
-	return (0);
+	/* Classify all received frames to the default class (TC_ID = 0). */
+	return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd));
 }
 
 /**
@@ -679,7 +704,7 @@ static device_method_t dpaa2_ni_methods[] = {
 	/* MII bus interface */
 	DEVMETHOD(miibus_readreg,	dpaa2_ni_miibus_readreg),
 	DEVMETHOD(miibus_writereg,	dpaa2_ni_miibus_writereg),
-	DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg),
+	/* DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg), */
 
 	DEVMETHOD_END
 };

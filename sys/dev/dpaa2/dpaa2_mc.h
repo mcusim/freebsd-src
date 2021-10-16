@@ -139,9 +139,9 @@ struct dpaa2_ni_softc {
 	} mac;
 
 	struct {
-		uint32_t	rate;
-		uint64_t	options;
-		bool		up;
+		uint32_t	 rate;
+		uint64_t	 options;
+		bool		 up;
 	} link_state;
 };
 
