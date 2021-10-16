@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include "miibus_if.h"
 
 #include "dpaa2_mc.h"
+#include "dpaa2_ni.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 #include "dpaa2_swp_if.h"
@@ -82,8 +83,21 @@ __FBSDID("$FreeBSD$");
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
 #define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
 
+/* Macros to calculate DPAA2 resource IDs. */
+
+#define IO_RID_OFF		(0u)
+#define IO_RID(rid)		((rid) + IO_RID_OFF)
+
+#define BP_RID_OFF		(4u)
+#define BP_RID(rid)		((rid) + BP_RID_OFF)
+
+#define CON_RID_OFF		(5u)
+#define CON_RID(rid)		((rid) + CON_RID_OFF)
+
+/* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
+
 #define DPNI_ENQ_FQID_VER_MAJOR	7U
 #define DPNI_ENQ_FQID_VER_MINOR	9U
 
@@ -127,11 +141,19 @@ __FBSDID("$FreeBSD$");
 /* Select to modify the data-tail-room setting */
 #define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
 
-static struct resource_spec dpaa2_ni_spec[] = {
-	{ DPAA2_DEV_IO,  0, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_IO,  1, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_BP,  2, RF_ACTIVE | RF_UNMAPPED },
-	{ DPAA2_DEV_CON, 3, RF_ACTIVE | RF_UNMAPPED },
+struct resource_spec dpaa2_ni_spec[] = {
+	/* DPIO resources */
+	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
+	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	/* DPBP resources */
+	{ DPAA2_DEV_BP,  BP_RID(0),   RF_ACTIVE },
+	/* DPCON resources */
+	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
+	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
+	{ DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL },
+	{ DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL },
 
 	RESOURCE_SPEC_END
 };
@@ -142,6 +164,7 @@ static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
+static int	set_qos_table(device_t dev, dpaa2_cmd_t cmd);
 
 /*
  * Device interface.
@@ -314,6 +337,14 @@ dpaa2_ni_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
 		    "error=%d\n", error);
+		goto err_free_cmd;
+	}
+
+	/* Configure ingress traffic classification. */
+	error = set_qos_table(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to configure QoS table: error=%d\n",
+		    error);
 		goto err_free_cmd;
 	}
 
@@ -609,6 +640,22 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
 
 	sc->link_state.options = link_cfg.options;
 
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Configure QoS table to determine the traffic class for the received
+ * frame.
+ */
+static int
+set_qos_table(device_t dev, dpaa2_cmd_t cmd)
+{
+	/*
+	 * Classify all received frames to the default traffic class (TC_ID = 0)
+	 * for now.
+	 */
+	/* return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd)); */
 	return (0);
 }
 

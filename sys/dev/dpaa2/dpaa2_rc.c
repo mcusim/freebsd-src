@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_ni.h"
 #include "dpaa2_mc_if.h"
 #include "dpaa2_cmd_if.h"
 
@@ -231,14 +232,6 @@ struct __packed dpaa2_bp_attr {
 	uint32_t	id;
 };
 
-/**
- * @brief Descriptor of a DPAA2-specific resource.
- */
-typedef struct dpaa2_res_desc {
-	int rid;
-	enum dpaa2_dev_type type;
-} dpaa2_res_desc_t;
-
 /* Forward declarations. */
 static int	discover_objects(struct dpaa2_rc_softc *sc);
 static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
@@ -246,7 +239,7 @@ static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 static int	add_dpaa2_res(device_t rcdev, device_t child,
-		    enum dpaa2_dev_type devtype, int *rid);
+		    enum dpaa2_dev_type devtype, int *rid, int flags);
 static int	configure_irq(device_t rcdev, device_t child, int rid,
 		    uint64_t addr, uint32_t data);
 static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
@@ -2013,17 +2006,10 @@ static int
 add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
     const dpaa2_obj_t *obj)
 {
-	const dpaa2_res_desc_t dpni_res_descriptors[] = {
-		{ 0, DPAA2_DEV_IO },
-		{ 1, DPAA2_DEV_IO },
-		{ 2, DPAA2_DEV_BP },
-		{ 3, DPAA2_DEV_CON },
-		DPAA2_RESDESC_END
-	};
-	const dpaa2_res_desc_t *res_desc;
 	device_t rcdev, dev;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
+	struct resource_spec *res_spec;
 	enum dpaa2_dev_type devtype;
 	const char *devclass;
 	int rid, error;
@@ -2035,7 +2021,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	case DPAA2_DEV_NI:
 		devclass = "dpaa2_ni";
 		devtype = DPAA2_DEV_NI;
-		res_desc = dpni_res_descriptors;
+		res_spec = dpaa2_ni_spec;
 		break;
 	default:
 		return (ENXIO);
@@ -2077,9 +2063,10 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	for (; res_desc->type != DPAA2_DEV_NOTYPE; res_desc++) {
-		rid = res_desc->rid;
-		error = add_dpaa2_res(rcdev, dev, res_desc->type, &rid);
+	for (; res_spec->type != -1; res_spec++) {
+		rid = res_spec->rid;
+		error = add_dpaa2_res(rcdev, dev, res_spec->type, &rid,
+		    res_spec->flags);
 		if (error)
 			device_printf(rcdev, "add_dpaa2_res() failed: "
 			    "error=%d\n", error);
@@ -2387,14 +2374,16 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 	return (DPAA2_CMD_STAT_OK);
 }
 
+/**
+ * @internal
+ */
 static int
 add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
-    int *rid)
+    int *rid, int flags)
 {
 	device_t dpaa2_dev;
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 	struct resource *res;
-	uint32_t flags = 0;
 	int error;
 
 	/* Request a free DPAA2 device of the given type from MC. */
@@ -2423,6 +2412,9 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	return (0);
 }
 
+/**
+ * @internal
+ */
 static int
 print_dpaa2_type(struct resource_list *rl, enum dpaa2_dev_type type)
 {

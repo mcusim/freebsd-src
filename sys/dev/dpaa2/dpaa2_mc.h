@@ -30,6 +30,8 @@
 #define	_DPAA2_MC_H
 
 #include <sys/rman.h>
+#include <sys/bus.h>
+
 #include <net/ethernet.h>
 
 #include "pci_if.h"
@@ -124,7 +126,7 @@ struct dpaa2_bp_softc {
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
-	struct resource 	*res[4];
+	struct resource 	*res[9];
 	uint16_t		 api_major;
 	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;
