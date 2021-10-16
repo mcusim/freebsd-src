@@ -146,6 +146,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
 #define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
 #define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
+#define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1519,6 +1520,21 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_ni_clear_qos_table(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_CLEAR_QOS_TABLE));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2499,6 +2515,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_link_cfg,	dpaa2_rc_ni_set_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
+	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
