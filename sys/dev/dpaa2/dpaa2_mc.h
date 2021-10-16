@@ -133,6 +133,13 @@ struct dpaa2_ni_softc {
 	uint16_t		 tx_data_off;
 	dpaa2_ni_attr_t		 attr;
 
+	struct ifnet		*ifp;
+	struct mtx		 lock;
+	device_t		 miibus;
+	struct mii_data		*mii;
+	struct callout		 mii_callout;
+	int			 media_status;
+
 	struct {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
