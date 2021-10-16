@@ -296,6 +296,15 @@ CODE {
 				device_get_parent(dev), cmd, mac));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_clear_qos_table(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -644,6 +653,11 @@ METHOD int ni_get_port_mac_addr {
 	dpaa2_cmd_t	 cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_get_port_mac_addr;
+
+METHOD int ni_clear_qos_table {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_ni_clear_qos_table;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
