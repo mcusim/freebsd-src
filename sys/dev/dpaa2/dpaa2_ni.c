@@ -435,7 +435,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	sc = device_get_softc(dev);
 	dinfo = device_get_ivars(dev);
 
-	sc->ifp = NULL
+	sc->ifp = NULL;
 	sc->miibus = NULL;
 	sc->mii = NULL;
 	sc->media_status = 0;
