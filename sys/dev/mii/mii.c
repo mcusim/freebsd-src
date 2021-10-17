@@ -412,7 +412,6 @@ mii_attach(device_t dev, device_t *miibus, if_t ifp,
 		ivars->mii_flags = flags;
 		*miibus = device_add_child(dev, "miibus", -1);
 		if (*miibus == NULL) {
-			device_printf(dev, "Failed to add miibus child\n");
 			rv = ENXIO;
 			goto fail;
 		}
@@ -466,8 +465,6 @@ mii_attach(device_t dev, device_t *miibus, if_t ifp,
 		 * many braindead PHYs report 0/0 in their ID registers,
 		 * so we test for media in the BMSR.
 		 */
-		(void)MIIBUS_READREG(dev, ma.mii_phyno, MII_PHYIDR1);
-		(void)MIIBUS_READREG(dev, ma.mii_phyno, MII_PHYIDR2);
 		bmsr = MIIBUS_READREG(dev, ma.mii_phyno, MII_BMSR);
 		if (bmsr == 0 || bmsr == 0xffff ||
 		    (bmsr & (BMSR_EXTSTAT | BMSR_MEDIAMASK)) == 0) {
@@ -523,7 +520,6 @@ mii_attach(device_t dev, device_t *miibus, if_t ifp,
 			goto fail;
 		free(children, M_TEMP);
 		if (nchildren == 0) {
-			device_printf(dev, "No children found on the miibus\n");
 			rv = ENXIO;
 			goto fail;
 		}
