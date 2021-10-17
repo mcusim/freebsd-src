@@ -312,6 +312,8 @@ dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
 	pdev = device_get_parent(dev);
 	rcinfo = device_get_ivars(pdev);
 
+	printf("%s: reading phy=%#x, reg=%#x\n", __func__, phy, reg);
+
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
@@ -341,7 +343,9 @@ dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
 		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
 		    phy, reg, error);
 		val = 0;
-	}
+	} else
+		printf("%s: read %#x from phy=%#x, reg=%#x\n", __func__, val,
+		    phy, reg);
 
 	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
 	if (error)
@@ -371,6 +375,8 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 	pdev = device_get_parent(dev);
 	rcinfo = device_get_ivars(pdev);
 
+	printf("%s: writing %#x to phy=%#x, reg=%#x\n", __func__, val, phy, reg);
+
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
@@ -399,6 +405,9 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 		device_printf(dev, "Failed to write PHY register: dpmac_id=%d, "
 		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
 		    phy, reg, error);
+	else
+		printf("%s: %#x written to phy=%#x, reg=%#x\n", __func__, val,
+		    phy, reg);
 
 	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
 	if (error)
