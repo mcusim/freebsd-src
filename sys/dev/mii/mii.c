@@ -466,6 +466,8 @@ mii_attach(device_t dev, device_t *miibus, if_t ifp,
 		 * many braindead PHYs report 0/0 in their ID registers,
 		 * so we test for media in the BMSR.
 		 */
+		(void)MIIBUS_READREG(dev, ma.mii_phyno, MII_PHYIDR1);
+		(void)MIIBUS_READREG(dev, ma.mii_phyno, MII_PHYIDR2);
 		bmsr = MIIBUS_READREG(dev, ma.mii_phyno, MII_BMSR);
 		if (bmsr == 0 || bmsr == 0xffff ||
 		    (bmsr & (BMSR_EXTSTAT | BMSR_MEDIAMASK)) == 0) {
