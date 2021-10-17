@@ -234,22 +234,25 @@ struct __packed dpaa2_bp_attr {
 };
 
 /* Forward declarations. */
+
 static int	discover_objects(struct dpaa2_rc_softc *sc);
 static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
-static int	add_dpaa2_res(device_t rcdev, device_t child,
-		    enum dpaa2_dev_type devtype, int *rid, int flags);
-static int	configure_irq(device_t rcdev, device_t child, int rid,
-		    uint64_t addr, uint32_t data);
+
 static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		    const uint16_t cmdid);
 static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+
 static int	set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		    const uint8_t irq_idx, const uint8_t enable,
 		    const uint16_t cmdid);
+static int	configure_irq(device_t rcdev, device_t child, int rid,
+		    uint64_t addr, uint32_t data);
+static int	add_dpaa2_res(device_t rcdev, device_t child,
+		    enum dpaa2_dev_type devtype, int *rid, int flags);
 static int	print_dpaa2_type(struct resource_list *rl,
 		    enum dpaa2_dev_type type);
 /*
