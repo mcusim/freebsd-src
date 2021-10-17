@@ -1813,7 +1813,7 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 		uint16_t	reg;
 		uint32_t	_reserved1;
 		uint64_t	_reserved2[6];
-	} *args = {0};
+	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	int error;
@@ -1826,6 +1826,7 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 	args = (struct mdio_read_args *) &cmd->params[0];
 	args->phy = phy;
 	args->reg = reg;
+	args->clause = 0;
 
 	error = exec_command(sc->portal, cmd, CMDID_MAC_MDIO_READ);
 	if (!error)
@@ -1845,7 +1846,7 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 		uint16_t	val;
 		uint16_t	_reserved1;
 		uint64_t	_reserved2[6];
-	} *args = {0};
+	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 
@@ -1858,6 +1859,7 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 	args->phy = phy;
 	args->reg = reg;
 	args->val = val;
+	args->clause = 0;
 
 	return (exec_command(sc->portal, cmd, CMDID_MAC_MDIO_WRITE));
 }
