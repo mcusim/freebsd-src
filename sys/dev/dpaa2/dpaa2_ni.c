@@ -86,10 +86,13 @@ __FBSDID("$FreeBSD$");
 #define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
 
 /* Macros to calculate DPAA2 resource IDs. */
+
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
+
 #define BP_RID_OFF		(4u)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
+
 #define CON_RID_OFF		(5u)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
 
@@ -432,6 +435,13 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	sc = device_get_softc(dev);
 	dinfo = device_get_ivars(dev);
 
+	sc->ifp = NULL
+	sc->miibus = NULL;
+	sc->mii = NULL;
+	sc->media_status = 0;
+	sc->mac.dpmac_id = 0;
+	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
+
 	/* Open network interface object. */
 	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
 	if (error) {
@@ -496,9 +506,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    "error=%d\n", error);
 		goto err_close_ni;
 	}
-
-	sc->mac.dpmac_id = 0;
-	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
 	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
 	ep1_desc.obj_id = dinfo->id;
