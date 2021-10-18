@@ -783,7 +783,7 @@ METHOD int mac_mdio_write {
 METHOD int mac_get_addr {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
-	uint64_t	*addr;
+	uint8_t		*mac;
 } DEFAULT bypass_mac_get_addr;
 
 METHOD int mac_get_attributes {
