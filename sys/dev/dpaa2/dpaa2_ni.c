@@ -537,6 +537,9 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
 			else {
+				device_printf(dev, "ether %6D\n", sc->mac.addr,
+				    ":");
+
 				error = mii_attach(dev, &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
 				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);

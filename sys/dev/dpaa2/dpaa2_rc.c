@@ -1866,7 +1866,7 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, dpaa2_cmd_t cmd, uint8_t phy,
 }
 
 static int
-dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint64_t *addr)
+dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1874,12 +1874,18 @@ dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint64_t *addr)
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !addr)
+	if (!sc->portal || !cmd || !mac)
 		return (DPAA2_CMD_STAT_ERR);
 
 	error = exec_command(sc->portal, cmd, CMDID_MAC_GET_ADDR);
-	if (!error)
-		*addr = cmd->params[0] >> 16;
+	if (!error) {
+		mac[0] = (cmd->params[0] >> 56) & 0xFFU;
+		mac[1] = (cmd->params[0] >> 48) & 0xFFU;
+		mac[2] = (cmd->params[0] >> 40) & 0xFFU;
+		mac[3] = (cmd->params[0] >> 32) & 0xFFU;
+		mac[4] = (cmd->params[0] >> 24) & 0xFFU;
+		mac[5] = (cmd->params[0] >> 16) & 0xFFU;
+	}
 
 	return (error);
 }
@@ -2091,6 +2097,11 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		devtype = DPAA2_DEV_NI;
 		res_spec = dpaa2_ni_spec;
 		break;
+	case DPAA2_DEV_MAC:
+		devclass = "dpaa2_mac";
+		devtype = DPAA2_DEV_MAC;
+		res_spec = NULL;
+		break;
 	default:
 		return (ENXIO);
 	}
@@ -2131,7 +2142,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	resource_list_init(&dinfo->resources);
 
 	/* Add DPAA2-specific resources to the resource list. */
-	for (; res_spec->type != -1; res_spec++) {
+	for (; res_spec && res_spec->type != -1; res_spec++) {
 		rid = res_spec->rid;
 		error = add_dpaa2_res(rcdev, dev, res_spec->type, &rid,
 		    res_spec->flags);
