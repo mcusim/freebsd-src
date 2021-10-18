@@ -348,8 +348,7 @@ dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
 		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
 		    phy, reg, error);
 		val = 0;
-	} else
-		printf("%s: phy=%#x, reg=%#x -> %#x\n", __func__, phy, reg, val);
+	}
 
 	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
 	if (error)
@@ -407,8 +406,6 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 		device_printf(dev, "Failed to write PHY register: dpmac_id=%d, "
 		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
 		    phy, reg, error);
-	else
-		printf("%s: phy=%#x, reg=%#x <- %#x\n", __func__, phy, reg, val);
 
 	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
 	if (error)
