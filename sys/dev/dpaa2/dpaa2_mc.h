@@ -113,6 +113,20 @@ struct dpaa2_bp_softc {
 };
 
 /**
+ * @brief Software context for the DPAA2 Concentrator driver.
+ */
+struct dpaa2_con_softc {
+	device_t		 dev;
+};
+
+/**
+ * @brief Software context for the DPAA2 MAC driver.
+ */
+struct dpaa2_mac_softc {
+	device_t		 dev;
+};
+
+/**
  * @brief Software context for the DPAA2 Network Interface driver.
  *
  * dev:		Device associated with this software context.

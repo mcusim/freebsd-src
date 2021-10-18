@@ -173,6 +173,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_MAC_MDIO_READ			CMD_MAC(0x0C0)
 #define CMDID_MAC_MDIO_WRITE			CMD_MAC(0x0C1)
 #define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
+#define CMDID_MAC_GET_ATTR			CMD_MAC(0x004)
 
 /* ------------------------- End of command IDs ----------------------------- */
 
@@ -1879,6 +1880,53 @@ dpaa2_rc_mac_get_addr(device_t rcdev, dpaa2_cmd_t cmd, uint64_t *addr)
 	error = exec_command(sc->portal, cmd, CMDID_MAC_GET_ADDR);
 	if (!error)
 		*addr = cmd->params[0] >> 16;
+
+	return (error);
+}
+
+static int
+dpaa2_rc_mac_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_mac_attr_t *attr)
+{
+	struct __packed mac_attr_resp {
+		uint8_t		eth_if;
+		uint8_t		link_type;
+		uint16_t	id;
+		uint32_t	max_rate;
+
+		uint8_t		fec_mode;
+		uint8_t		ifg_mode;
+		uint8_t		ifg_len;
+		uint8_t		_reserved1;
+		uint32_t	_reserved2;
+
+		uint8_t		sgn_post_pre;
+		uint8_t		serdes_cfg_mode;
+		uint8_t		eq_amp_red;
+		uint8_t		eq_post1q;
+		uint8_t		eq_preq;
+		uint8_t		eq_type;
+		uint16_t	_reserved3;
+
+		uint64_t	_reserved[4];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	error = exec_command(sc->portal, cmd, CMDID_MAC_GET_ATTR);
+	if (!error) {
+		resp = (struct mac_attr_resp *) &cmd->params[0];
+		attr->id = resp->id;
+		attr->max_rate = resp->max_rate;
+		attr->eth_if = resp->eth_if;
+		attr->link_type = resp->link_type;
+	}
 
 	return (error);
 }

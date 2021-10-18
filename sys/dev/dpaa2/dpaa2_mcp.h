@@ -93,20 +93,42 @@
  */
 
 enum dpaa2_rc_region_type {
-	DPAA2_RC_REG_MC_PORTAL		= 0,
-	DPAA2_RC_REG_QBMAN_PORTAL	= 1
+	DPAA2_RC_REG_MC_PORTAL,
+	DPAA2_RC_REG_QBMAN_PORTAL
 };
 
 enum dpaa2_io_chan_mode {
-	DPAA2_IO_NO_CHANNEL		= 0,
-	DPAA2_IO_LOCAL_CHANNEL		= 1
+	DPAA2_IO_NO_CHANNEL,
+	DPAA2_IO_LOCAL_CHANNEL
 };
 
 enum dpaa2_ni_queue_type {
-	DPAA2_NI_QUEUE_RX		= 0,
-	DPAA2_NI_QUEUE_TX		= 1,
-	DPAA2_NI_QUEUE_TX_CONF		= 2,
-	DPAA2_NI_QUEUE_RX_ERR		= 3
+	DPAA2_NI_QUEUE_RX,
+	DPAA2_NI_QUEUE_TX,
+	DPAA2_NI_QUEUE_TX_CONF,
+	DPAA2_NI_QUEUE_RX_ERR
+};
+
+enum dpaa2_mac_eth_if {
+	DPAA2_MAC_ETH_IF_MII,
+	DPAA2_MAC_ETH_IF_RMII,
+	DPAA2_MAC_ETH_IF_SMII,
+	DPAA2_MAC_ETH_IF_GMII,
+	DPAA2_MAC_ETH_IF_RGMII,
+	DPAA2_MAC_ETH_IF_SGMII,
+	DPAA2_MAC_ETH_IF_QSGMII,
+	DPAA2_MAC_ETH_IF_XAUI,
+	DPAA2_MAC_ETH_IF_XFI,
+	DPAA2_MAC_ETH_IF_CAUI,
+	DPAA2_MAC_ETH_IF_1000BASEX,
+	DPAA2_MAC_ETH_IF_USXGMII
+};
+
+enum dpaa2_mac_link_type {
+	DPAA2_MAC_LINK_TYPE_NONE,
+	DPAA2_MAC_LINK_TYPE_FIXED,
+	DPAA2_MAC_LINK_TYPE_PHY,
+	DPAA2_MAC_LINK_TYPE_BACKPLANE
 };
 
 /**
@@ -341,6 +363,21 @@ typedef struct {
 	uint32_t	if_id;
 	enum dpaa2_dev_type type;
 } dpaa2_ep_desc_t;
+
+/**
+ * @brief Attributes of the DPMAC object.
+ *
+ * id:		DPMAC object ID.
+ * max_rate:	Maximum supported rate (in Mbps).
+ * eth_if:	Type of the Ethernet interface.
+ * link_type:	Type of the link.
+ */
+typedef struct {
+	uint32_t	id;
+	uint32_t	max_rate;
+	enum dpaa2_mac_eth_if eth_if;
+	enum dpaa2_mac_link_type link_type;
+} dpaa2_mac_attr_t;
 
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
