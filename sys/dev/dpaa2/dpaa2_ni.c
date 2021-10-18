@@ -537,12 +537,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
 			else {
-				/* An attempt to read PHY ID registers. */
-				for (int i = 0; i < 0x1f; i++) {
-					MIIBUS_READREG(dev, i, MII_PHYIDR1);
-					MIIBUS_READREG(dev, i, MII_PHYIDR2);
-				}
-
 				error = mii_attach(dev, &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
 				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
