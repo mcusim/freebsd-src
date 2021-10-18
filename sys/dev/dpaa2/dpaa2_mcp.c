@@ -166,7 +166,7 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
 }
 
 dpaa2_cmd_t
-dpaa2_mcp_t(dpaa2_cmd_t cmd, const uint16_t token)
+dpaa2_mcp_tk(dpaa2_cmd_t cmd, const uint16_t token)
 {
 	struct dpaa2_cmd_header *hdr;
 	if (cmd) {
