@@ -131,17 +131,13 @@ dpaa2_mac_attach(device_t dev)
 	}
 	error = DPAA2_CMD_MAC_GET_ADDR(dev, cmd, mac);
 	if (error)
-		device_printf(dev, "Failed to get MAC address: error=%d\n",
+		device_printf(dev, "Failed to get physical address: error=%d\n",
 		    error);
 	if (bootverbose) {
-		device_printf(dev,
-		    "\t ether %6D, max_rate=%d\n"
-		    "\t eth_if=%s\n"
-		    "\t link_type=%s\n",
-		    mac, ":", attr.max_rate,
-		    etf_if_to_str(attr.eth_if),
-		    link_type_to_str(attr.link_type)
-		);
+		device_printf(dev, "ether %6D\n", mac, ":");
+		device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n",
+		    attr.max_rate, etf_if_to_str(attr.eth_if),
+		    link_type_to_str(attr.link_type));
 	}
 
 	/* Close the DPMAC object and the resource container. */
@@ -200,11 +196,11 @@ etf_if_to_str(enum dpaa2_mac_eth_if eth_if)
 	case DPAA2_MAC_ETH_IF_CAUI:
 		return ("CAUI");
 	case DPAA2_MAC_ETH_IF_1000BASEX:
-		return ("1000BASEX");
+		return ("1000BASE-X");
 	case DPAA2_MAC_ETH_IF_USXGMII:
 		return ("USXGMII");
 	default:
-		return ("UNKNOWN");
+		return ("unknown");
 	}
 }
 
@@ -221,7 +217,7 @@ link_type_to_str(enum dpaa2_mac_link_type link_type)
 	case DPAA2_MAC_LINK_TYPE_BACKPLANE:
 		return ("BACKPLANE");
 	default:
-		return ("UNKNOWN");
+		return ("unknown");
 	}
 }
 
