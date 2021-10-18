@@ -469,12 +469,12 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_get_addr(device_t dev, dpaa2_cmd_t cmd, uint64_t *addr)
+	bypass_mac_get_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_MAC_GET_ADDR(
-				device_get_parent(dev), cmd, addr));
+				device_get_parent(dev), cmd, mac));
 		return (ENXIO);
 	}
 	static int
