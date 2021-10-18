@@ -215,6 +215,13 @@ dpaa2_ni_attach(device_t dev)
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
+	sc->ifp = NULL;
+	sc->miibus = NULL;
+	sc->mii = NULL;
+	sc->media_status = 0;
+	sc->mac.dpmac_id = 0;
+	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
+
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
 	if (error) {
 		device_printf(dev, "Failed to allocate resources: error=%d\n",
@@ -438,13 +445,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	sc = device_get_softc(dev);
 	dinfo = device_get_ivars(dev);
 
-	sc->ifp = NULL;
-	sc->miibus = NULL;
-	sc->mii = NULL;
-	sc->media_status = 0;
-	sc->mac.dpmac_id = 0;
-	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
-
 	/* Open network interface object. */
 	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
 	if (error) {
@@ -549,12 +549,11 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 				error = mii_attach(dev, &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
 				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
-				if (error) {
+				if (error)
 					device_printf(dev, "Failed to attach "
 					    "miibus: error=%d\n", error);
-					goto err_close_ni;
-				}
-				sc->mii = device_get_softc(sc->miibus);
+				else
+					sc->mii = device_get_softc(sc->miibus);
 			}
 		}
 	}
@@ -762,8 +761,10 @@ dpni_ifmedia_change(struct ifnet *ifp)
 
 	DPNI_LOCK(sc);
 
-	mii_mediachg(sc->mii);
-	sc->media_status = sc->mii->mii_media.ifm_media;
+	if (sc->mii) {
+		mii_mediachg(sc->mii);
+		sc->media_status = sc->mii->mii_media.ifm_media;
+	}
 
 	DPNI_UNLOCK(sc);
 
@@ -781,9 +782,11 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 
 	DPNI_LOCK(sc);
 
-	mii_pollstat(sc->mii);
-	ifmr->ifm_active = sc->mii->mii_media_active;
-	ifmr->ifm_status = sc->mii->mii_media_status;
+	if (sc->mii) {
+		mii_pollstat(sc->mii);
+		ifmr->ifm_active = sc->mii->mii_media_active;
+		ifmr->ifm_status = sc->mii->mii_media_status;
+	}
 
 	DPNI_UNLOCK(sc);
 }
@@ -798,11 +801,13 @@ dpni_ifmedia_tick(void *arg)
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 
 	/* Check for media type change */
-	mii_tick(sc->mii);
-	if (sc->media_status != sc->mii->mii_media.ifm_media) {
-		printf("%s: media type changed (ifm_media=%x)\n", __func__,
-			sc->mii->mii_media.ifm_media);
-		dpni_ifmedia_change(sc->ifp);
+	if (sc->mii) {
+		mii_tick(sc->mii);
+		if (sc->media_status != sc->mii->mii_media.ifm_media) {
+			printf("%s: media type changed (ifm_media=%x)\n",
+			    __func__, sc->mii->mii_media.ifm_media);
+			dpni_ifmedia_change(sc->ifp);
+		}
 	}
 
 	/* Schedule another timeout one second from now */
@@ -825,7 +830,8 @@ dpni_if_init(void *arg)
 		return;
 	}
 
-	mii_mediachg(sc->mii);
+	if (sc->mii)
+		mii_mediachg(sc->mii);
 	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
@@ -876,7 +882,9 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:
-		error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, command);
+		if (sc->mii)
+			error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media,
+			    command);
 		break;
 	default:
 		error = ether_ioctl(ifp, command, data);
