@@ -56,9 +56,12 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
+#include "dpaa2_mc.h"
+#include "dpaa2_ni.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
-#include "dpaa2_mc.h"
+#include "dpaa2_swp_if.h"
+#include "dpaa2_cmd_if.h"
 
 /* Forward declarations. */
 
@@ -179,25 +182,25 @@ etf_if_to_str(enum dpaa2_mac_eth_if eth_if)
 	switch (eth_if) {
 	case DPAA2_MAC_ETH_IF_MII:
 		return ("MII");
-	case DPAA2_MAC_ETH_IF_RMII,
+	case DPAA2_MAC_ETH_IF_RMII:
 		return ("RMII");
-	case DPAA2_MAC_ETH_IF_SMII,
+	case DPAA2_MAC_ETH_IF_SMII:
 		return ("SMII");
-	case DPAA2_MAC_ETH_IF_GMII,
+	case DPAA2_MAC_ETH_IF_GMII:
 		return ("GMII");
-	case DPAA2_MAC_ETH_IF_RGMII,
+	case DPAA2_MAC_ETH_IF_RGMII:
 		return ("RGMII");
-	case DPAA2_MAC_ETH_IF_SGMII,
+	case DPAA2_MAC_ETH_IF_SGMII:
 		return ("SGMII");
-	case DPAA2_MAC_ETH_IF_QSGMII,
+	case DPAA2_MAC_ETH_IF_QSGMII:
 		return ("QSGMII");
-	case DPAA2_MAC_ETH_IF_XAUI,
+	case DPAA2_MAC_ETH_IF_XAUI:
 		return ("XAUI");
-	case DPAA2_MAC_ETH_IF_XFI,
+	case DPAA2_MAC_ETH_IF_XFI:
 		return ("XFI");
-	case DPAA2_MAC_ETH_IF_CAUI,
+	case DPAA2_MAC_ETH_IF_CAUI:
 		return ("CAUI");
-	case DPAA2_MAC_ETH_IF_1000BASEX,
+	case DPAA2_MAC_ETH_IF_1000BASEX:
 		return ("1000BASEX");
 	case DPAA2_MAC_ETH_IF_USXGMII:
 		return ("USXGMII");
