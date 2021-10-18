@@ -208,8 +208,7 @@ dpaa2_io_attach(device_t dev)
 		    dinfo->id, error);
 		goto err_free_cmd;
 	}
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_t(cmd, rc_token));
 	if (error) {
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
 		goto err_free_cmd;

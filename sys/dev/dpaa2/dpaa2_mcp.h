@@ -350,9 +350,12 @@ int	dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 int	dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
 void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
 void	dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
-void	dpaa2_mcp_set_token(dpaa2_cmd_t cmd, const uint16_t token);
-void	dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags);
 void	dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags);
 void	dpaa2_mcp_unlock(dpaa2_mcp_t portal);
+
+/* to quickly update command token */
+dpaa2_cmd_t dpaa2_mcp_t(dpaa2_cmd_t cmd, const uint16_t token);
+/* to quickly update command flags */
+dpaa2_cmd_t dpaa2_mcp_f(dpaa2_cmd_t cmd, const uint16_t flags);
 
 #endif /* _DPAA2_MCP_H */

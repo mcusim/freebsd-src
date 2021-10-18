@@ -276,8 +276,7 @@ dpaa2_ni_attach(device_t dev)
 		goto err_free_cmd;
 
 	/* Close resource container. */
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_t(cmd, rc_token));
 	if (error) {
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
 		goto err_free_cmd;
@@ -355,8 +354,7 @@ dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
 		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
 		    sc->mac.dpmac_id, error);
  close_rc:
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_t(cmd, rc_token));
 	if (error)
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
  free_cmd:
@@ -412,8 +410,7 @@ dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
 		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
 		    sc->mac.dpmac_id, error);
  close_rc:
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_CLOSE(dev, cmd);
+	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_t(cmd, rc_token));
 	if (error)
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
  free_cmd:
@@ -512,13 +509,17 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
 	ep1_desc.type = dinfo->dtype;
 
-	dpaa2_mcp_set_token(cmd, rc_token);
-	error = DPAA2_CMD_RC_GET_CONN(dev, cmd, &ep1_desc, &ep2_desc, &link);
+	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_t(cmd, rc_token),
+	    &ep1_desc, &ep2_desc, &link);
 	if (error)
 		device_printf(dev, "Failed to obtain an object DPNI is "
 		    "connected to: error=%d\n", error);
 	else {
-		device_printf(dev, "connected to %s (id=%d), link is %s\n",
+		/*
+		 * NOTE: For the DPAA2 link to be up, both objects must be in
+		 * enabled state.
+		 */
+		device_printf(dev, "connected to %s (id=%d), DPAA2 link %s\n",
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
 		    link ? "up" : "down");
 
@@ -529,9 +530,8 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 			 */
 			sc->mac.dpmac_id = ep2_desc.obj_id;
 
-			dpaa2_mcp_set_token(cmd, ni_token);
-			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, cmd,
-			    sc->mac.addr);
+			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev,
+			    dpaa2_mcp_t(cmd, ni_token), sc->mac.addr);
 			if (error)
 				device_printf(dev, "Failed to obtain a MAC "
 				    "address of the connected DPMAC: error=%d\n",
@@ -559,7 +559,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	 *       in link configuration. It might be necessary to attach miibus
 	 *       and PHY before this point.
 	 */
-	error = set_pause_frame(dev, cmd);
+	error = set_pause_frame(dev, dpaa2_mcp_t(cmd, ni_token));
 	if (error) {
 		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
 		    "error=%d\n", error);
@@ -567,15 +567,14 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	}
 
 	/* Configure ingress traffic classification. */
-	error = set_qos_table(dev, cmd);
+	error = set_qos_table(dev, dpaa2_mcp_t(cmd, ni_token));
 	if (error) {
 		device_printf(dev, "Failed to configure QoS table: error=%d\n",
 		    error);
 		goto err_close_ni;
 	}
 
-	dpaa2_mcp_set_token(cmd, ni_token);
-	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
+	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_t(cmd, ni_token));
 	if (error) {
 		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
 		    dinfo->id, error);
@@ -585,8 +584,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	return (0);
 
  err_close_ni:
-	dpaa2_mcp_set_token(cmd, ni_token);
-	error = DPAA2_CMD_NI_CLOSE(dev, cmd);
+	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_t(cmd, ni_token));
 	if (error)
 		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
 		    dinfo->id, error);
