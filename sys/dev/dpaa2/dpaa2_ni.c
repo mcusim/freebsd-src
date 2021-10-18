@@ -276,7 +276,7 @@ dpaa2_ni_attach(device_t dev)
 		goto err_free_cmd;
 
 	/* Close resource container. */
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_t(cmd, rc_token));
+	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
 	if (error) {
 		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
 		goto err_free_cmd;
