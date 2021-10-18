@@ -477,6 +477,16 @@ CODE {
 				device_get_parent(dev), cmd, addr));
 		return (ENXIO);
 	}
+	static int
+	bypass_mac_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_mac_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
+		return (ENXIO);
+	}
 
 };
 
@@ -775,3 +785,9 @@ METHOD int mac_get_addr {
 	dpaa2_cmd_t	 cmd;
 	uint64_t	*addr;
 } DEFAULT bypass_mac_get_addr;
+
+METHOD int mac_get_attributes {
+	device_t	  dev;
+	dpaa2_cmd_t	  cmd;
+	dpaa2_mac_attr_t *attr;
+} DEFAULT bypass_mac_get_attributes;
