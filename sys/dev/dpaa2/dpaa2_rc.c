@@ -2601,6 +2601,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mac_mdio_read,	dpaa2_rc_mac_mdio_read),
 	DEVMETHOD(dpaa2_cmd_mac_mdio_write,	dpaa2_rc_mac_mdio_write),
 	DEVMETHOD(dpaa2_cmd_mac_get_addr,	dpaa2_rc_mac_get_addr),
+	DEVMETHOD(dpaa2_cmd_mac_get_attributes, dpaa2_rc_mac_get_attributes),
 
 	DEVMETHOD_END
 };
