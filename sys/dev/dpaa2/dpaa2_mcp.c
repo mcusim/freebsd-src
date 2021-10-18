@@ -165,22 +165,21 @@ dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
 		free(cmd, M_DPAA2_MCP);
 }
 
-void
-dpaa2_mcp_set_token(dpaa2_cmd_t cmd, const uint16_t token)
+dpaa2_cmd_t
+dpaa2_mcp_t(dpaa2_cmd_t cmd, const uint16_t token)
 {
 	struct dpaa2_cmd_header *hdr;
-
 	if (cmd) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		hdr->token = token;
 	}
+	return (cmd);
 }
 
-void
-dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags)
+dpaa2_cmd_t
+dpaa2_mcp_f(dpaa2_cmd_t cmd, const uint16_t flags)
 {
 	struct dpaa2_cmd_header *hdr;
-
 	if (cmd) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		hdr->flags_hw = DPAA2_CMD_DEF;
@@ -191,6 +190,7 @@ dpaa2_mcp_set_flags(dpaa2_cmd_t cmd, const uint16_t flags)
 		if (flags & DPAA2_CMD_INTR_DIS)
 			hdr->flags_sw |= DPAA2_SW_FLAG_INTR_DIS;
 	}
+	return (cmd);
 }
 
 void
