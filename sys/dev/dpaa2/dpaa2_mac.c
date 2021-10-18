@@ -162,7 +162,6 @@ dpaa2_mac_attach(device_t dev)
  err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
  err_exit:
-	dpaa2_mac_detach(dev);
 	return (ENXIO);
 }
 
