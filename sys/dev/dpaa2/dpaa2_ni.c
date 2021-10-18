@@ -735,8 +735,13 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
 static int
 set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 {
-	/* Classify all received frames to the default class (TC_ID = 0). */
-	return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd));
+	/*
+	 * NOTE: Don't forget to set QoS table beforehand which requires zeroed
+	 * 256 bytes of DMA-able memory to hold the QoS key configuration.
+	 *
+	 * return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd));
+	 */
+	return (0);
 }
 
 /**
