@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/queue.h>
 
 #include <vm/vm.h>
 
@@ -65,6 +66,16 @@ __FBSDID("$FreeBSD$");
 #define COMPARE_TYPE(t, v)		(strncmp((v), (t), strlen((v))) == 0)
 
 #define IORT_DEVICE_NAME		"MCE"
+
+/**
+ * @brief Structure to describe a DPAA2 device as resource which cannot be
+ * allocated, i.e. there is no rman for such devices.
+ */
+struct dpaa2_mc_devinfo {
+	STAILQ_ENTRY(dpaa2_mc_devinfo) link;
+	device_r	dpaa2_dev;
+	uint32_t	flags;
+};
 
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex memory");
 
@@ -190,6 +201,10 @@ dpaa2_mc_attach(device_t dev)
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
+
+	/* Initialize a list of non-allocatable DPAA2 devices. */
+	mtx_init(&sc->mdev_lock, "MC portal mdev lock", NULL, MTX_DEF);
+	STAILQ_INIT(&sc->mdev_list);
 
 	/* Allocate devinfo to keep information about the MC bus itself. */
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
@@ -421,47 +436,68 @@ dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
 }
 
 /*
- * For DPAA2 Management Complex bus driver interface
+ * For DPAA2 Management Complex bus driver interface.
  */
 
 int
-dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev)
+dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 {
+	struct dpaa2_mc_softc *sc;
 	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_mc_devinfo *di;
 	struct rman *rm;
 	int error;
 
+	sc = device_get_softc(mcdev);
 	mcinfo = device_get_ivars(mcdev);
 	dinfo = device_get_ivars(dpaa2_dev);
 
-	if (!mcinfo || !dinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (!sc || !mcinfo || !dinfo || mcinfo->dtype != DPAA2_DEV_MC)
 		return (EINVAL);
 
-	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
-	if (!rm) {
-		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_ttos(dinfo->dtype));
-		return (EINVAL);
-	}
+	if (flags & DPAA2_MC_DEV_ALLOCATABLE) {
+		/* Select rman based on a type of the DPAA2 device. */
+		rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
+		if (!rm) {
+			device_printf(mcdev, "No resource manager for %s "
+			    "objects\n", dpaa2_ttos(dinfo->dtype));
+			return (EINVAL);
+		}
 
-	/* Manage DPAA2 device as an allocatable resource. */
-	error = rman_manage_region(rm, (rman_res_t) dpaa2_dev,
-	    (rman_res_t) dpaa2_dev);
-	if (error) {
-		device_printf(mcdev, "rman_manage_region() failed for DPAA2 "
-		    "device: type=%s, start=%#jx, end=%#jx, error=%d\n",
-		    dpaa2_ttos(dinfo->dtype), (rman_res_t) dpaa2_dev,
-		    (rman_res_t) dpaa2_dev, error);
-		return (error);
+		/* Manage DPAA2 device as an allocatable resource. */
+		error = rman_manage_region(rm, (rman_res_t) dpaa2_dev,
+		    (rman_res_t) dpaa2_dev);
+		if (error) {
+			device_printf(mcdev, "rman_manage_region() failed for "
+			    "DPAA2 device: type=%s, start=%#jx, end=%#jx, "
+			    "error=%d\n", dpaa2_ttos(dinfo->dtype),
+			    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev,
+			    error);
+			return (error);
+		}
+	} else if (flags & DPAA2_MC_DEV_ASSOCIATED) {
+		/* Prepare information about non-allocatable DPAA2 device. */
+		di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
+		if (!di) {
+			device_printf(dev, "Failed to allocate "
+			    "dpaa2_mc_devinfo\n");
+			return (ENOMEM);
+		}
+		di->dpaa2_dev = dpaa2_dev;
+		di->flags = flags;
+
+		mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+		mtx_lock(&sc->mdev_lock);
+		STAILQ_INSERT_TAIL(&sc->mdev_list, di, link);
+		mtx_unlock(&sc->mdev_lock);
 	}
 
 	return (0);
 }
 
 int
-dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
 	struct dpaa2_devinfo *mcinfo;
@@ -500,42 +536,38 @@ dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
 }
 
 int
-dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
-    enum dpaa2_dev_type devtype)
+dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype, uint32_t obj_id)
 {
+	device_t dev;
+	struct dpaa2_mc_softc *sc;
 	struct dpaa2_devinfo *mcinfo;
-	struct rman *rm;
-	rman_res_t start, end;
-	int error;
+	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_mc_devinfo *di;
+	int error = ENOENT;
 
+	sc = device_get_softc(mcdev);
 	mcinfo = device_get_ivars(mcdev);
 
-	if (!mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (!sc || !mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
 		return (EINVAL);
 
-	/* Select resource manager based on a type of the DPAA2 device. */
-	rm = dpaa2_mc_rman(mcdev, devtype);
-	if (!rm) {
-		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_ttos(devtype));
-		return (EINVAL);
+	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+	mtx_lock(&sc->mdev_lock);
+
+	/* Find DPAA2 device with the given devtype and ID. */
+	STAILQ_FOREACH(di, &sc->mdev_list, link) {
+		dinfo = device_get_ivars(di->dpaa2_dev);
+		if (dinfo->dtype == devtype && dinfo->id == obj_id) {
+			*dpaa2_dev = di->dpaa2_dev;
+			error = 0;
+			break;
+		}
 	}
 
-	/* Find last free DPAA2 device of the given type. */
-	error = rman_last_free_region(rm, &start, &end);
-	if (error) {
-		device_printf(mcdev, "rman_last_free_region() failed for DPAA2 "
-		    "device: type=%s, error=%d\n", dpaa2_ttos(devtype),
-		    error);
-		return (error);
-	}
+	mtx_unlock(&sc->mdev_lock);
 
-	KASSERT(start == end, ("start != end, but should be the same pointer "
-	    "to the DPAA2 device: start=%jx, end=%jx", start, end));
-
-	*dpaa2_dev = (device_t) start;
-
-	return (0);
+	return (error);
 }
 
 const char *
