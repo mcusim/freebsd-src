@@ -73,7 +73,7 @@ __FBSDID("$FreeBSD$");
  */
 struct dpaa2_mc_devinfo {
 	STAILQ_ENTRY(dpaa2_mc_devinfo) link;
-	device_r	dpaa2_dev;
+	device_t	dpaa2_dev;
 	uint32_t	flags;
 };
 
@@ -480,7 +480,7 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 		/* Prepare information about non-allocatable DPAA2 device. */
 		di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
 		if (!di) {
-			device_printf(dev, "Failed to allocate "
+			device_printf(mcdev, "Failed to allocate "
 			    "dpaa2_mc_devinfo\n");
 			return (ENOMEM);
 		}
@@ -539,7 +539,6 @@ int
 dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype, uint32_t obj_id)
 {
-	device_t dev;
 	struct dpaa2_mc_softc *sc;
 	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
