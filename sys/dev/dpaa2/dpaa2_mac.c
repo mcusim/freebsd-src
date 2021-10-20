@@ -89,9 +89,7 @@ dpaa2_mac_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
-	dpaa2_mac_attr_t attr;
 	uint16_t rc_token, mac_token;
-	uint8_t mac[6];
 	int error;
 
 	sc = device_get_softc(dev);
@@ -100,7 +98,7 @@ dpaa2_mac_attach(device_t dev)
 	rcsc = device_get_softc(pdev);
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
-	memset(mac, 0, ETHER_ADDR_LEN);
+	memset(sc->addr, 0, ETHER_ADDR_LEN);
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
@@ -123,21 +121,21 @@ dpaa2_mac_attach(device_t dev)
 		goto err_free_cmd;
 	}
 
-	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, cmd, &attr);
+	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPMAC attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_MAC_GET_ADDR(dev, cmd, mac);
+	error = DPAA2_CMD_MAC_GET_ADDR(dev, cmd, sc->addr);
 	if (error)
 		device_printf(dev, "Failed to get physical address: error=%d\n",
 		    error);
 	if (bootverbose) {
-		device_printf(dev, "ether %6D\n", mac, ":");
+		device_printf(dev, "ether %6D\n", sc->addr, ":");
 		device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n",
-		    attr.max_rate, etf_if_to_str(attr.eth_if),
-		    link_type_to_str(attr.link_type));
+		    sc->attr.max_rate, etf_if_to_str(sc->attr.eth_if),
+		    link_type_to_str(sc->attr.link_type));
 	}
 
 	/* Close the DPMAC object and the resource container. */

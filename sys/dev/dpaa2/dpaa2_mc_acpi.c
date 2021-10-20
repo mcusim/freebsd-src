@@ -165,23 +165,23 @@ dpaa2_mc_acpi_deactivate_resource(device_t mcdev, device_t child, int type,
  */
 
 static int
-dpaa2_mc_acpi_manage_device(device_t mcdev, device_t dpaa2_dev)
+dpaa2_mc_acpi_manage_dev(device_t mcdev, device_t dpaa2_dev)
 {
-	return (dpaa2_mc_manage_device(mcdev, dpaa2_dev));
+	return (dpaa2_mc_manage_dev(mcdev, dpaa2_dev));
 }
 
 static int
-dpaa2_mc_acpi_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+dpaa2_mc_acpi_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
-	return (dpaa2_mc_first_free_device(mcdev, dpaa2_dev, devtype));
+	return (dpaa2_mc_get_free_dev(mcdev, dpaa2_dev, devtype));
 }
 
 static int
-dpaa2_mc_acpi_last_free_device(device_t mcdev, device_t *dpaa2_dev,
-    enum dpaa2_dev_type devtype)
+dpaa2_mc_acpi_get_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype, uint32_t obj_id)
 {
-	return (dpaa2_mc_last_free_device(mcdev, dpaa2_dev, devtype));
+	return (dpaa2_mc_get_dev(mcdev, dpaa2_dev, devtype, obj_id));
 }
 
 static device_method_t dpaa2_mc_acpi_methods[] = {
@@ -205,10 +205,10 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
 	DEVMETHOD(pcib_get_id,		dpaa2_mc_acpi_get_id),
 
-	/* DPAA2 Management Complex bus driver interface */
-	DEVMETHOD(dpaa2_mc_manage_device, dpaa2_mc_acpi_manage_device),
-	DEVMETHOD(dpaa2_mc_first_free_device, dpaa2_mc_acpi_first_free_device),
-	DEVMETHOD(dpaa2_mc_last_free_device, dpaa2_mc_acpi_last_free_device),
+	/* DPAA2 MC bus driver interface */
+	DEVMETHOD(dpaa2_mc_manage_dev,	dpaa2_mc_acpi_manage_dev),
+	DEVMETHOD(dpaa2_mc_get_free_dev,dpaa2_mc_acpi_get_free_dev),
+	DEVMETHOD(dpaa2_mc_get_dev,	dpaa2_mc_acpi_get_dev),
 
 	DEVMETHOD_END
 };

@@ -2084,7 +2084,6 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct resource_spec *res_spec;
-	enum dpaa2_dev_type devtype;
 	const char *devclass;
 	int rid, error;
 
@@ -2094,13 +2093,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	switch (obj->type) {
 	case DPAA2_DEV_NI:
 		devclass = "dpaa2_ni";
-		devtype = DPAA2_DEV_NI;
 		res_spec = dpaa2_ni_spec;
-		break;
-	case DPAA2_DEV_MAC:
-		devclass = "dpaa2_mac";
-		devtype = DPAA2_DEV_MAC;
-		res_spec = NULL;
 		break;
 	default:
 		return (ENXIO);
@@ -2129,7 +2122,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	dinfo->pdev = rcdev;
 	dinfo->dev = dev;
 	dinfo->id = obj->id;
-	dinfo->dtype = devtype;
+	dinfo->dtype = obj->type;
 	/* Children share their parent container's ICID and portal ID. */
 	dinfo->icid = rcinfo->icid;
 	dinfo->portal_id = rcinfo->portal_id;
@@ -2159,9 +2152,9 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
  * @brief Add a new managed DPAA2 device to the resource container bus.
  *
  * There are DPAA2 objects (DPIO, DPBP) which have their own drivers and can be
- * allocated as resources for the other DPAA2 objects (DPNI). This function is
- * supposed to discover such managed objects in the resource container and
- * add them as children to perform a proper initialization.
+ * allocated as resources or associated with the other DPAA2 objects. This
+ * function is supposed to discover such managed objects in the resource
+ * container and add them as children to perform a proper initialization.
  *
  * NOTE: It must be called together with bus_generic_probe() and
  *       bus_generic_attach() before add_child().
@@ -2173,9 +2166,9 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	device_t rcdev, dev;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
 	dpaa2_rc_obj_region_t reg;
-	enum dpaa2_dev_type devtype;
 	const char *devclass;
 	uint64_t start, end, count;
+	uint32_t flags = 0;
 	int error;
 
 	rcdev = sc->dev;
@@ -2184,18 +2177,24 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	switch (obj->type) {
 	case DPAA2_DEV_IO:
 		devclass = "dpaa2_io";
+		flags = DPAA2_MC_DEV_ALLOCATABLE;
 		break;
 	case DPAA2_DEV_BP:
 		devclass = "dpaa2_bp";
+		flags = DPAA2_MC_DEV_ALLOCATABLE;
 		break;
 	case DPAA2_DEV_CON:
 		devclass = "dpaa2_con";
+		flags = DPAA2_MC_DEV_ALLOCATABLE;
+		break;
+	case DPAA2_DEV_MAC:
+		devclass = "dpaa2_mac";
+		flags = DPAA2_MC_DEV_ASSOCIATED;
 		break;
 	default:
 		/* Only managed devices above are supported. */
 		return (EINVAL);
 	}
-	devtype = obj->type;
 
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
@@ -2220,7 +2219,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	dinfo->pdev = rcdev;
 	dinfo->dev = dev;
 	dinfo->id = obj->id;
-	dinfo->dtype = devtype;
+	dinfo->dtype = obj->type;
 	/* Children share their parent container's ICID and portal ID. */
 	dinfo->icid = rcinfo->icid;
 	dinfo->portal_id = rcinfo->portal_id;
@@ -2251,7 +2250,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	}
 
 	/* Inform MC about a new managed device. */
-	error = DPAA2_MC_MANAGE_DEVICE(rcdev, dev);
+	error = DPAA2_MC_MANAGE_DEV(rcdev, dev, flags);
 	if (error) {
 		device_printf(rcdev, "Failed to add a managed DPAA2 device: "
 		    "type=%s, id=%u, error=%d\n", (const char *)obj->type,
@@ -2455,6 +2454,7 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 
 /**
  * @internal
+ * @brief Reserve a DPAA2-specific device of the given devtype for the child.
  */
 static int
 add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
@@ -2466,7 +2466,7 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	int error;
 
 	/* Request a free DPAA2 device of the given type from MC. */
-	error = DPAA2_MC_FIRST_FREE_DEVICE(rcdev, &dpaa2_dev, devtype);
+	error = DPAA2_MC_GET_FREE_DEV(rcdev, &dpaa2_dev, devtype);
 	if (error) {
 		device_printf(rcdev, "Failed to obtain a free %s (rid=%d) for: "
 		    "%s (id=%u)\n", dpaa2_ttos(devtype), *rid,

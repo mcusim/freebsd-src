@@ -39,10 +39,10 @@ INTERFACE dpaa2_mc;
 #
 CODE {
 	static int
-	bypass_manage_device(device_t dev, device_t dpaa2_dev)
+	bypass_manage_dev(device_t dev, device_t dpaa2_dev)
 	{
 		if (device_get_parent(dev) != NULL)
-			return (DPAA2_MC_MANAGE_DEVICE(device_get_parent(dev),
+			return (DPAA2_MC_MANAGE_DEV(device_get_parent(dev),
 				dpaa2_dev));
 		return (ENXIO);
 	}
@@ -52,35 +52,37 @@ CODE {
 		enum dpaa2_dev_type devtype)
 	{
 		if (device_get_parent(dev) != NULL)
-			return (DPAA2_MC_FIRST_FREE_DEVICE(
-				device_get_parent(dev), dpaa2_dev, devtype));
+			return (DPAA2_MC_GET_FREE_DEV(device_get_parent(dev),
+				dpaa2_dev, devtype));
 		return (ENXIO);
 	}
 
 	static int
-	bypass_last_free_device(device_t dev, device_t *dpaa2_dev,
-		enum dpaa2_dev_type devtype)
+	bypass_get_dev(device_t dev, device_t *dpaa2_dev,
+		enum dpaa2_dev_type devtype, uint32_t obj_id)
 	{
 		if (device_get_parent(dev) != NULL)
-			return (DPAA2_MC_LAST_FREE_DEVICE(
-				device_get_parent(dev), dpaa2_dev, devtype));
+			return (DPAA2_MC_GET_DEVICE(device_get_parent(dev),
+				dpaa2_dev, devtype, obj_id));
 		return (ENXIO);
 	}
 }
 
-METHOD int manage_device {
-	device_t dev;
-	device_t dpaa2_dev;
-} DEFAULT bypass_manage_device;
+METHOD int manage_dev {
+	device_t	 dev;
+	device_t	 dpaa2_dev;
+	uint32_t	 flags;
+} DEFAULT bypass_manage_dev;
 
-METHOD int first_free_device {
-	device_t dev;
-	device_t *dpaa2_dev;
+METHOD int get_free_dev {
+	device_t	 dev;
+	device_t	*dpaa2_dev;
 	enum dpaa2_dev_type devtype;
-} DEFAULT bypass_first_free_device;
+} DEFAULT bypass_get_free_dev;
 
-METHOD int last_free_device {
-	device_t dev;
-	device_t *dpaa2_dev;
+METHOD int get_dev {
+	device_t	 dev;
+	device_t	*dpaa2_dev;
 	enum dpaa2_dev_type devtype;
-} DEFAULT bypass_last_free_device;
+	uint32_t	 obj_id;
+} DEFAULT bypass_get_dev;

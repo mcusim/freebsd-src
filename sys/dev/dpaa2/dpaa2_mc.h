@@ -31,6 +31,7 @@
 
 #include <sys/rman.h>
 #include <sys/bus.h>
+#include <sys/queue.h>
 
 #include <net/ethernet.h>
 
@@ -43,11 +44,21 @@
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Minimal size of the MC portal. */
 #define DPAA2_IO_MSI_COUNT	1
 
-/* MC Registers */
+/*
+ * MC Registers
+ */
 #define MC_REG_GCR1		0x00u
 #define GCR1_P1_STOP		0x80000000
 #define MC_REG_GSR		0x08u
 #define MC_REG_FAPR		0x28u
+
+/*
+ * Flags for DPAA2 devices as resources.
+ */
+#define DPAA2_MC_DEV_ALLOCATABLE	0x01u
+#define DPAA2_MC_DEV_ASSOCIATED		0x02u
+
+struct dpaa2_mc_devinfo;
 
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.
@@ -74,6 +85,9 @@ struct dpaa2_mc_softc {
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
 	struct rman		 dpcon_rman;
+
+	struct mtx		 mdev_lock;
+	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
 };
 
 /**
@@ -121,9 +135,15 @@ struct dpaa2_con_softc {
 
 /**
  * @brief Software context for the DPAA2 MAC driver.
+ *
+ * dev:		Device associated with this software context.
+ * addr:	Physical address assigned to the DPMAC object.
+ * attr:	Attributes of the DPMAC object.
  */
 struct dpaa2_mac_softc {
 	device_t		 dev;
+	uint8_t			 addr[ETHER_ADDR_LEN];
+	dpaa2_mac_attr_t	 attr;
 };
 
 /**
@@ -232,10 +252,10 @@ int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
 
 /* For DPAA2 Management Complex bus driver interface */
-int dpaa2_mc_manage_device(device_t mcdev, device_t dpaa2_dev);
-int dpaa2_mc_first_free_device(device_t mcdev, device_t *dpaa2_dev,
+int dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev);
+int dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
-int dpaa2_mc_last_free_device(device_t mcdev, device_t *dpaa2_dev,
-    enum dpaa2_dev_type devtype);
+int dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype, uint32_t obj_id);
 
 #endif /* _DPAA2_MC_H */
