@@ -48,7 +48,7 @@ CODE {
 	}
 
 	static int
-	bypass_first_free_device(device_t dev, device_t *dpaa2_dev,
+	bypass_get_free_dev(device_t dev, device_t *dpaa2_dev,
 		enum dpaa2_dev_type devtype)
 	{
 		if (device_get_parent(dev) != NULL)
@@ -62,7 +62,7 @@ CODE {
 		enum dpaa2_dev_type devtype, uint32_t obj_id)
 	{
 		if (device_get_parent(dev) != NULL)
-			return (DPAA2_MC_GET_DEVICE(device_get_parent(dev),
+			return (DPAA2_MC_GET_DEV(device_get_parent(dev),
 				dpaa2_dev, devtype, obj_id));
 		return (ENXIO);
 	}
