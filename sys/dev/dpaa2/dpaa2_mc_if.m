@@ -39,11 +39,11 @@ INTERFACE dpaa2_mc;
 #
 CODE {
 	static int
-	bypass_manage_dev(device_t dev, device_t dpaa2_dev)
+	bypass_manage_dev(device_t dev, device_t dpaa2_dev, uint32_t flags)
 	{
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_MC_MANAGE_DEV(device_get_parent(dev),
-				dpaa2_dev));
+				dpaa2_dev, flags));
 		return (ENXIO);
 	}
 
