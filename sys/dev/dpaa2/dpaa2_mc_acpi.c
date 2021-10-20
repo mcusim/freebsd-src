@@ -165,9 +165,9 @@ dpaa2_mc_acpi_deactivate_resource(device_t mcdev, device_t child, int type,
  */
 
 static int
-dpaa2_mc_acpi_manage_dev(device_t mcdev, device_t dpaa2_dev)
+dpaa2_mc_acpi_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 {
-	return (dpaa2_mc_manage_dev(mcdev, dpaa2_dev));
+	return (dpaa2_mc_manage_dev(mcdev, dpaa2_dev, flags));
 }
 
 static int
