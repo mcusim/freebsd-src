@@ -252,7 +252,7 @@ int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
 
 /* For DPAA2 Management Complex bus driver interface */
-int dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev);
+int dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags);
 int dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
 int dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
