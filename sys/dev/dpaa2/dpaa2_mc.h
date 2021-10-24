@@ -58,6 +58,7 @@
 #define DPAA2_MC_DEV_ALLOCATABLE	0x01u
 #define DPAA2_MC_DEV_ASSOCIATED		0x02u
 
+/* An element in the list of managed and non-allocatable DPAA2 objects. */
 struct dpaa2_mc_devinfo;
 
 /**
@@ -80,12 +81,14 @@ struct dpaa2_mc_softc {
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
 
+	/* For managed and allocatable DPAA2 objects. */
 	struct rman		 io_rman;
 	struct rman		 msi_rman;
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
 	struct rman		 dpcon_rman;
 
+	/* For managed and non-allocatable DPAA2 objects. */
 	struct mtx		 mdev_lock;
 	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
 };
@@ -110,13 +113,15 @@ struct dpaa2_rc_softc {
  */
 struct dpaa2_io_softc {
 	device_t		 dev;
+	dpaa2_swp_desc_t	 swp_desc;
+	dpaa2_swp_t		 swp;
+
 	struct resource 	*res[3];
 	struct resource_map	 map[3];
+
 	int			 irq_rid[DPAA2_IO_MSI_COUNT];
 	struct resource		*irq_resource;
 	void			*intr; /* interrupt handle */
-	dpaa2_swp_desc_t	 swp_desc;
-	dpaa2_swp_t		 swp;
 };
 
 /**
@@ -167,6 +172,7 @@ struct dpaa2_ni_softc {
 	uint16_t		 tx_data_off;
 	dpaa2_ni_attr_t		 attr;
 
+	/* For network interface and miibus. */
 	struct ifnet		*ifp;
 	struct mtx		 lock;
 	device_t		 miibus;
@@ -175,9 +181,16 @@ struct dpaa2_ni_softc {
 	int			 media_status;
 
 	struct {
+		bus_dma_tag_t	 dtag;
+		bus_dmamap_t	 dmap;
+		bus_addr_t	 buf_busaddr;
+		uint8_t		*buf;
+	} qos_kcfg; /* QoS table key configuration. */
+
+	struct {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
-	} mac;
+	} mac; /* Info about connected DPMAC (if exists) */
 
 	struct {
 		uint32_t	 rate;
