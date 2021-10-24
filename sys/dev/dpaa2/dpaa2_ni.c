@@ -85,8 +85,9 @@ __FBSDID("$FreeBSD$");
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
 #define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
 
-/* Macros to calculate DPAA2 resource IDs. */
-
+/*
+ * Macros to calculate DPAA2 resource IDs.
+ */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
 
@@ -96,14 +97,15 @@ __FBSDID("$FreeBSD$");
 #define CON_RID_OFF		(5u)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
 
-/* Macros to lock/unlock DPNI. */
 #define DPNI_LOCK(sc) do {			\
 	mtx_assert(&(sc)->lock, MA_NOTOWNED);	\
 	mtx_lock(&(sc)->lock);			\
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-/* Minimally supported version of the DPNI API. */
+/*
+ * Minimally supported version of the DPNI API.
+ */
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
 
@@ -132,6 +134,11 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
 #define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf))//, CACHE_LINE_SIZE)
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
+
+/*
+ * Size of a buffer to keep a QoS table key configuration.
+ */
+#define ETH_QOS_KCFG_BUF_SIZE	256
 
 /* DPNI buffer layout options. */
 
@@ -182,6 +189,8 @@ static void	dpni_ifmedia_tick(void *arg);
 static void	dpni_if_init(void *arg);
 static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
+		    int nseg, int error);
 
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
@@ -571,11 +580,9 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 
 	/* Configure ingress traffic classification. */
 	error = set_qos_table(dev, dpaa2_mcp_tk(cmd, ni_token));
-	if (error) {
+	if (error)
 		device_printf(dev, "Failed to configure QoS table: error=%d\n",
 		    error);
-		goto err_close_ni;
-	}
 
 	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
@@ -738,12 +745,64 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
 static int
 set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 {
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	dpaa2_ni_qos_table_t tbl;
+	int error;
+
 	/*
-	 * NOTE: Don't forget to set QoS table beforehand which requires zeroed
-	 * 256 bytes of DMA-able memory to hold the QoS key configuration.
-	 *
-	 * return (DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd));
+	 * Allocate a buffer visible to the device to hold the QoS table key
+	 * configuration.
 	 */
+
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    PAGE_SIZE, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    NULL, NULL,			/* filter, filterarg */
+	    ETH_QOS_KCFG_BUF_SIZE, 1,	/* maxsize, nsegments */
+	    ETH_QOS_KCFG_BUF_SIZE, 0,	/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->qos_kcfg.dtag);
+	if (error) {
+		device_printf(dev, "Failed to create a DMA tag for QoS key "
+		    "configuration buffer\n");
+		return (error);
+	}
+
+	error = bus_dmamem_alloc(sc->qos_kcfg.dtag, (void **) &sc->qos_kcfg.buf,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->qos_kcfg.dmap);
+	if (error) {
+		device_printf(dev, "Failed to allocate a buffer for QoS key "
+		    "configuration\n");
+		return (error);
+	}
+
+	error = bus_dmamap_load(sc->qos_kcfg.dtag, sc->qos_kcfg.dmap,
+	    sc->qos_kcfg.buf, ETH_QOS_KCFG_BUF_SIZE, dpni_qos_kcfg_dmamap_cb,
+	    &sc->qos_kcfg.buf_busaddr, BUS_DMA_NOWAIT);
+	if (error) {
+		device_printf(dev, "Failed to map QoS key configuration buffer "
+		    "into bus space\n");
+		return (error);
+	}
+
+	tbl.default_tc = 0;
+	tbl.discard_on_miss = false;
+	tbl.keep_entries = false;
+	tbl.kcfg_busaddr = sc->qos_kcfg.buf_busaddr;
+	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, cmd, &tbl);
+	if (error) {
+		device_printf(dev, "Failed to set QoS table\n");
+		return (error);
+	}
+
+	error = DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd);
+	if (error) {
+		device_printf(dev, "Failed to clear QoS table\n");
+		return (error);
+	}
+
 	return (0);
 }
 
@@ -888,6 +947,23 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	return (error);
+}
+
+/**
+ * @internal
+ * @brief Callback function to obtain an address of the QoS table key
+ * configuration buffer in the device visible address space.
+ */
+static void
+dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
+{
+	if (error)
+		return;
+	/*
+	 * Only one 256-bytes long segment has been requested for QoS key
+	 * configuration buffer.
+	 */
+	*(bus_addr_t *) arg = segs[0].ds_addr;
 }
 
 /**

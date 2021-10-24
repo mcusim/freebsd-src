@@ -146,6 +146,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
 #define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
 #define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
+#define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
 #define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
@@ -256,6 +257,8 @@ static int	add_dpaa2_res(device_t rcdev, device_t child,
 		    enum dpaa2_dev_type devtype, int *rid, int flags);
 static int	print_dpaa2_type(struct resource_list *rl,
 		    enum dpaa2_dev_type type);
+static void	reset_cmd_params(dpaa2_cmd_t cmd);
+
 /*
  * Device interface.
  */
@@ -1524,6 +1527,38 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_ni_set_qos_table(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_qos_table_t *tbl)
+{
+	struct __packed qos_table_args {
+		uint32_t	_reserved1;
+		uint8_t		default_tc;
+		uint8_t		options;
+		uint16_t	_reserved2;
+		uint64_t	_reserved[5];
+		uint64_t	kcfg_busaddr;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !tbl)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct qos_table_args *) &cmd->params[0];
+	args->default_tc = tbl->default_tc;
+	args->kcfg_busaddr = tbl->kcfg_busaddr;
+
+	args->options |= tbl->discard_on_miss	? 1U : 0U;
+	args->options |= tbl->keep_entries	? 2U : 0U;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_QOS_TABLE));
+}
+
+static int
 dpaa2_rc_ni_clear_qos_table(device_t rcdev, dpaa2_cmd_t cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -2523,6 +2558,17 @@ print_dpaa2_type(struct resource_list *rl, enum dpaa2_dev_type type)
 	return (retval);
 }
 
+/**
+ * @internal
+ */
+static void
+reset_cmd_params(dpaa2_cmd_t cmd)
+{
+	if (!cmd)
+		return;
+	memset(cmd->params, 0, sizeof(cmd->params[0]) * DPAA2_CMD_PARAMS_N);
+}
+
 static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_rc_probe),
@@ -2579,6 +2625,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_link_cfg,	dpaa2_rc_ni_set_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
+	DEVMETHOD(dpaa2_cmd_ni_set_qos_table,	dpaa2_rc_ni_set_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),

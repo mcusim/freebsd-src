@@ -297,6 +297,16 @@ CODE {
 		return (ENXIO);
 	}
 	static int
+	bypass_ni_set_qos_table(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_qos_table_t *tbl)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_QOS_TABLE(
+				device_get_parent(dev), cmd, tbl));
+		return (ENXIO);
+	}
+	static int
 	bypass_ni_clear_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	{
 		panic_on_mc(dev);
@@ -663,6 +673,12 @@ METHOD int ni_get_port_mac_addr {
 	dpaa2_cmd_t	 cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_get_port_mac_addr;
+
+METHOD int ni_set_qos_table {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_qos_table_t *tbl;
+} DEFAULT bypass_ni_set_qos_table;
 
 METHOD int ni_clear_qos_table {
 	device_t	 dev;

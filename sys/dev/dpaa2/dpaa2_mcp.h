@@ -351,6 +351,26 @@ typedef struct {
 } dpaa2_ni_link_cfg_t;
 
 /**
+ * @brief QoS table configuration.
+ *
+ * kcfg_busaddr:	Address of the buffer in I/O virtual address space which
+ *			holds the QoS table key configuration.
+ * default_tc:		Default traffic class to use in case of a lookup miss in
+ *			the QoS table.
+ * discard_on_miss:	Set to true to discard frames in case of no match.
+ *			Default traffic class will be used otherwise.
+ * keep_entries:	Set to true to keep existing QoS table entries. This
+ *			option will work properly only for DPNI objects created
+ *			with DPNI_OPT_HAS_KEY_MASKING option.
+ */
+typedef struct {
+	uint64_t	kcfg_busaddr;
+	uint8_t		default_tc;
+	bool		discard_on_miss;
+	bool		keep_entries;
+} dpaa2_ni_qos_table_t;
+
+/**
  * @brief DPAA2 endpoint descriptor.
  *
  * obj_id:	Endpoint object ID.
