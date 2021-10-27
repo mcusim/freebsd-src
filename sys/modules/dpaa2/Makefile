@@ -17,7 +17,7 @@ SRCS+=	dpaa2_cmd_if.c dpaa2_cmd_if.h
 SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
 SRCS+=	dpaa2_mc_if.c dpaa2_mc_if.h
 
-SRCS+=	bus_if.h device_if.h opt_platform.h
+SRCS+=	bus_if.h device_if.h miibus_if.h opt_platform.h
 
 .if ${MACHINE_CPUARCH} == "aarch64" || \
     ${MACHINE_CPUARCH} == "amd64" || \
