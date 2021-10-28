@@ -114,15 +114,13 @@ __FBSDID("$FreeBSD$");
 
 /*
  * Due to a limitation in WRIOP 1.0.0, the RX buffer data must be aligned
- * to 256B. For newer revisions, the requirement is only for 64B alignment.
+ * to 256 bytes. For newer revisions, the requirement is only for 64B alignment.
  */
 #define ETH_RX_BUF_ALIGN_REV1	256
 #define ETH_RX_BUF_ALIGN	64
 
 /*
- * We are accommodating a skb backpointer and some S/G info in the frame's
- * software annotation. The hardware options are either 0 or 64, so we choose
- * the latter.
+ * Frame's software annotation. The hardware options are either 0 or 64.
  */
 #define ETH_SWA_SIZE		64
 
@@ -131,6 +129,9 @@ __FBSDID("$FreeBSD$");
  */
 #define ETH_RX_HWA_SIZE		64
 
+/*
+ * Rx buffer configuration.
+ */
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
 #define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf))//, CACHE_LINE_SIZE)
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
@@ -140,22 +141,21 @@ __FBSDID("$FreeBSD$");
  */
 #define ETH_QOS_KCFG_BUF_SIZE	256
 
-/* DPNI buffer layout options. */
-
-/* Select to modify the time-stamp setting */
+/*
+ * DPNI buffer layout options.
+ */
 #define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
-/* Select to modify the parser-result setting; not applicable for Tx */
 #define DPNI_BUF_LAYOUT_OPT_PARSER_RESULT	0x00000002
-/* Select to modify the frame-status setting */
 #define DPNI_BUF_LAYOUT_OPT_FRAME_STATUS	0x00000004
-/* Select to modify the private-data-size setting */
 #define DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE	0x00000008
-/* Select to modify the data-alignment setting */
 #define DPNI_BUF_LAYOUT_OPT_DATA_ALIGN		0x00000010
-/* Select to modify the data-head-room setting */
 #define DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM	0x00000020
-/* Select to modify the data-tail-room setting */
 #define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
+
+/*
+ * Enables TCAM for Flow Steering and QoS look-ups.
+ */
+#define DPNI_OPT_HAS_KEY_MASKING		0x000010
 
 struct resource_spec dpaa2_ni_spec[] = {
 	/* DPIO resources */
@@ -488,20 +488,18 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	}
 	if (bootverbose) {
 		device_printf(dev,
-		    "options=%#x\n"
-		    "\t queues=%d, tx_channels=%d\n"
-		    "\t rx_tcs=%d, tx_tcs=%d, cgs_groups=%d\n"
-		    "\t tables mac=%d, vlan=%d, qos=%d, fs=%d\n"
-		    "\t key sizes qos=%d, fs=%d\n"
-		    "\t wriop_ver=%#x\n",
+		    "options=%#x queues=%d tx_channels=%d wriop_version=%#x\n"
+		    "\t traffic classes: rx=%d tx=%d, cgs_groups=%d\n"
+		    "\t table entries: mac=%d vlan=%d qos=%d fs=%d\n"
+		    "\t key sizes: qos=%d, fs=%d\n",
 		    sc->attr.options,
 		    sc->attr.num.queues, sc->attr.num.channels,
+		    sc->attr.wriop_ver,
 		    sc->attr.num.rx_tcs + 1, sc->attr.num.tx_tcs + 8,
 		    sc->attr.num.cgs,
 		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
 		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
 		    sc->attr.key_size.qos, sc->attr.key_size.fs,
-		    sc->attr.wriop_ver
 		);
 	}
 
@@ -748,6 +746,14 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	dpaa2_ni_qos_table_t tbl;
 	int error;
+
+	if (sc->attr.num.rx_tcs == 1 ||
+	    !(sc->attr.options & DPNI_OPT_HAS_KEY_MASKING)) {
+		if (bootverbose)
+			device_printf(dev, "VLAN-based QoS classification is "
+			    "not supported\n");
+		return (0);
+	}
 
 	/*
 	 * Allocate a buffer visible to the device to hold the QoS table key
