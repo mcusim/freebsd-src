@@ -489,9 +489,9 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	if (bootverbose) {
 		device_printf(dev,
 		    "options=%#x queues=%d tx_channels=%d wriop_version=%#x\n"
-		    "\t traffic classes: rx=%d tx=%d, cgs_groups=%d\n"
+		    "\t traffic classes: rx=%d tx=%d cgs_groups=%d\n"
 		    "\t table entries: mac=%d vlan=%d qos=%d fs=%d\n"
-		    "\t key sizes: qos=%d, fs=%d\n",
+		    "\t key sizes: qos=%d fs=%d\n",
 		    sc->attr.options,
 		    sc->attr.num.queues, sc->attr.num.channels,
 		    sc->attr.wriop_ver,
