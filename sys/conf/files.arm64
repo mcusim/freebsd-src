@@ -326,6 +326,7 @@ dev/dpaa2/dpaa2_swp.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_bp.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_ni.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_mac.c				optional SOC_NXP_LS dpaa2
+dev/dpaa2/dpaa2_con.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_mc_acpi.c			optional SOC_NXP_LS dpaa2 acpi
 #dev/dpaa2/dpaa2_mc_fdt.c			optional SOC_NXP_LS dpaa2 fdt
 
