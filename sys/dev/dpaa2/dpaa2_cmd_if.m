@@ -546,7 +546,7 @@ CODE {
 	}
 	static int
 	bypass_con_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_mac_attr_t *attr)
+		dpaa2_con_attr_t *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
