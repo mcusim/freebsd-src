@@ -399,6 +399,19 @@ typedef struct {
 	enum dpaa2_mac_link_type link_type;
 } dpaa2_mac_attr_t;
 
+/**
+ * @brief Attributes of the DPCON object.
+ *
+ * id:		DPCON object ID.
+ * chan_id:	QBMan channel ID to be used for dequeue operations.
+ * prior_num:	Number of priorities for the DPCON channel (1-8).
+ */
+typedef struct {
+	uint32_t	id;
+	uint16_t	chan_id;
+	uint8_t		prior_num;
+} dpaa2_con_attr_t;
+
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
 

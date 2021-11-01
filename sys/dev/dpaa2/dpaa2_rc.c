@@ -176,6 +176,20 @@ __FBSDID("$FreeBSD$");
 #define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
 #define CMDID_MAC_GET_ATTR			CMD_MAC(0x004)
 
+/* ------------------------- DPCON command IDs ------------------------------ */
+#define CMD_CON_BASE_VERSION	1
+#define CMD_CON_ID_OFFSET	4
+
+#define CMD_CON(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_CON_OPEN				CMD_CON(0x808)
+#define CMDID_CON_CLOSE				CMD_CON(0x800)
+#define CMDID_CON_ENABLE			CMD_CON(0x002)
+#define CMDID_CON_DISABLE			CMD_CON(0x003)
+#define CMDID_CON_GET_ATTR			CMD_CON(0x004)
+#define CMDID_CON_RESET				CMD_CON(0x005)
+#define CMDID_CON_SET_NOTIF			CMD_CON(0x100)
+
 /* ------------------------- End of command IDs ----------------------------- */
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
@@ -1972,6 +1986,118 @@ dpaa2_rc_mac_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 	return (error);
 }
 
+static int
+dpaa2_rc_con_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
+    uint16_t *token)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_cmd_header *hdr;
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !token)
+		return (DPAA2_CMD_STAT_ERR);
+
+	cmd->params[0] = dpcon_id;
+	error = exec_command(sc->portal, cmd, CMDID_CON_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
+
+	return (error);
+}
+
+
+static int
+dpaa2_rc_con_close(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_CON_CLOSE));
+}
+
+static int
+dpaa2_rc_con_reset(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_CON_RESET));
+}
+
+static int
+dpaa2_rc_con_enable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_CON_ENABLE));
+}
+
+static int
+dpaa2_rc_con_disable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_CON_DISABLE));
+}
+
+static int
+dpaa2_rc_con_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_con_attr_t *attr)
+{
+	struct __packed con_attr_resp {
+		uint32_t	id;
+		uint16_t	chan_id;
+		uint8_t		prior_num;
+		uint8_t		_reserved1;
+		uint64_t	_reserved2[6];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !attr)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	error = exec_command(sc->portal, cmd, CMDID_CON_GET_ATTR);
+	if (!error) {
+		resp = (struct con_attr_resp *) &cmd->params[0];
+		attr->id = resp->id;
+		attr->chan_id = resp->chan_id;
+		attr->prior_num = resp->prior_num;
+	}
+
+	return (error);
+}
+
 /*
  * Internal functions.
  */
@@ -2649,6 +2775,13 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mac_mdio_write,	dpaa2_rc_mac_mdio_write),
 	DEVMETHOD(dpaa2_cmd_mac_get_addr,	dpaa2_rc_mac_get_addr),
 	DEVMETHOD(dpaa2_cmd_mac_get_attributes, dpaa2_rc_mac_get_attributes),
+	/*	DPCON commands */
+	DEVMETHOD(dpaa2_cmd_con_open,		dpaa2_rc_con_open),
+	DEVMETHOD(dpaa2_cmd_con_close,		dpaa2_rc_con_close),
+	DEVMETHOD(dpaa2_cmd_con_reset,		dpaa2_rc_con_reset),
+	DEVMETHOD(dpaa2_cmd_con_enable,		dpaa2_rc_con_enable),
+	DEVMETHOD(dpaa2_cmd_con_disable,	dpaa2_rc_con_disable),
+	DEVMETHOD(dpaa2_cmd_con_get_attributes,	dpaa2_rc_con_get_attributes),
 
 	DEVMETHOD_END
 };

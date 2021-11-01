@@ -498,6 +498,63 @@ CODE {
 		return (ENXIO);
 	}
 
+	static int
+	bypass_con_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
+		uint16_t *token)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_OPEN(
+				device_get_parent(dev), cmd, dpcon_id, token));
+		return (ENXIO);
+	}
+	static int
+	bypass_con_close(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_CLOSE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_con_reset(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_RESET(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_con_enable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_ENABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_con_disable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_DISABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_con_get_attributes(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_mac_attr_t *attr)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_GET_ATTRIBUTES(
+				device_get_parent(dev), cmd, attr));
+		return (ENXIO);
+	}
+
 };
 
 /**
@@ -807,3 +864,40 @@ METHOD int mac_get_attributes {
 	dpaa2_cmd_t	  cmd;
 	dpaa2_mac_attr_t *attr;
 } DEFAULT bypass_mac_get_attributes;
+
+/**
+ * @brief Data Path Concentrator (DPCON) commands.
+ */
+
+METHOD int con_open {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	const uint32_t	 dpcon_id;
+	uint16_t	*token;
+} DEFAULT bypass_con_open;
+
+METHOD int con_close {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_con_close;
+
+METHOD int con_reset {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_con_reset;
+
+METHOD int con_enable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_con_enable;
+
+METHOD int con_disable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_con_disable;
+
+METHOD int con_get_attributes {
+	device_t	  dev;
+	dpaa2_cmd_t	  cmd;
+	dpaa2_con_attr_t *attr;
+} DEFAULT bypass_con_get_attributes;
