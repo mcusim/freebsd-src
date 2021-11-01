@@ -491,7 +491,8 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 		mtx_lock(&sc->mdev_lock);
 		STAILQ_INSERT_TAIL(&sc->mdev_list, di, link);
 		mtx_unlock(&sc->mdev_lock);
-	}
+	} else
+		panic("Please, specify a type of the DPAA2 device to manage!");
 
 	return (0);
 }

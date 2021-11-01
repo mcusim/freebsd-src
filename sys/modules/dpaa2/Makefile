@@ -12,6 +12,7 @@ SRCS+=	dpaa2_ni.c
 SRCS+=	dpaa2_mcp.c
 SRCS+=	dpaa2_swp.c
 SRCS+=	dpaa2_mac.c
+SRCS+=	dpaa2_con.c
 
 SRCS+=	dpaa2_cmd_if.c dpaa2_cmd_if.h
 SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
