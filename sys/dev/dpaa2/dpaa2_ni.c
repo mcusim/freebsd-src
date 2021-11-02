@@ -633,9 +633,9 @@ setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		dpcon_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
 		dpcon_sc = device_get_softc(dpcon_dev);
 
-		sc->channel[i].dpio_dev = dpio_dev;
-		sc->channel[i].dpcon_dev = dpcon_dev;
-		sc->channel[i].chan_id = dpcon_sc->attr.chan_id;
+		sc->channel[i]->dpio_dev = dpio_dev;
+		sc->channel[i]->dpcon_dev = dpcon_dev;
+		sc->channel[i]->chan_id = dpcon_sc->attr.chan_id;
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
