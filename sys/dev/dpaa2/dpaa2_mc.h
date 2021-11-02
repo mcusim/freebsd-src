@@ -40,8 +40,11 @@
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
+#include "dpaa2_ni.h"
 
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Minimal size of the MC portal. */
+
+/* Maximum number of MSIs supported by DPIO objects. */
 #define DPAA2_IO_MSI_COUNT	1
 
 /*
@@ -150,54 +153,6 @@ struct dpaa2_mac_softc {
 	device_t		 dev;
 	uint8_t			 addr[ETHER_ADDR_LEN];
 	dpaa2_mac_attr_t	 attr;
-};
-
-/**
- * @brief Software context for the DPAA2 Network Interface driver.
- *
- * dev:		Device associated with this software context.
- * api_major:	Major version of the DPNI API.
- * api_minor:	Minor version of the DPNI API.
- * rx_bufsz:	Size of a buffer to receive frames.
- * tx_data_off: ...
- * attr:	Attributes of the DPNI object.
- * mac:		Details about DPMAC connected to this DPNI object (if exists).
- * link_state:	Link state of the network interface.
- */
-struct dpaa2_ni_softc {
-	device_t		 dev;
-	struct resource 	*res[9];
-	uint16_t		 api_major;
-	uint16_t		 api_minor;
-	uint16_t		 rx_bufsz;
-	uint16_t		 tx_data_off;
-	dpaa2_ni_attr_t		 attr;
-
-	/* For network interface and miibus. */
-	struct ifnet		*ifp;
-	struct mtx		 lock;
-	device_t		 miibus;
-	struct mii_data		*mii;
-	struct callout		 mii_callout;
-	int			 media_status;
-
-	struct {
-		bus_dma_tag_t	 dtag;
-		bus_dmamap_t	 dmap;
-		bus_addr_t	 buf_busaddr;
-		uint8_t		*buf;
-	} qos_kcfg; /* QoS table key configuration. */
-
-	struct {
-		uint32_t	 dpmac_id;
-		uint8_t		 addr[ETHER_ADDR_LEN];
-	} mac; /* Info about connected DPMAC (if exists) */
-
-	struct {
-		uint32_t	 rate;
-		uint64_t	 options;
-		bool		 up;
-	} link_state;
 };
 
 /**
