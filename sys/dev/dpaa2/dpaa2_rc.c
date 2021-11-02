@@ -639,7 +639,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += resource_list_print_type(rl, "iomem", SYS_RES_MEMORY, "%#jx");
 	retval += resource_list_print_type(rl, "irq", SYS_RES_IRQ, "%jd");
 
-	/* Print DPAA-specific resources. */
+	/* Print DPAA2-specific resources. */
 	retval += print_dpaa2_type(rl, DPAA2_DEV_IO);
 	retval += print_dpaa2_type(rl, DPAA2_DEV_BP);
 	retval += print_dpaa2_type(rl, DPAA2_DEV_CON);
