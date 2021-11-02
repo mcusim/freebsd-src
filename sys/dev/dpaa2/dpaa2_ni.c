@@ -145,17 +145,20 @@ __FBSDID("$FreeBSD$");
  */
 #define DPNI_OPT_HAS_KEY_MASKING		0x000010
 
+MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni_memory", "DPAA2 Network Interface memory");
+
 /*
  * Macros to calculate DPAA2 resource IDs.
  */
+/* DPIO resources */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
 #define IO_RES_NUM		(4u)
-
+/* DPBP resources */
 #define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
 #define BP_RES_NUM		(1u)
-
+/* DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
 #define CON_RES_NUM		(4u)
@@ -270,8 +273,6 @@ dpaa2_ni_attach(device_t dev)
 	IFQ_SET_READY(&ifp->if_snd);
 
 	sc->num_chan = calc_channels_num(sc);
-	if (bootverbose)
-		device_printf(dev, "allocated channels=%d\n", sc->num_chan);
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
@@ -619,6 +620,30 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 static int
 setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 {
+	device_t dpio_dev;
+	device_t dpcon_dev;
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_con_softc *dpcon_sc;
+
+	for (uint32_t i = 0; i < sc->num_chan; i++) {
+		sc->channel[i] = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
+		    M_WAITOK | M_ZERO);
+
+		dpio_dev =  (device_t) rman_get_start(sc->res[IO_RID(i)]);
+		dpcon_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
+		dpcon_sc = device_get_softc(dpcon_dev);
+
+		sc->channel[i].dpio_dev = dpio_dev;
+		sc->channel[i].dpcon_dev = dpcon_dev;
+		sc->channel[i].chan_id = dpcon_sc->attr.chan_id;
+
+		if (bootverbose)
+			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
+			    "channel_id=%d\n", dpio_dev, dpcon_dev, chan_id);
+	}
+
+	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
+
 	return (0);
 }
 
@@ -1024,8 +1049,10 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 	for (i = 0; i < CON_RES_NUM; i++)
 		if (!sc->res[CON_RID(i)])
 			break;
+	num_chan = i < num_chan ? i : num_chan;
 
-	return (i < num_chan ? i : num_chan);
+	return (num_chan > DPAA2_NI_MAX_CHANNELS
+	    ? DPAA2_NI_MAX_CHANNELS : num_chan);
 }
 
 static device_method_t dpaa2_ni_methods[] = {
