@@ -85,18 +85,6 @@ __FBSDID("$FreeBSD$");
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
 #define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
 
-/*
- * Macros to calculate DPAA2 resource IDs.
- */
-#define IO_RID_OFF		(0u)
-#define IO_RID(rid)		((rid) + IO_RID_OFF)
-
-#define BP_RID_OFF		(4u)
-#define BP_RID(rid)		((rid) + BP_RID_OFF)
-
-#define CON_RID_OFF		(5u)
-#define CON_RID(rid)		((rid) + CON_RID_OFF)
-
 #define DPNI_LOCK(sc) do {			\
 	mtx_assert(&(sc)->lock, MA_NOTOWNED);	\
 	mtx_lock(&(sc)->lock);			\
@@ -157,6 +145,21 @@ __FBSDID("$FreeBSD$");
  */
 #define DPNI_OPT_HAS_KEY_MASKING		0x000010
 
+/*
+ * Macros to calculate DPAA2 resource IDs.
+ */
+#define IO_RID_OFF		(0u)
+#define IO_RID(rid)		((rid) + IO_RID_OFF)
+#define IO_RES_NUM		(4u)
+
+#define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
+#define BP_RID(rid)		((rid) + BP_RID_OFF)
+#define BP_RES_NUM		(1u)
+
+#define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
+#define CON_RID(rid)		((rid) + CON_RID_OFF)
+#define CON_RES_NUM		(4u)
+
 struct resource_spec dpaa2_ni_spec[] = {
 	/* DPIO resources */
 	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
@@ -168,8 +171,8 @@ struct resource_spec dpaa2_ni_spec[] = {
 	/* DPCON resources */
 	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
 	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
-	{ DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL },
-	{ DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL },
+	/* { DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL }, */
 
 	RESOURCE_SPEC_END
 };
@@ -177,6 +180,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 /* Forward declarations. */
 
 static int	setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
+static int	setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -191,6 +195,8 @@ static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
+
+static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
@@ -263,6 +269,10 @@ dpaa2_ni_attach(device_t dev)
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
 	IFQ_SET_READY(&ifp->if_snd);
 
+	sc->num_chan = calc_channels_num(sc);
+	if (bootverbose)
+		device_printf(dev, "allocated channels=%d\n", sc->num_chan);
+
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
@@ -281,6 +291,10 @@ dpaa2_ni_attach(device_t dev)
 
 	/* Setup network interface object. */
 	error = setup_dpni(dev, cmd, rc_token);
+	if (error)
+		goto err_free_cmd;
+	/* Configure QBMan channels. */
+	error = setup_dpio(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
 
@@ -486,7 +500,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    "error=%d\n", dinfo->id, error);
 		goto err_close_ni;
 	}
-	if (bootverbose) {
+	if (bootverbose)
 		device_printf(dev,
 		    "options=%#x queues=%d tx_channels=%d wriop_version=%#x\n"
 		    "\t traffic classes: rx=%d tx=%d cgs_groups=%d\n"
@@ -500,7 +514,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
 		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
 		    sc->attr.key_size.qos, sc->attr.key_size.fs);
-	}
 
 	/* Configure buffer layouts of the DPNI queues. */
 	error = set_buf_layout(dev, cmd);
@@ -597,6 +610,16 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    dinfo->id, error);
 
 	return (ENXIO);
+}
+
+/**
+ * @internal
+ * @brief Сonfigure QBMan channels and register data availability notifications.
+ */
+static int
+setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
+{
+	return (0);
 }
 
 /**
@@ -980,6 +1003,29 @@ cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
 	if (sc->api_major == major)
 		return sc->api_minor - minor;
 	return sc->api_major - major;
+}
+
+/**
+ * @internal
+ * @brief
+ */
+static uint8_t
+calc_channels_num(struct dpaa2_ni_softc *sc)
+{
+	uint8_t i, num_chan;
+
+	/* # of allocated DPIOs */
+	for (i = 0; i < IO_RES_NUM; i++)
+		if (!sc->res[IO_RID(i)])
+			break;
+	num_chan = i;
+
+	/* # of allocated DPCONs */
+	for (i = 0; i < CON_RES_NUM; i++)
+		if (!sc->res[CON_RID(i)])
+			break;
+
+	return (i < num_chan ? i : num_chan);
 }
 
 static device_method_t dpaa2_ni_methods[] = {
