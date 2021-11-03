@@ -266,7 +266,7 @@ struct dpaa2_swp {
 	} dqrr;
 
 	struct {
-		uint32_t	 pi;
+		uint32_t	 pi; /* producer index */
 		uint32_t	 pi_vb; /* PI valid bits */
 		uint32_t	 pi_ring_size;
 		uint32_t	 pi_ci_mask;
@@ -288,5 +288,10 @@ uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
 void	 dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed);
 void	 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always);
 void	 dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid);
+void	 dpaa2_swp_set_intr_trigger(dpaa2_swp_t swp, uint32_t mask);
+uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
+uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
+void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
+void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
 
 #endif /* _DPAA2_SWP_H */
