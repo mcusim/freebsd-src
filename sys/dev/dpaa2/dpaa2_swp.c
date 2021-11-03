@@ -288,6 +288,93 @@ dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid)
 	ed->tgtid = fqid;
 }
 
+/**
+ * @brief Enable interrupts for a software portal.
+ */
+void
+dpaa2_swp_set_intr_trigger(dpaa2_swp_t swp, uint32_t mask)
+{
+	if (swp)
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_IER, mask);
+	else
+		printf("%s failed\n", __func__);
+}
+
+/**
+ * @brief Return the value in the SWP_IER register.
+ */
+uint32_t
+dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp)
+{
+	if (swp)
+		return dpaa2_swp_read_reg(swp, DPAA2_SWP_CINH_IER);
+	else
+		printf("%s failed\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief Return the value in the SWP_ISR register.
+ */
+uint32_t
+dpaa2_swp_read_intr_status(dpaa2_swp_t swp)
+{
+	if (swp)
+		return dpaa2_swp_read_reg(swp, DPAA2_SWP_CINH_ISR);
+	else
+		printf("%s failed\n", __func__);
+
+	return (0);
+}
+
+/**
+ * @brief Clear SWP_ISR register according to the given mask.
+ */
+void
+dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask)
+{
+	if (swp)
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_ISR, mask);
+	else
+		printf("%s failed\n", __func__);
+}
+
+/**
+ * @brief Enable or disable push dequeue.
+ *
+ * p:		the software portal object
+ * chan_idx:	the channel index (0 to 15)
+ * en:		enable or disable push dequeue
+ */
+void
+dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
+{
+	uint16_t dqsrc;
+
+	if (chan_idx > 15) {
+		printf("%s: channel index should be <= 15: chan_idx=%d\n",
+		    __func__, chan_idx);
+		return;
+	}
+
+	if (swp) {
+		if (en)
+			swp->sdq |= 1 << chan_idx;
+		else
+			swp->sdq &= ~(1 << chan_idx);
+		/*
+		 * Read make the complete src map. If no channels are enabled
+		 * the SDQCR must be 0 or else QMan will assert errors.
+		 */
+		dqsrc = (swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
+		    DPAA2_SDQCR_SRC_MASK;
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
+		    ? swp->sdq : 0);
+	} else
+		printf("%s failed\n", __func__);
+}
+
 /*
  * Internal functions.
  */

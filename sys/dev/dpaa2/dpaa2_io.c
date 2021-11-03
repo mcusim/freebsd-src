@@ -232,10 +232,10 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Enable only DQRR interrupts for now */
-	DPAA2_SWP_SET_INTR_TRIGGER(dev, DPAA2_SWP_INTR_DQRI);
-	DPAA2_SWP_CLEAR_INTR_STATUS(dev, 0xffffffff);
+	dpaa2_swp_set_intr_trigger(sc->swp, DPAA2_SWP_INTR_DQRI);
+	dpaa2_swp_clear_intr_status(sc->swp, 0xffffffff);
 	if (sc->swp_desc.has_notif)
-		DPAA2_SWP_SET_PUSH_DEQUEUE(dev, 0, true);
+		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 
 	/* Configure IRQs. */
 	error = setup_msi(sc);
@@ -276,109 +276,7 @@ dpaa2_io_detach(device_t dev)
  */
 
 /**
- * @brief Enable interrupts for a software portal.
- */
-static void
-dpaa2_io_set_intr_trigger(device_t iodev, uint32_t mask)
-{
-	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
-
-	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IER, mask);
-	else
-		device_printf(iodev, "%s failed\n", __func__);
-}
-
-/**
- * @brief Return the value in the SWP_IER register.
- */
-static uint32_t
-dpaa2_io_get_intr_trigger(device_t iodev)
-{
-	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
-
-	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_IER);
-	else
-		device_printf(iodev, "%s failed\n", __func__);
-
-	return (0);
-}
-
-/**
- * @brief Return the value in the SWP_ISR register.
- */
-static uint32_t
-dpaa2_io_read_intr_status(device_t iodev)
-{
-	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
-
-	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		return dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
-	else
-		device_printf(iodev, "%s failed\n", __func__);
-
-	return (0);
-}
-
-/**
- * @brief Clear SWP_ISR register according to the given mask.
- */
-static void
-dpaa2_io_clear_intr_status(device_t iodev, uint32_t mask)
-{
-	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
-
-	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp)
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, mask);
-	else
-		device_printf(iodev, "%s failed\n", __func__);
-}
-
-/**
- * @brief Enable or disable push dequeue.
- *
- * p:		the software portal object
- * chan_idx:	the channel index (0 to 15)
- * en:		enable or disable push dequeue
- */
-static void
-dpaa2_io_set_push_dequeue(device_t iodev, uint8_t chan_idx, bool en)
-{
-	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(iodev);
-	uint16_t dqsrc;
-
-	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_IO && sc->swp) {
-		if (chan_idx > 15) {
-			device_printf(iodev, "%s: channel index should "
-			    "be <= 15: chan_idx=%d\n", __func__, chan_idx);
-			return;
-		}
-
-		if (en)
-			sc->swp->sdq |= 1 << chan_idx;
-		else
-			sc->swp->sdq &= ~(1 << chan_idx);
-
-		/*
-		 * Read make the complete src map. If no channels are enabled
-		 * the SDQCR must be 0 or else QMan will assert errors.
-		 */
-		dqsrc = (sc->swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
-		    DPAA2_SDQCR_SRC_MASK;
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
-		    ? sc->swp->sdq : 0);
-	} else
-		device_printf(iodev, "%s failed\n", __func__);
-}
-
-/**
- * @brief Enqueue multiple frames to a frame queue using one fqid.
+ * @brief Enqueue multiple frames to a frame queue using one FQID.
  */
 static int
 dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
@@ -444,11 +342,6 @@ static device_method_t dpaa2_io_methods[] = {
 	DEVMETHOD(device_detach,	dpaa2_io_detach),
 
 	/* QBMan software portal interface */
-	DEVMETHOD(dpaa2_swp_set_intr_trigger,	dpaa2_io_set_intr_trigger),
-	DEVMETHOD(dpaa2_swp_get_intr_trigger,	dpaa2_io_get_intr_trigger),
-	DEVMETHOD(dpaa2_swp_read_intr_status,	dpaa2_io_read_intr_status),
-	DEVMETHOD(dpaa2_swp_clear_intr_status,	dpaa2_io_clear_intr_status),
-	DEVMETHOD(dpaa2_swp_set_push_dequeue,	dpaa2_io_set_push_dequeue),
 	DEVMETHOD(dpaa2_swp_enq_multiple_fq,	dpaa2_io_enq_multiple_fq),
 
 	DEVMETHOD_END

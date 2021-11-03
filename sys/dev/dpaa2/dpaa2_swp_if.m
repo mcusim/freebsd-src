@@ -41,30 +41,6 @@
  */
 INTERFACE dpaa2_swp;
 
-METHOD void set_intr_trigger {
-	device_t dev;
-	uint32_t mask;
-};
-
-METHOD uint32_t get_intr_trigger {
-	device_t dev;
-};
-
-METHOD uint32_t read_intr_status {
-	device_t dev;
-};
-
-METHOD void clear_intr_status {
-	device_t dev;
-	uint32_t mask;
-};
-
-METHOD void set_push_dequeue {
-	device_t dev;
-	uint8_t chan_idx;
-	bool en;
-};
-
 /**
  * @brief Enqueue multiple frames to a frame queue using one Frame Queue ID.
  *
