@@ -37,6 +37,7 @@
 
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
+#include "dpaa2_io.h"
 
 /* Maximum number of resources per DPNI. */
 #define DPAA2_NI_MAX_RESOURCES	9
@@ -45,12 +46,13 @@
 #define DPAA2_NI_MAX_CHANNELS	16
 
 /**
- * @brief
+ * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
  */
 typedef struct {
-	device_t		 dpio_dev;
-	device_t		 dpcon_dev;
-	uint16_t		 chan_id;
+	dpaa2_io_notif_ctx_t	 ctx;
+	device_t		 io_dev;
+	device_t		 con_dev;
+	uint16_t		 id;
 } dpaa2_ni_channel_t;
 
 /**
