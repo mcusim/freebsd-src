@@ -41,9 +41,12 @@
 
 #define DPAA2_PORTAL_TIMEOUT		100000	/* us */
 
-/* Portal flags. */
+/*
+ * Portal flags.
+ *
+ * TODO: Use the same flags for both MC and software portals.
+ */
 #define DPAA2_PORTAL_DEF		0x0u
-#define DPAA2_PORTAL_ATOMIC		0x1u	/* Use spinlock for a portal */
 #define DPAA2_PORTAL_NOWAIT_ALLOC	0x2u	/* Do not sleep during init */
 #define DPAA2_PORTAL_LOCKED		0x4000u	/* Wait till portal's unlocked */
 #define DPAA2_PORTAL_DESTROYED		0x8000u /* Terminate any operations */
@@ -132,7 +135,7 @@ enum dpaa2_mac_link_type {
 };
 
 /**
- * @brief Helper object to send commands to the MC portal.
+ * @brief Helper object to interact with the MC portal.
  *
  * res:			Unmapped portal's I/O memory.
  * map:			Mapped portal's I/O memory.
@@ -152,6 +155,7 @@ struct dpaa2_mcp {
 	uint16_t	flags;
 	uint16_t	rc_api_major;
 	uint16_t	rc_api_minor;
+	uint8_t		atomic;
 };
 
 /**
@@ -416,6 +420,8 @@ typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
 
 int	dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+	    struct resource_map *map, const uint16_t flags);
+int	dpaa2_mcp_init_atomic(dpaa2_mcp_t *portal, struct resource *res,
 	    struct resource_map *map, const uint16_t flags);
 int	dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
 void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
