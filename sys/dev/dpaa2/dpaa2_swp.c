@@ -55,7 +55,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
 
-#define CMD_SLEEP_TIMEOUT		1u	/* ms */
+#define CMD_SLEEP_TIMEOUT		10u	/* ms */
 #define CMD_SLEEP_ATTEMPTS		150u	/* max. 150 ms */
 #define CMD_SPIN_TIMEOUT		10u	/* us */
 #define CMD_SPIN_ATTEMPTS		15u	/* max. 150 us */
