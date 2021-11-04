@@ -2569,10 +2569,10 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 	const uint8_t atomic_portal = portal->atomic;
 	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
-
 	struct dpaa2_cmd_header *hdr;
 	uint64_t val;
 	uint32_t i;
+	int rc;
 
 	/* Wait for a command execution result from the MC hardware. */
 	for (i = 1; i <= attempts; i++) {
@@ -2584,19 +2584,18 @@ wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 		if (atomic_portal)
 			DELAY(CMD_SPIN_TIMEOUT);
 		else
-			pause("mcp_pa", CMD_SLEEP_TIMEOUT);
+			pause("dpaa2", CMD_SLEEP_TIMEOUT);
 	}
 
-	/* Update command results. */
+	/* Return an error on expired timeout, OK - otherwise. */
+	rc = i > attempts ? DPAA2_CMD_STAT_TIMEOUT : DPAA2_CMD_STAT_OK;
+
+	/* Read command response. */
 	cmd->header = val;
 	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
 		cmd->params[i-1] = bus_read_8(portal->map, i * sizeof(uint64_t));
 
-	/* Return an error on expired timeout. */
-	if (i > attempts)
-		return (DPAA2_CMD_STAT_TIMEOUT);
-
-	return (DPAA2_CMD_STAT_OK);
+	return (rc);
 }
 
 /**

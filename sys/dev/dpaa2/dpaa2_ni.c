@@ -183,7 +183,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 /* Forward declarations. */
 
 static int	setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
-static int	setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
+static int	setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -196,13 +196,17 @@ static void	dpni_ifmedia_tick(void *arg);
 static void	dpni_if_init(void *arg);
 static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+
+static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
+static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
+		    uint16_t minor);
+
+/* Callbacks. */
+
+static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
 
-static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
-
-static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
-		    uint16_t minor);
 /*
  * Device interface.
  */
@@ -272,8 +276,6 @@ dpaa2_ni_attach(device_t dev)
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
 	IFQ_SET_READY(&ifp->if_snd);
 
-	sc->num_chan = calc_channels_num(sc);
-
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
@@ -295,7 +297,7 @@ dpaa2_ni_attach(device_t dev)
 	if (error)
 		goto err_free_cmd;
 	/* Configure QBMan channels. */
-	error = setup_dpio(dev, cmd, rc_token);
+	error = setup_channels(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
 
@@ -618,29 +620,72 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
  * @brief Сonfigure QBMan channels and register data availability notifications.
  */
 static int
-setup_dpio(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
+setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 {
-	device_t dpio_dev;
-	device_t dpcon_dev;
+	device_t io_dev, con_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	struct dpaa2_con_softc *dpcon_sc;
+	struct dpaa2_io_softc *iosc;
+	struct dpaa2_con_softc *consc;
+	dpaa2_ni_channel_t *channel;
+	dpaa2_io_notif_ctx_t *ctx;
+	int error;
+
+	sc->num_chan = calc_channels_num(sc);
+
+	/* Allocate no more channels then DPNI queues. */
+	sc->num_chan = sc->num_chan > sc->attr.num.queues
+	    ? sc->attr.num.queues : sc->num_chan;
 
 	for (uint32_t i = 0; i < sc->num_chan; i++) {
-		sc->channel[i] = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
+		channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
 		    M_WAITOK | M_ZERO);
+		if (!channel) {
+			device_printf(dev, "Failed to allocate a channel\n");
+			return (ENOMEM);
+		}
+		sc->channel[i] = channel;
 
-		dpio_dev =  (device_t) rman_get_start(sc->res[IO_RID(i)]);
-		dpcon_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
-		dpcon_sc = device_get_softc(dpcon_dev);
+		io_dev =  (device_t) rman_get_start(sc->res[IO_RID(i)]);
+		con_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
+		iosc = device_get_softc(io_dev);
+		consc = device_get_softc(con_dev);
 
-		sc->channel[i]->dpio_dev = dpio_dev;
-		sc->channel[i]->dpcon_dev = dpcon_dev;
-		sc->channel[i]->chan_id = dpcon_sc->attr.chan_id;
+		channel->io_dev = io_dev;
+		channel->con_dev = con_dev;
+		channel->id = consc->attr.chan_id;
+
+		/* Setup channel notification context. */
+		ctx = &channel->ctx;
+		ctx->cb = dpni_cdan_cb;
+		ctx->qman_ctx = (uint64_t) ctx;
+		ctx->is_cdan = true;
+		ctx->fq_chan_id = channel->id;
+		ctx->io_dev = channel->io_dev;
+
+		/* Register the new notification context. */
+		error = DPAA2_SWP_REGISTER_NOTIF(channel->io_dev, ctx);
+		if (error) {
+			device_printf(dev, "Failed to register notification: "
+			    "error=%d\n", error);
+			return (ENXIO);
+		}
+
+		/* Register DPCON notification with MC */
+
+		/* dpcon_notif_cfg.dpio_id = nctx->dpio_id; */
+		/* dpcon_notif_cfg.priority = 0; */
+		/* dpcon_notif_cfg.user_ctx = nctx->qman64; */
+		/* err = dpcon_set_notification(priv->mc_io, 0, */
+		/*     channel->dpcon->mc_handle, &dpcon_notif_cfg); */
+		/* if (err) { */
+		/* 	dev_err(dev, "dpcon_set_notification failed()\n"); */
+		/* 	goto err_set_cdan; */
+		/* } */
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
-			    "channel_id=%d\n", (rman_res_t) dpio_dev,
-			    (rman_res_t) dpcon_dev, dpcon_sc->attr.chan_id);
+			    "channel_id=%d\n", (rman_res_t) io_dev,
+			    (rman_res_t) con_dev, chan->id);
 	}
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
@@ -1001,6 +1046,16 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	return (error);
+}
+
+/**
+ * @internal
+ * @brief Channel data availability notification (CDAN) callback.
+ */
+static void
+dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
+{
+	/* TBD */
 }
 
 /**

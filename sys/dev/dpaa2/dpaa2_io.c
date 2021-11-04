@@ -295,6 +295,21 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
 	return (swp->enq_mult(swp, &ed, fd, &flags, frames_n));
 }
 
+/**
+ * @brief
+ */
+static int
+dpaa2_io_register_notif(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+
+	/* Enable generation of the CDAN notifications. */
+	if (ctx->is_cdan)
+		return (dpaa2_swp_cdan_set_ctx_enable(sc->swp, ctx->fq_chan_id,
+		    ctx->qman_ctx));
+	return (0);
+}
+
 /*
  * Internal functions.
  */
@@ -343,6 +358,7 @@ static device_method_t dpaa2_io_methods[] = {
 
 	/* QBMan software portal interface */
 	DEVMETHOD(dpaa2_swp_enq_multiple_fq,	dpaa2_io_enq_multiple_fq),
+	DEVMETHOD(dpaa2_swp_register_notif,	dpaa2_io_register_notif),
 
 	DEVMETHOD_END
 };

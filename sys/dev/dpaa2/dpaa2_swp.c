@@ -55,6 +55,11 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
 
+#define CMD_SLEEP_TIMEOUT		1u	/* ms */
+#define CMD_SLEEP_ATTEMPTS		150u	/* max. 150 ms */
+#define CMD_SPIN_TIMEOUT		10u	/* us */
+#define CMD_SPIN_ATTEMPTS		15u	/* max. 150 us */
+
 /* Shifts in the VERB byte of the enqueue command descriptor. */
 #define ENQ_CMD_ORP_ENABLE_SHIFT	2
 #define ENQ_CMD_IRQ_ON_DISPATCH_SHIFT	3
@@ -70,10 +75,25 @@ __FBSDID("$FreeBSD$");
 #define ENQ_DCA_IDXMASK			(0x0Fu)
 #define ENQ_FLAG_DCA			(1ull << 31)
 
+/* Write Enable bitmask for a command to configure SWP WQ Channel.*/
+#define CDAN_WE_EN			(0x1u)
+#define CDAN_WE_ICD			(0x1u) /* Interrupt Coalescing Disable */
+#define CDAN_WE_CTX			(0x4u)
+
+/* QBMan portal command codes. */
+#define CMDID_SWP_MC_ACQUIRE		(0x30)
+#define CMDID_SWP_WQCHAN_CONFIGURE	(0x46)
+
+/* QBMan portal command result codes. */
+#define QBMAN_CMD_RC_OK			(0xF0)
+
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp_memory", "DPAA2 QBMan Software Portal "
     "memory");
 
 /* Forward declarations. */
+
+static int	swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
+		    const uint16_t flags, const uint8_t atomic);
 static int	swp_enq_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 		    const dpaa2_fd_t *fd);
 static int	swp_enq_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
@@ -85,9 +105,31 @@ static int	swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 static uint8_t	cyc_diff(const uint8_t ringsize, const uint8_t first,
 		    const uint8_t last);
 
+static int	exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+		    const uint8_t cmdid);
+static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+		    const uint8_t cmdid);
+static int	wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd);
+
+/* Management routines. */
+
 int
-dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
+dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
     const uint16_t flags)
+{
+	return (swp_init_portal(swp, desc, flags, 0));
+}
+
+int
+dpaa2_swp_init_atomic(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
+    const uint16_t flags)
+{
+	return (swp_init_portal(swp, desc, flags, 0xFF));
+}
+
+static int
+swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
+    const uint16_t flags, const uint8_t atomic)
 {
 	const int mflags = flags & DPAA2_SWP_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
@@ -103,10 +145,20 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	if (!p)
 		return (DPAA2_SWP_STAT_NO_MEMORY);
 
-	mtx_init(&p->lock, "QBMan portal spin lock", NULL, MTX_DEF);
+	if (atomic) {
+		/*
+		 * NOTE: Do not initialize cv for an atomic software portal:
+		 * it's not possible to sleep on it in case of a spin mutex.
+		 */
+		mtx_init(&p->lock, "QBMan portal spin lock", NULL, MTX_SPIN);
+	} else {
+		mtx_init(&p->lock, "QBMan portal sleep lock", NULL, MTX_DEF);
+		cv_init(&p->cv, "QBMan portal cv");
+	}
 
 	p->desc = desc;
 	p->flags = flags;
+	p->atomic = atomic;
 	p->mc.valid_bit = DPAA2_SWP_VALID_BIT;
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000)
 		p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
@@ -214,22 +266,63 @@ dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 }
 
 void
-dpaa2_swp_free_portal(dpaa2_swp_t portal)
+dpaa2_swp_free_portal(dpaa2_swp_t swp)
 {
-	if (portal)
-		free(portal, M_DPAA2_SWP);
+	uint16_t flags;
+
+	if (swp) {
+		if (swp->atomic) {
+			mtx_destroy(&swp->lock);
+			free(swp, M_DPAA2_SWP);
+		} else {
+			/*
+			 * Signal all threads sleeping on portal's cv that it's
+			 * going to be destroyed.
+			 */
+			dpaa2_swp_lock(swp, &flags);
+			swp->flags |= DPAA2_SWP_DESTROYED;
+			cv_signal(&swp->cv);
+			dpaa2_swp_unlock(swp);
+
+			/* Let threads stop using this portal. */
+			DELAY(DPAA2_SWP_TIMEOUT);
+
+			mtx_destroy(&swp->lock);
+			cv_destroy(&swp->cv);
+			free(swp, M_DPAA2_SWP);
+		}
+	}
 }
 
 void
-dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
+dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags)
 {
-	bus_write_4(swp->cinh_map, offset, val);
+	mtx_assert(&swp->lock, MA_NOTOWNED);
+
+	if (swp->atomic) {
+		mtx_lock_spin(&swp->lock);
+		*flags = swp->flags;
+	} else {
+		mtx_lock(&swp->lock);
+		while (swp->flags & DPAA2_SWP_LOCKED)
+			cv_wait(&swp->cv, &swp->lock);
+		*flags = swp->flags;
+		swp->flags |= DPAA2_SWP_LOCKED;
+		mtx_unlock(&swp->lock);
+	}
 }
 
-uint32_t
-dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
+void
+dpaa2_swp_unlock(dpaa2_swp_t swp)
 {
-	return (bus_read_4(swp->cinh_map, offset));
+	if (swp->atomic) {
+		mtx_unlock_spin(&swp->lock);
+	} else {
+		mtx_lock(&swp->lock);
+		swp->flags &= ~DPAA2_SWP_LOCKED;
+		cv_signal(&swp->cv);
+		mtx_unlock(&swp->lock);
+	}
 }
 
 uint32_t
@@ -251,6 +344,22 @@ dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est, uint8_t rpm,
 	    ep		<< DPAA2_SWP_CFG_EP_SHIFT
 	);
 }
+
+/* Read/write registers of a software portal. */
+
+void
+dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val)
+{
+	bus_write_4(swp->cinh_map, offset, val);
+}
+
+uint32_t
+dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset)
+{
+	return (bus_read_4(swp->cinh_map, offset));
+}
+
+/* Helper routines. */
 
 /**
  * @brief Clear enqueue descriptor.
@@ -375,6 +484,69 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
 		printf("%s failed\n", __func__);
 }
 
+/**
+ * @brief
+ */
+int
+dpaa2_swp_cdan_set_ctx_enable(dpaa2_swp_t swp, uint16_t chan_id, uint64_t ctx)
+{
+	return (dpaa2_swp_cdan_set(swp, chan_id, CDAN_WE_EN | CDAN_WE_CTX, 1,
+	    ctx));
+}
+
+/**
+ * @brief
+ */
+int
+dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
+    uint8_t cdan_en, uint64_t ctx)
+{
+	/*
+	 * This command is used to enable and configure the channel data
+	 * availability notification (CDAN) feature in a particular software
+	 * portal WQ channel.
+	 *
+	 * NOTE: 64 bytes.
+	 */
+	struct __packed cdan_cfg {
+		uint8_t		verb;
+		uint8_t		result; /* in response only! */
+		uint16_t	chan_id;
+		uint8_t		we;
+		uint8_t		ctrl;
+		uint16_t	_reserved2;
+		uint64_t	ctx;
+		uint8_t		_reserved3[48];
+	} cmd;
+	int error;
+
+	memset(&cmd, 0, sizeof(cmd));
+	cmd->chan_id = chan_id;
+	cmd->we = we_mask;
+	cmd->ctrl = cdan_en ? 1 : 0;
+	cmd->ctx = ctx;
+
+	error = exec_command(swp, (dpaa2_swp_cmd_t) &cmd,
+	    CMDID_SWP_WQCHAN_CONFIGURE);
+	if (error) {
+		printf("%s: WQ channel configuration failed: error=%d\n",
+		    __func__, error);
+		return (EIO);
+	}
+
+	KASSERT((cmd.verb & 0x7f) != CMDID_SWP_WQCHAN_CONFIGURE,
+	    ("unexpected VERB byte in response"));
+
+	/* Determine success or failure */
+	if (cmd.result != QBMAN_CMD_RC_OK) {
+		printf("%s: WQ channel configuration error: channel_id=%d, "
+		    "result=0x%02x\n", __func__, chan_id, cmd->result);
+		return (EIO);
+	}
+
+	return (0);
+}
+
 /*
  * Internal functions.
  */
@@ -453,11 +625,11 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	uint32_t eqcr_ci; /* consumer index */
 	uint32_t eqcr_pi; /* producer index */
 	uint32_t half_mask, full_mask;
+	uint16_t flags;
 	int num_enq = 0;
 	uint32_t val;
 
-	mtx_assert(&swp->lock, MA_NOTOWNED);
-	mtx_lock(&swp->lock);
+	dpaa2_swp_lock(swp, &flags);
 
 	half_mask = swp->eqcr.pi_ci_mask >> 1;
 	full_mask = swp->eqcr.pi_ci_mask;
@@ -470,7 +642,7 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 		    eqcr_ci, swp->eqcr.ci);
 
 		if (!swp->eqcr.available) {
-			mtx_unlock(&swp->lock);
+			dpaa2_swp_unlock(swp);
 			return (0);
 		}
 	}
@@ -534,7 +706,7 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_EQCR_PI, 
 	    DPAA2_SWP_RT_MODE | swp->eqcr.pi | swp->eqcr.pi_vb);
 
-	mtx_unlock(&swp->lock);
+	dpaa2_swp_unlock(swp);
 
 	return (num_enq);
 }
@@ -550,4 +722,120 @@ cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
 		return (last - first);
 	else
 		return (2 * ringsize) - (first - last);
+}
+
+static int
+exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
+{
+	uint16_t flags;
+	int error;
+
+	if (!swp || !cmd)
+		return (EINVAL);
+
+	dpaa2_swp_lock(swp, &flags);
+	if (flags & DPAA2_SWP_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
+		dpaa2_swp_unlock(swp);
+		return (ENOENT);
+	}
+
+	/* Send a command to QBMan and wait for the result. */
+	send_command(swp, cmd);
+	error = wait_for_command(swp, cmd);
+	if (error) {
+		dpaa2_swp_unlock(swp);
+		return (error);
+	}
+	dpaa2_swp_unlock(portal);
+
+	return (0);
+}
+
+static void
+send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
+{
+	const bool old_ver =
+	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
+	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
+	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
+	const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR
+	    : DPAA2_SWP_CENA_CR_MEM;
+
+	/* Write command bytes (without VERB byte). */
+	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)  /* 8 to 64 */
+		bus_write_8(swp->cena_map, offset + sizeof(uint64_t) * i,
+		    cmd->params[i]);
+	bus_write_4(swp->cena_map, offset + 4, cmd_pdat32[1]); /* 4 to 7 */
+	for (uint32_t i = 1; i <= 3; i++)		       /* 1 to 3 */
+		bus_write_1(swp->cena_map, offset + i, cmd_pdat8[i]);
+
+	/* Write VERB byte and trigger command execution. */
+	if (old_ver) {
+		bus_barrier(swp->cena_map, offset, sizeof(struct dpaa2_swp_cmd),
+		    BUS_SPACE_BARRIER_WRITE);
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
+	} else {
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
+		bus_barrier(swp->cena_map, offset, sizeof(struct dpaa2_swp_cmd),
+		    BUS_SPACE_BARRIER_WRITE);
+
+		/* Ask QBMan to read the command from memory. */
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
+		    DPAA2_SWP_RT_MODE); 
+	}
+}
+
+static int
+wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
+{
+	const bool old_ver =
+	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
+	const uint8_t atomic_portal = swp->atomic;
+	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
+	    : CMD_SLEEP_ATTEMPTS;
+	uint32_t i, offset;
+	uint8_t verb;
+	int rc;
+
+	/* Wait for a command execution response from QBMan. */
+	for (i = 1; i <= attempts; i++) {
+		if (old_ver) {
+			/* Command response to be read from RR0/RR1. */
+			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
+
+			verb = bus_read_1(swp->cena_map, offset);
+			verb = verb & ~DPAA2_SWP_VALID_BIT;
+			if (!verb)
+				goto wait;
+			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
+		} else {
+			/* Command response to be read from the only RR. */
+			offset = DPAA2_SWP_CENA_RR_MEM;
+
+			verb = bus_read_1(swp->cena_map, offset);
+			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
+				goto wait;
+			verb = verb & ~DPAA2_SWP_VALID_BIT;
+			if (!verb)
+				goto wait;
+			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
+		}
+		break;
+ wait:
+		if (atomic_portal)
+			DELAY(CMD_SPIN_TIMEOUT);
+		else
+			pause("dpaa2", CMD_SLEEP_TIMEOUT);
+	}
+
+	/* Return an error on expired timeout, OK - otherwise. */
+	rc = i > attempts ? ETIMEDOUT : 0;
+
+	/* Read command response. */
+	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+		cmd->params[i] = bus_read_8(swp->cena_map,
+		    offset + i * sizeof(uint64_t));
+
+	return (rc);
 }

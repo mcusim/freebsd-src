@@ -50,8 +50,16 @@ INTERFACE dpaa2_swp;
  * frames_n:	Number of frames to enqueue.
  */
 METHOD int enq_multiple_fq {
-	device_t dev;
-	uint32_t fqid;
-	const dpaa2_fd_t *fd;
-	int frames_n;
+	device_t		 dev;
+	uint32_t		 fqid;
+	const dpaa2_fd_t	*fd;
+	int			 frames_n;
 }
+
+/**
+ * @brief
+ */
+METHOD int register_notif {
+	device_t		 dev;
+	dpaa2_io_notif_ctx_t	*ctx;
+};

@@ -38,6 +38,9 @@
 /* All QBMan command and result structures use this "valid bit" encoding */
 #define DPAA2_SWP_VALID_BIT		((uint32_t)0x80)
 
+#define DPAA2_SWP_TIMEOUT		100000	/* us */
+#define DPAA2_SWP_CMD_PARAMS_N		8u
+
 /* Versions of the QBMan software portals. */
 #define DPAA2_SWP_REV_4000		0x04000000
 #define DPAA2_SWP_REV_4100		0x04010000
@@ -70,7 +73,7 @@
 #define DPAA2_SWP_CENA_EQCR(n)		(0x000 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_DQRR(n)		(0x200 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR(n)		(0x400 + ((uint32_t)(n) << 6))
-#define DPAA2_SWP_CENA_CR		(0x600) /* Management Command */
+#define DPAA2_SWP_CENA_CR		(0x600) /* Command Ring offset */
 #define DPAA2_SWP_CENA_RR(vb)		(0x700 + ((uint32_t)(vb) >> 1))
 #define DPAA2_SWP_CENA_VDQCR		(0x780)
 #define DPAA2_SWP_CENA_EQCR_CI		(0x840)
@@ -78,7 +81,7 @@
 /* CENA register offsets in memory-backed mode */
 #define DPAA2_SWP_CENA_DQRR_MEM(n)	(0x0800 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR_MEM(n)	(0x1400 + ((uint32_t)(n) << 6))
-#define DPAA2_SWP_CENA_CR_MEM		(0x1600)
+#define DPAA2_SWP_CENA_CR_MEM		(0x1600) /* CR offset (memory backed) */
 #define DPAA2_SWP_CENA_RR_MEM		(0x1680)
 #define DPAA2_SWP_CENA_VDQCR_MEM	(0x1780)
 #define DPAA2_SWP_CENA_EQCR_CI_MEMBACK	(0x1840)
@@ -111,17 +114,23 @@
 #define DPAA2_SDQCR_SRC_MASK		0xffff
 
 /*
- * Read trigger bit is used to trigger QMan to read an enqueue command from
- * memory, without having software perform a cache flush to force a write of the
- * command to QMan.
+ * Read trigger bit is used to trigger QMan to read a command from memory,
+ * without having software perform a cache flush to force a write of the command
+ * to QMan.
  *
  * NOTE: Implemented in QBMan 5.0 or above.
  */
 #define DPAA2_SWP_RT_MODE		((uint32_t)0x100)
 
-/* Portal flags. */
+/*
+ * Portal flags.
+ *
+ * TODO: Use the same flags for both MC and software portals.
+ */
 #define DPAA2_SWP_DEF			0x0u
-#define DPAA2_SWP_NOWAIT_ALLOC		0x1u	/* Do not sleep during init */
+#define DPAA2_SWP_NOWAIT_ALLOC		0x2u	/* Do not sleep during init */
+#define DPAA2_SWP_LOCKED		0x4000u	/* Wait till portal's unlocked */
+#define DPAA2_SWP_DESTROYED		0x8000u /* Terminate any operations */
 
 /* Command return codes. */
 #define DPAA2_SWP_STAT_OK		0x0
@@ -216,7 +225,18 @@ typedef struct {
 	bool			 has_8prio;
 } dpaa2_swp_desc_t;
 
+/**
+ * @brief Command object holds data to be written to the software portal.
+ *
+ * params:	Parts of the command to write to the software portal. Might keep
+ *		command execution results.
+ */
+struct dpaa2_swp_cmd {
+	uint64_t	params[DPAA2_SWP_CMD_PARAMS_N];
+};
+
 typedef struct dpaa2_swp *dpaa2_swp_t;
+typedef struct dpaa2_swp_cmd *dpaa2_swp_cmd_t;
 
 /**
  * @brief Helper object to interact with the QBMan software portal.
@@ -224,7 +244,9 @@ typedef struct dpaa2_swp *dpaa2_swp_t;
  * res:		Unmapped cache-enabled and cache-inhibited parts of the portal.
  * map:		Mapped cache-enabled and cache-inhibited parts of the portal.
  * desc:	Descriptor of the QBMan software portal.
- * lock:	Spinlock to guard an access to the portal.
+ * lock:	Lock to guard an access to the portal.
+ * cv:		Conditional variable helps to wait for the helper object's state
+ *		change.
  * flags:	Current state of the object.
  * sdq:		Push dequeues status.
  * mc:		Management commands data.
@@ -246,9 +268,11 @@ struct dpaa2_swp {
 	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
 
 	struct mtx		 lock;
+	struct cv		 cv;
 	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
 	uint32_t		 sdq;
+	uint8_t			 atomic;
 
 	struct {
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
@@ -277,14 +301,26 @@ struct dpaa2_swp {
 	} eqcr;
 };
 
-int	 dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
+/* Management routines. */
+
+int	 dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
 	     const uint16_t flags);
-void	 dpaa2_swp_free_portal(dpaa2_swp_t portal);
-void	 dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
-uint32_t dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
+int	 dpaa2_swp_init_atomic(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
+	     const uint16_t flags);
+void	 dpaa2_swp_free_portal(dpaa2_swp_t swp);
+void	 dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags);
+void	 dpaa2_swp_unlock(dpaa2_swp_t swp);
 uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
 	     uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se,
 	     int dp, int de, int ep);
+
+/* Read/write registers of a software portal. */
+
+void	 dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
+uint32_t dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
+
+/* Helper routines. */
+
 void	 dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed);
 void	 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always);
 void	 dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid);
@@ -293,5 +329,9 @@ uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
 uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
 void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
 void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
+int	 dpaa2_swp_cdan_set_ctx_enable(dpaa2_swp_t swp, uint16_t chan_id,
+	     uint64_t ctx);
+int	 dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
+	     uint8_t cdan_en, uint64_t ctx);
 
 #endif /* _DPAA2_SWP_H */
