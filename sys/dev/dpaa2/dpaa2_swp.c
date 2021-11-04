@@ -521,10 +521,10 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	int error;
 
 	memset(&cmd, 0, sizeof(cmd));
-	cmd->chan_id = chan_id;
-	cmd->we = we_mask;
-	cmd->ctrl = cdan_en ? 1 : 0;
-	cmd->ctx = ctx;
+	cmd.chan_id = chan_id;
+	cmd.we = we_mask;
+	cmd.ctrl = cdan_en ? 1 : 0;
+	cmd.ctx = ctx;
 
 	error = exec_command(swp, (dpaa2_swp_cmd_t) &cmd,
 	    CMDID_SWP_WQCHAN_CONFIGURE);
@@ -540,7 +540,7 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	/* Determine success or failure */
 	if (cmd.result != QBMAN_CMD_RC_OK) {
 		printf("%s: WQ channel configuration error: channel_id=%d, "
-		    "result=0x%02x\n", __func__, chan_id, cmd->result);
+		    "result=0x%02x\n", __func__, chan_id, cmd.result);
 		return (EIO);
 	}
 
@@ -625,11 +625,11 @@ swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 	uint32_t eqcr_ci; /* consumer index */
 	uint32_t eqcr_pi; /* producer index */
 	uint32_t half_mask, full_mask;
-	uint16_t flags;
+	uint16_t swp_flags;
 	int num_enq = 0;
 	uint32_t val;
 
-	dpaa2_swp_lock(swp, &flags);
+	dpaa2_swp_lock(swp, &swp_flags);
 
 	half_mask = swp->eqcr.pi_ci_mask >> 1;
 	full_mask = swp->eqcr.pi_ci_mask;
@@ -741,13 +741,13 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	}
 
 	/* Send a command to QBMan and wait for the result. */
-	send_command(swp, cmd);
+	send_command(swp, cmd, cmdid);
 	error = wait_for_command(swp, cmd);
 	if (error) {
 		dpaa2_swp_unlock(swp);
 		return (error);
 	}
-	dpaa2_swp_unlock(portal);
+	dpaa2_swp_unlock(swp);
 
 	return (0);
 }
