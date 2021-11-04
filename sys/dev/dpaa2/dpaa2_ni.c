@@ -685,7 +685,7 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		if (bootverbose)
 			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
 			    "channel_id=%d\n", (rman_res_t) io_dev,
-			    (rman_res_t) con_dev, chan->id);
+			    (rman_res_t) con_dev, channel->id);
 	}
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
