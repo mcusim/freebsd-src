@@ -58,9 +58,29 @@ __FBSDID("$FreeBSD$");
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
     "memory");
 
+/* Forward declarations. */
+
+static int	mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+		    struct resource_map *map, const uint16_t flags,
+		    const uint8_t atomic);
+
 int
-dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+dpaa2_mcp_init_portal(dpaa2_mcp_t *mcp, struct resource *res,
     struct resource_map *map, const uint16_t flags)
+{
+	return (mcp_init_portal(mcp, res, map, flags, 0));
+}
+
+int
+dpaa2_mcp_init_atomic(dpaa2_mcp_t *mcp, struct resource *res,
+    struct resource_map *map, const uint16_t flags)
+{
+	return (mcp_init_portal(mcp, res, map, flags, 0xFF));
+}
+
+static int
+mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
+    struct resource_map *map, const uint16_t flags, const uint8_t atomic)
 {
 	const int mflags = flags & DPAA2_PORTAL_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
@@ -73,7 +93,7 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 	if (!p)
 		return (DPAA2_CMD_STAT_NO_MEMORY);
 
-	if (flags & DPAA2_PORTAL_ATOMIC) {
+	if (atomic) {
 		/*
 		 * NOTE: Do not initialize cv for atomic portal: it's not
 		 * possible to sleep on it in case of a spin mutex.
@@ -90,6 +110,7 @@ dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 	/* Reset DPRC API version to cache later. */
 	p->rc_api_major = 0;
 	p->rc_api_minor = 0;
+	p->atomic = atomic;
 
 	*portal = p;
 
@@ -102,7 +123,7 @@ dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
 	uint16_t flags;
 
 	if (portal) {
-		if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+		if (portal->atomic) {
 			mtx_destroy(&portal->lock);
 			free(portal, M_DPAA2_MCP);
 		} else {
@@ -198,7 +219,7 @@ dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags)
 {
 	mtx_assert(&portal->lock, MA_NOTOWNED);
 
-	if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+	if (portal->atomic) {
 		mtx_lock_spin(&portal->lock);
 		*flags = portal->flags;
 	} else {
@@ -214,7 +235,7 @@ dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags)
 void
 dpaa2_mcp_unlock(dpaa2_mcp_t portal)
 {
-	if (portal->flags & DPAA2_PORTAL_ATOMIC) {
+	if (portal->atomic) {
 		mtx_unlock_spin(&portal->lock);
 	} else {
 		mtx_lock(&portal->lock);

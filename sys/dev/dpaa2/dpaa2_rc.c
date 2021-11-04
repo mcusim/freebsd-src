@@ -213,42 +213,6 @@ struct __packed dpaa2_obj {
 	uint8_t			 label[16];
 };
 
-/**
- * @brief Helper object to access fields of the DPRC attributes response.
- */
-struct __packed dpaa2_rc_attr {
-	uint32_t		 cont_id;
-	uint16_t		 icid;
-	uint16_t		 _reserved1;
-	uint32_t		 options;
-	uint32_t		 portal_id;
-};
-
-/**
- * @brief Helper object to access fields of the DPIO attributes response.
- */
-struct __packed dpaa2_io_attr {
-	uint32_t		 id;
-	uint16_t		 swp_id;
-	uint8_t			 priors_num;
-	uint8_t			 chan_mode;
-	uint64_t		 swp_ce_paddr;
-	uint64_t		 swp_ci_paddr;
-	uint32_t		 swp_version;
-	uint32_t		 _reserved1;
-	uint32_t		 clk;
-	uint32_t		 _reserved2[5];
-};
-
-/**
- * @brief Helper object to access fields of the DPBP attributes response.
- */
-struct __packed dpaa2_bp_attr {
-	uint16_t	_reserved1;
-	uint16_t	bpid;
-	uint32_t	id;
-};
-
 /* Forward declarations. */
 
 static int	discover_objects(struct dpaa2_rc_softc *sc);
@@ -1043,7 +1007,13 @@ dpaa2_rc_get_attributes(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_rc_attr_t *attr)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	struct dpaa2_rc_attr *pattr;
+	struct __packed dpaa2_rc_attr {
+		uint32_t	cont_id;
+		uint16_t	icid;
+		uint16_t	_reserved1;
+		uint32_t	options;
+		uint32_t	portal_id;
+	} *pattr;
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
@@ -1672,7 +1642,18 @@ dpaa2_rc_io_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	struct dpaa2_io_attr *pattr;
+	struct __packed dpaa2_io_attr {
+		uint32_t	id;
+		uint16_t	swp_id;
+		uint8_t		priors_num;
+		uint8_t		chan_mode;
+		uint64_t	swp_ce_paddr;
+		uint64_t	swp_ci_paddr;
+		uint32_t	swp_version;
+		uint32_t	_reserved1;
+		uint32_t	clk;
+		uint32_t	_reserved2[5];
+	} *pattr;
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
@@ -1783,7 +1764,12 @@ dpaa2_rc_bp_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	struct dpaa2_bp_attr *pattr;
+	struct __packed dpaa2_bp_attr {
+		uint16_t	_reserved1;
+		uint16_t	bpid;
+		uint32_t	id;
+	} *pattr;
+
 	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
@@ -2580,7 +2566,7 @@ send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 static int
 wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd)
 {
-	const uint16_t atomic_portal = portal->flags & DPAA2_PORTAL_ATOMIC;
+	const uint8_t atomic_portal = portal->atomic;
 	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
 
