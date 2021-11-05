@@ -860,8 +860,8 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    PAGE_SIZE, 0,		/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
-	    BUS_SPACE_MAXADDR,		/* highaddr */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    ETH_QOS_KCFG_BUF_SIZE, 1,	/* maxsize, nsegments */
 	    ETH_QOS_KCFG_BUF_SIZE, 0,	/* maxsegsize, flags */
