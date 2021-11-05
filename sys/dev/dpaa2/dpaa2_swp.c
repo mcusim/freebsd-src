@@ -771,6 +771,7 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 				if (((j + 1) % 8) == 0)
 					printf(" ");
 			}
+			printf("\n");
 		}
 	}
 
