@@ -168,6 +168,13 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->cinh_res = desc->cinh_res;
 	p->cinh_map = desc->cinh_map;
 
+	if (bootverbose) {
+		printf("%s: cena vaddr=%#jx, paddr=%#jx\n", p->cena_map->r_vaddr,
+		    vtophys((vm_offset_t) p->cena_map->r_vaddr));
+		printf("%s: cinh vaddr=%#jx, paddr=%#jx\n", p->cinh_map->r_vaddr,
+		    vtophys((vm_offset_t) p->cinh_map->r_vaddr));
+	}
+
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
 	p->dqrr.valid_bit = DPAA2_SWP_VALID_BIT;
