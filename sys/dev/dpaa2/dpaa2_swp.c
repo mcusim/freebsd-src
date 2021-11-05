@@ -789,31 +789,35 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 	/* Write VERB byte and trigger command execution. */
 	if (old_ver) {
-		bus_barrier(swp->cena_map, offset, sizeof(struct dpaa2_swp_cmd),
+		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
 		    BUS_SPACE_BARRIER_WRITE);
+
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
-		bus_barrier(swp->cena_map, offset, sizeof(struct dpaa2_swp_cmd),
+
+		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
+		    BUS_SPACE_BARRIER_WRITE);
+		bus_barrier(swp->cinh_map, 0, rman_get_size(swp->cinh_res),
 		    BUS_SPACE_BARRIER_WRITE);
 
 		/* For debug purposes only! */
-		if (bootverbose) {
-			for (int i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
-				buf[i] = bus_read_8(swp->cena_map,
-				    offset + i * sizeof(uint64_t));
+		/* if (bootverbose) { */
+		/* 	for (int i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++) */
+		/* 		buf[i] = bus_read_8(swp->cena_map, */
+		/* 		    offset + i * sizeof(uint64_t)); */
 
-			printf("%s: read from CENA at offset=%x...\n", __func__,
-			    offset);
-			for (int i = 0; i <= 3; i++) {
-				for (int j = 0; j <= 15; j++) {
-					printf("%02x ", buf_pdat8[i * 16 + j]);
-					if (((j + 1) % 8) == 0)
-						printf(" ");
-				}
-				printf("\n");
-			}
-		}
+		/* 	printf("%s: read from CENA at offset=%x...\n", __func__, */
+		/* 	    offset); */
+		/* 	for (int i = 0; i <= 3; i++) { */
+		/* 		for (int j = 0; j <= 15; j++) { */
+		/* 			printf("%02x ", buf_pdat8[i * 16 + j]); */
+		/* 			if (((j + 1) % 8) == 0) */
+		/* 				printf(" "); */
+		/* 		} */
+		/* 		printf("\n"); */
+		/* 	} */
+		/* } */
 
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
