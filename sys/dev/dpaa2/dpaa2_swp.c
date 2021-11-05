@@ -535,6 +535,7 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		return (EIO);
 	}
 
+	printf("%s: response VERB=0x%02x\n", __func__, cmd.verb);
 	KASSERT((cmd.verb & 0x7f) != CMDID_SWP_WQCHAN_CONFIGURE,
 	    ("unexpected VERB byte in response"));
 
