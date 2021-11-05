@@ -201,7 +201,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    rman_get_size(p->cena_res) / 4);
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    1, /* writes are enabled in the CINH portion of the portal */
+		    0, /* writes are enabled in the CENA portion of the portal */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -798,8 +798,9 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 		wmb();
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
 		wmb();
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
+		dsb(st);
 		/* Trigger QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
 		    DPAA2_SWP_RT_MODE);
@@ -831,6 +832,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			/* Command response to be read from the only RR. */
 			offset = DPAA2_SWP_CENA_RR_MEM;
 
+			dsb(ld);
 			verb = bus_read_1(swp->cena_map, offset);
 			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
