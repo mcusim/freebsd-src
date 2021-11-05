@@ -208,10 +208,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* dequeue stashing enable */
 		    0); /* EQCR_CI stashing priority enable */
 
-		reg |= 1 << DPAA2_SWP_CFG_VPM_SHIFT; /* VDQCR read trig. mode */
-		/* reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /\* memory-backed mode *\/ */
-		/*     1 << DPAA2_SWP_CFG_VPM_SHIFT |  /\* VDQCR read trig. mode *\/ */
-		/*     1 << DPAA2_SWP_CFG_CPM_SHIFT;   /\* CR read trig. mode *\/ */
+		reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
+		    1 << DPAA2_SWP_CFG_VPM_SHIFT |  /* VDQCR read trig. mode */
+		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
@@ -222,9 +221,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	/* Enable read trigger mode. */
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI, */
-		/*     DPAA2_SWP_RT_MODE); */
-		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE); */
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
+		    DPAA2_SWP_RT_MODE);
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
 	}
 
 	/*
@@ -756,18 +755,12 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static void
 send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
-	const bool old_ver = true;
-	/* const bool old_ver = */
-	/*     (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
+	const bool old_ver =
+	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
 	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
-	const uint32_t offset = DPAA2_SWP_CINH_CR;
-	/* const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR */
-	/*     : DPAA2_SWP_CENA_CR_MEM; */
-
-	/* For debug purposes only! */
-	/* uint64_t buf[8]; */
-	/* const uint8_t *buf_pdat8 = (const uint8_t *) buf; */
+	const uint32_t offset = old_ver
+	    ? DPAA2_SWP_CENA_CR : DPAA2_SWP_CENA_CR_MEM;
 
 	/* For debug purposes only! */
 	if (bootverbose) {
@@ -783,44 +776,32 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	}
 
 	/* Write command bytes (without VERB byte). */
-	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)  /* 8 to 64 */
-		bus_write_8(swp->cinh_map, offset + sizeof(uint64_t) * i,
+
+	/* bytes from 8 to 64 */
+	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+		bus_write_8(swp->cena_map, offset + sizeof(uint64_t) * i,
 		    cmd->params[i]);
-	bus_write_4(swp->cinh_map, offset + 4, cmd_pdat32[1]); /* 4 to 7 */
-	for (uint32_t i = 1; i <= 3; i++)		       /* 1 to 3 */
-		bus_write_1(swp->cinh_map, offset + i, cmd_pdat8[i]);
+	/* bytes from 4 to 7 */
+	bus_write_4(swp->cena_map, offset + 4, cmd_pdat32[1]);
+	/* bytes from 1 to 3 */
+	for (uint32_t i = 1; i <= 3; i++)
+		bus_write_1(swp->cena_map, offset + i, cmd_pdat8[i]);
 
 	/* Write VERB byte and trigger command execution. */
 	if (old_ver) {
-		bus_barrier(swp->cinh_map, 0, rman_get_size(swp->cinh_res),
+		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
 		    BUS_SPACE_BARRIER_WRITE);
 
-		bus_write_1(swp->cinh_map, offset, cmdid | swp->mc.valid_bit);
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 
 		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
 		    BUS_SPACE_BARRIER_WRITE);
-		bus_barrier(swp->cinh_map, 0, rman_get_size(swp->cinh_res),
-		    BUS_SPACE_BARRIER_WRITE);
 
-		/* For debug purposes only! */
-		/* if (bootverbose) { */
-		/* 	for (int i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++) */
-		/* 		buf[i] = bus_read_8(swp->cena_map, */
-		/* 		    offset + i * sizeof(uint64_t)); */
-
-		/* 	printf("%s: read from CENA at offset=%x...\n", __func__, */
-		/* 	    offset); */
-		/* 	for (int i = 0; i <= 3; i++) { */
-		/* 		for (int j = 0; j <= 15; j++) { */
-		/* 			printf("%02x ", buf_pdat8[i * 16 + j]); */
-		/* 			if (((j + 1) % 8) == 0) */
-		/* 				printf(" "); */
-		/* 		} */
-		/* 		printf("\n"); */
-		/* 	} */
-		/* } */
+		/* Flush 64 bytes of the command to memory. */
+		cpu_dcache_wb_range((vm_offset_t) swp->cena_map->r_vaddr,
+		    rman_get_size(swp->cena_res));
 
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
@@ -831,9 +812,8 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static int
 wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 {
-	const bool old_ver = true;
-	/* const bool old_ver = */
-	/*     (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
+	const bool old_ver =
+	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
 	const uint8_t atomic_portal = swp->atomic;
 	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
@@ -848,7 +828,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			/* Command response to be read from RR0/RR1. */
 			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 
-			verb = bus_read_1(swp->cinh_map, offset);
+			verb = bus_read_1(swp->cena_map, offset);
 			verb = verb & ~DPAA2_SWP_VALID_BIT;
 			if (!verb)
 				goto wait;
@@ -878,7 +858,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 
 	/* Read command response. */
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
-		cmd->params[i] = bus_read_8(swp->cinh_map,
+		cmd->params[i] = bus_read_8(swp->cena_map,
 		    offset + i * sizeof(uint64_t));
 
 	/* For debug purposes only! */
