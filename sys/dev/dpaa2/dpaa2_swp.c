@@ -763,8 +763,8 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	    : DPAA2_SWP_CENA_CR_MEM;
 
 	/* For debug purposes only! */
-	uint64_t buf[8];
-	const uint8_t *buf_pdat8 = (const uint8_t *) buf;
+	/* uint64_t buf[8]; */
+	/* const uint8_t *buf_pdat8 = (const uint8_t *) buf; */
 
 	/* For debug purposes only! */
 	if (bootverbose) {
