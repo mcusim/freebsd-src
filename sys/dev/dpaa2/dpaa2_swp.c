@@ -201,7 +201,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    rman_get_size(p->cena_res) / 4);
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    0, /* writes are enabled in the CENA portion of the portal */
+		    1, /* writes are enabled in the CINH portion of the portal */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -811,7 +811,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 {
 	const uint8_t atomic = swp->atomic;
 	const uint32_t atmps = atomic ? CMD_SPIN_ATTEMPTS : CMD_SLEEP_ATTEMPTS;
-	const uint8_t  *cmd_pdat8 = (const uint8_t *) cmd->params;
+	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
 	uint32_t i, offset;
 	uint8_t verb;
 	int rc;
