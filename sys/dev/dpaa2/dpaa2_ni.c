@@ -654,6 +654,11 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
 
+		if (bootverbose)
+			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
+			    "channel_id=%d\n", (rman_res_t) io_dev,
+			    (rman_res_t) con_dev, channel->id);
+
 		/* Setup channel notification context. */
 		ctx = &channel->ctx;
 		ctx->cb = dpni_cdan_cb;
@@ -681,11 +686,6 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		/* 	dev_err(dev, "dpcon_set_notification failed()\n"); */
 		/* 	goto err_set_cdan; */
 		/* } */
-
-		if (bootverbose)
-			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
-			    "channel_id=%d\n", (rman_res_t) io_dev,
-			    (rman_res_t) con_dev, channel->id);
 	}
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
