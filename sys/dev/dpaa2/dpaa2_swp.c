@@ -55,8 +55,8 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp.h"
 #include "dpaa2_mc.h"
 
-#define CMD_SLEEP_TIMEOUT		10u	/* ms */
-#define CMD_SLEEP_ATTEMPTS		150u	/* max. 150 ms */
+#define CMD_SLEEP_TIMEOUT		1u	/* ms */
+#define CMD_SLEEP_ATTEMPTS		2000u	/* max. 2000 ms */
 #define CMD_SPIN_TIMEOUT		10u	/* us */
 #define CMD_SPIN_ATTEMPTS		15u	/* max. 150 us */
 
@@ -761,8 +761,9 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	/*     (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
 	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
-	const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR
-	    : DPAA2_SWP_CENA_CR_MEM;
+	const uint32_t offset = DPAA2_SWP_CINH_CR;
+	/* const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR */
+	/*     : DPAA2_SWP_CENA_CR_MEM; */
 
 	/* For debug purposes only! */
 	/* uint64_t buf[8]; */
@@ -783,18 +784,18 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 	/* Write command bytes (without VERB byte). */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)  /* 8 to 64 */
-		bus_write_8(swp->cena_map, offset + sizeof(uint64_t) * i,
+		bus_write_8(swp->cinh_map, offset + sizeof(uint64_t) * i,
 		    cmd->params[i]);
-	bus_write_4(swp->cena_map, offset + 4, cmd_pdat32[1]); /* 4 to 7 */
+	bus_write_4(swp->cinh_map, offset + 4, cmd_pdat32[1]); /* 4 to 7 */
 	for (uint32_t i = 1; i <= 3; i++)		       /* 1 to 3 */
-		bus_write_1(swp->cena_map, offset + i, cmd_pdat8[i]);
+		bus_write_1(swp->cinh_map, offset + i, cmd_pdat8[i]);
 
 	/* Write VERB byte and trigger command execution. */
 	if (old_ver) {
-		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
+		bus_barrier(swp->cinh_map, 0, rman_get_size(swp->cinh_res),
 		    BUS_SPACE_BARRIER_WRITE);
 
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
+		bus_write_1(swp->cinh_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 
@@ -847,7 +848,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			/* Command response to be read from RR0/RR1. */
 			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 
-			verb = bus_read_1(swp->cena_map, offset);
+			verb = bus_read_1(swp->cinh_map, offset);
 			verb = verb & ~DPAA2_SWP_VALID_BIT;
 			if (!verb)
 				goto wait;
@@ -877,7 +878,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 
 	/* Read command response. */
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
-		cmd->params[i] = bus_read_8(swp->cena_map,
+		cmd->params[i] = bus_read_8(swp->cinh_map,
 		    offset + i * sizeof(uint64_t));
 
 	/* For debug purposes only! */
