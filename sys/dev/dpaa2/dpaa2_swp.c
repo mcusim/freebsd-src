@@ -140,7 +140,6 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	uint32_t reg;
 	uint32_t mask_size;
 	uint32_t eqcr_pi;
-	int error;
 
 	if (!portal || !desc)
 		return (DPAA2_SWP_STAT_EINVAL);
@@ -213,7 +212,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0); /* EQCR_CI stashing priority enable */
 
 		reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
-		    1 << DPAA2_SWP_CFG_VPM_SHIFT; /* VDQCR read trig. mode */
+		    1 << DPAA2_SWP_CFG_VPM_SHIFT |  /* VDQCR read trig. mode */
 		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
