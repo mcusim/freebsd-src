@@ -626,6 +626,8 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_io_softc *iosc;
 	struct dpaa2_con_softc *consc;
+	struct dpaa2_devinfo *io_info;
+	struct dpaa2_devinfo *con_info;
 	dpaa2_ni_channel_t *channel;
 	dpaa2_io_notif_ctx_t *ctx;
 	int error;
@@ -649,15 +651,17 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		con_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
 		iosc = device_get_softc(io_dev);
 		consc = device_get_softc(con_dev);
+		io_info = device_get_ivars(io_dev);
+		con_info = device_get_ivars(con_dev);
 
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
 
 		if (bootverbose)
-			device_printf(dev, "channel: dpio=%#jx dpcon=%#jx "
-			    "channel_id=%d\n", (rman_res_t) io_dev,
-			    (rman_res_t) con_dev, channel->id);
+			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
+			    "channel_id=%d\n", io_info->id, con_info->id,
+			    channel->id);
 
 		/* Setup channel notification context. */
 		ctx = &channel->ctx;
