@@ -49,6 +49,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 
+#include <vm/vm.h>              /* for vtophys */
+#include <vm/pmap.h>            /* for vtophys */
+
 #include "pcib_if.h"
 #include "pci_if.h"
 
@@ -169,10 +172,12 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->cinh_map = desc->cinh_map;
 
 	if (bootverbose) {
-		printf("%s: cena vaddr=%#jx, paddr=%#jx\n", p->cena_map->r_vaddr,
-		    vtophys((vm_offset_t) p->cena_map->r_vaddr));
-		printf("%s: cinh vaddr=%#jx, paddr=%#jx\n", p->cinh_map->r_vaddr,
-		    vtophys((vm_offset_t) p->cinh_map->r_vaddr));
+		printf("%s: cena vaddr=%#jx, paddr=%#jx\n", __func__,
+		    (rman_res_t) p->cena_map->r_vaddr,
+		    (rman_res_t) vtophys((vm_offset_t) p->cena_map->r_vaddr));
+		printf("%s: cinh vaddr=%#jx, paddr=%#jx\n", __func__,
+		    (rman_res_t) p->cinh_map->r_vaddr,
+		    (rman_res_t) vtophys((vm_offset_t) p->cinh_map->r_vaddr));
 	}
 
 	/* Dequeue Response Ring configuration */
