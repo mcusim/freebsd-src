@@ -762,6 +762,18 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR
 	    : DPAA2_SWP_CENA_CR_MEM;
 
+	/* For debug purposes only! */
+	if (bootverbose) {
+		printf("%s: sending command to QBMan...\n", __func__);
+		for (int i = 0; i <= 3; i++) {
+			for (int j = 0; j <= 15; j++) {
+				printf("%02x ", cmd_pdat8[i * 16 + j]);
+				if (((j + 1) % 8) == 0)
+					printf(" ");
+			}
+		}
+	}
+
 	/* Write command bytes (without VERB byte). */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)  /* 8 to 64 */
 		bus_write_8(swp->cena_map, offset + sizeof(uint64_t) * i,
