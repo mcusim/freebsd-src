@@ -799,7 +799,7 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 		/* For debug purposes only! */
 		if (bootverbose) {
-			for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+			for (int i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
 				buf[i] = bus_read_8(swp->cena_map,
 				    offset + i * sizeof(uint64_t));
 
