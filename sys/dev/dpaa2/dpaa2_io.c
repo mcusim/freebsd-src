@@ -345,9 +345,7 @@ static void
 msi_intr(void *arg)
 {
 	/* NOTE: Useless interrupt handler. */
-	volatile uint32_t val = 0;
-	for (uint32_t i = 0; i < 100; i++)
-		val++;
+	printf("%s: invoked\n", __func__);
 }
 
 static device_method_t dpaa2_io_methods[] = {
