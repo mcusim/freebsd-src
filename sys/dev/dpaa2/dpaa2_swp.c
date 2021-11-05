@@ -163,13 +163,12 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->flags = flags;
 	p->atomic = atomic;
 	p->mc.valid_bit = DPAA2_SWP_VALID_BIT;
+	p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
 
 	p->cena_res = desc->cena_res;
 	p->cena_map = desc->cena_map;
 	p->cinh_res = desc->cinh_res;
 	p->cinh_map = desc->cinh_map;
-	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000)
-		p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
 
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
@@ -795,9 +794,9 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 		wmb();
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
 		wmb();
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
-		wmb();
+
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
 		    DPAA2_SWP_RT_MODE);
@@ -824,8 +823,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 
 			verb = bus_read_1(swp->cena_map, offset);
-			verb = verb & ~DPAA2_SWP_VALID_BIT;
-			if (!verb)
+			if (!(verb & ~DPAA2_SWP_VALID_BIT))
 				goto wait;
 			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		} else {
@@ -835,8 +833,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			verb = bus_read_1(swp->cena_map, offset);
 			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
-			verb = verb & ~DPAA2_SWP_VALID_BIT;
-			if (!verb)
+			if (!(verb & ~DPAA2_SWP_VALID_BIT))
 				goto wait;
 			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		}
@@ -855,6 +852,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
 		cmd->params[i] = bus_read_8(swp->cena_map,
 		    offset + i * sizeof(uint64_t));
+	rmb();
 
 	/* For debug purposes only! */
 	if (bootverbose) {
