@@ -123,6 +123,10 @@ dpaa2_mc_attach(device_t dev)
 			return (ENXIO);
 		}
 
+		/* Print Firmware Attributes and Partitioning Register. */
+		val = mcreg_read_4(sc, MC_REG_FAPR);
+		device_printf(dev, "FAPR=0x%x\n", val);
+
 		/* Reset P1_STOP bit to resume MC processor. */
 		val = mcreg_read_4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
 		mcreg_write_4(sc, MC_REG_GCR1, val);
