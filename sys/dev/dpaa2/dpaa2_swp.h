@@ -276,6 +276,11 @@ struct dpaa2_swp {
 
 	struct {
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+		bus_dma_tag_t	 tag;
+		bus_dmamap_t	 map;
+		uint8_t		*vaddr;
+		bus_addr_t	 paddr;
+		uint32_t	 size; /* 64 bytes */
 	} mc;
 
 	struct {
