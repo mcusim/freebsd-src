@@ -241,15 +241,15 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	 */
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
 
-	p->enq =	swp_enq_direct;
-	p->enq_mult =	swp_enq_mult_direct;
+	p->enq = swp_enq_direct;
+	p->enq_mult = swp_enq_mult_direct;
 
 	p->eqcr.pi_ring_size = 8;
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
 		p->eqcr.pi_ring_size = 32;
 
-		p->enq =	swp_enq_memback;
-		p->enq_mult =	swp_enq_mult_memback;
+		p->enq = swp_enq_memback;
+		p->enq_mult = swp_enq_mult_memback;
 		/* qbman_swp_enqueue_multiple_desc_ptr = */
 		/*     qbman_swp_enqueue_multiple_desc_mem_back; */
 		/* qbman_swp_pull_ptr = qbman_swp_pull_mem_back; */
@@ -762,11 +762,10 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static void
 send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
-	const bool old_ver = true;
-	    /* (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
-	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
+	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
-	const uint32_t offset = old_ver
+	const uint32_t offset =
+	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000
 	    ? DPAA2_SWP_CENA_CR : DPAA2_SWP_CENA_CR_MEM;
 
 	/* For debug purposes only! */
@@ -795,7 +794,7 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 		bus_write_1(swp->cena_map, offset + i, cmd_pdat8[i]);
 
 	/* Write VERB byte and trigger command execution. */
-	if (old_ver) {
+	if ((swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
 		wmb();
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
@@ -810,19 +809,17 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static int
 wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 {
-	const bool old_ver = true;
-	    /* (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
-	const uint8_t atomic_portal = swp->atomic;
-	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
-	    : CMD_SLEEP_ATTEMPTS;
-	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
+	const uint8_t atomic = swp->atomic;
+	const uint32_t atmps = atomic ? CMD_SPIN_ATTEMPTS : CMD_SLEEP_ATTEMPTS;
+	const uint8_t  *cmd_pdat8 = (const uint8_t *) cmd->params;
 	uint32_t i, offset;
 	uint8_t verb;
 	int rc;
 
-	/* Wait for a command execution response from QBMan. */
-	for (i = 1; i <= attempts; i++) {
-		if (old_ver) {
+	/* Wait for a command response from QBMan. */
+	for (i = 1; i <= atmps; i++) {
+		if ((swp->desc->swp_version & DPAA2_SWP_REV_MASK) <
+		    DPAA2_SWP_REV_5000) {
 			/* Command response to be read from RR0/RR1. */
 			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 
@@ -843,14 +840,13 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 		}
 		break;
  wait:
-		if (atomic_portal)
+		if (atomic)
 			DELAY(CMD_SPIN_TIMEOUT);
 		else
 			pause("dpaa2", CMD_SLEEP_TIMEOUT);
 	}
-
-	/* Return an error on expired timeout, OK - otherwise. */
-	rc = i > attempts ? ETIMEDOUT : 0;
+	/* Return an error on expired timeout. */
+	rc = i > atmps ? ETIMEDOUT : 0;
 
 	/* Read command response. */
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
@@ -870,6 +866,5 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			printf("\n");
 		}
 	}
-
 	return (rc);
 }
