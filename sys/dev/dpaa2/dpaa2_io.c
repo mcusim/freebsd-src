@@ -128,7 +128,8 @@ dpaa2_io_attach(device_t dev)
 	/* Map cache-enabled part of the software portal memory. */
 	resource_init_map_request(&req);
 	/* req.memattr = VM_MEMATTR_WRITE_BACK; */
-	req.memattr = VM_MEMATTR_WRITE_COMBINING;
+	/* req.memattr = VM_MEMATTR_WRITE_COMBINING; */
+	req.memattr = VM_MEMATTR_UNCACHEABLE;
 	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0],
 	    &req, &sc->map[0]);
 	if (error) {
