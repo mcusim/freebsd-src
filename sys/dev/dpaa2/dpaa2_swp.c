@@ -852,7 +852,6 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
 		cmd->params[i] = bus_read_8(swp->cena_map,
 		    offset + i * sizeof(uint64_t));
-	rmb();
 
 	/* For debug purposes only! */
 	if (bootverbose) {
