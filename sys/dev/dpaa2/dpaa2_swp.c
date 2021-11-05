@@ -114,10 +114,6 @@ static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    const uint8_t cmdid);
 static int	wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd);
 
-static int	swp_cr_dma_filter(void *arg, bus_addr_t addr);
-static void	swp_cr_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
-		    int error);
-
 /* Management routines. */
 
 int
@@ -173,57 +169,8 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->cena_map = desc->cena_map;
 	p->cinh_res = desc->cinh_res;
 	p->cinh_map = desc->cinh_map;
-
-	if (bootverbose) {
-		printf("%s: cena vaddr=%#jx, paddr=%#jx\n", __func__,
-		    (rman_res_t) p->cena_map->r_vaddr,
-		    (rman_res_t) vtophys((vm_offset_t) p->cena_map->r_vaddr));
-		printf("%s: cinh vaddr=%#jx, paddr=%#jx\n", __func__,
-		    (rman_res_t) p->cinh_map->r_vaddr,
-		    (rman_res_t) vtophys((vm_offset_t) p->cinh_map->r_vaddr));
-	}
-
-	/*
-	 * Allocate a 64-bytes buffer at the same physical address where
-	 * Management Command Register (CR) is.
-	 */
-	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
+	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000)
 		p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
-		p->mc.size = 64;
-
-		error = bus_dma_tag_create(
-		    bus_get_dma_tag(desc->dpio_dev),
-		    p->mc.size, 0,		/* alignment, boundary */
-		    0,				/* low restricted addr */
-		    BUS_SPACE_MAXADDR,		/* high restricted addr */
-		    swp_cr_dma_filter, p,	/* filter, filterarg */
-		    p->mc.size, 1,		/* maxsize, nsegments */
-		    p->mc.size, 0,		/* maxsegsize, flags */
-		    NULL, NULL,			/* lockfunc, lockarg */
-		    &p->mc.tag);
-		if (error) {
-			printf("%s: failed to create a DMA tag for Management "
-			    "Command Register (CR)\n", __func__);
-			return (error);
-		}
-
-		error = bus_dmamem_alloc(p->mc.tag, (void **) &p->mc.vaddr,
-		    BUS_DMA_NOWAIT | BUS_DMA_ZERO | BUS_DMA_COHERENT,
-		    &p->mc.map);
-		if (error) {
-			printf("%s: failed to allocate a buffer for Management "
-			    "Command Register (CR)\n", __func__);
-			return (error);
-		}
-
-		error = bus_dmamap_load(p->mc.tag, p->mc.map, p->mc.vaddr,
-		    p->mc.size, swp_cr_dmamap_cb, &p->mc.paddr, BUS_DMA_NOWAIT);
-		if (error) {
-			printf("%s: failed to map buffer for Management Command "
-			    "Register (CR)\n", __func__);
-			return (error);
-		}
-	}
 
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
@@ -267,7 +214,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 		reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
 		    1 << DPAA2_SWP_CFG_VPM_SHIFT; /* VDQCR read trig. mode */
-		    /* 1 << DPAA2_SWP_CFG_CPM_SHIFT;   /\* CR read trig. mode *\/ */
+		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
@@ -278,9 +225,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	/* Enable read trigger mode. */
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI, */
-		/*     DPAA2_SWP_RT_MODE); */
-		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE); */
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
+		    DPAA2_SWP_RT_MODE);
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
 	}
 
 	/*
@@ -846,16 +793,12 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 	/* Write VERB byte and trigger command execution. */
 	if (old_ver) {
-		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
-		    BUS_SPACE_BARRIER_WRITE);
-
+		wmb();
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
-		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
-		    BUS_SPACE_BARRIER_WRITE);
-
+		wmb();
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
-
+		wmb();
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
 		    DPAA2_SWP_RT_MODE);
@@ -929,28 +872,4 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 	}
 
 	return (rc);
-}
-
-static int
-swp_cr_dma_filter(void *arg, bus_addr_t addr)
-{
-	struct dpaa2_swp *p = (struct dpaa2_swp *) arg;
-	bus_addr_t cr_paddr = (bus_addr_t)
-	    vtophys((vm_offset_t) p->cena_map->r_vaddr) + DPAA2_SWP_CENA_CR_MEM;
-
-	/* For debug purposes only! */
-	if (bootverbose)
-		printf("%s: testing addr=%#jx, cr_paddr=%#jx\n", __func__,
-		    addr, cr_paddr);
-
-	return (cr_paddr == addr ? 0 : 1);
-}
-
-static void
-swp_cr_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
-{
-	if (error)
-		return;
-	/* Only one 64-bytes long segment has been requested. */
-	*(bus_addr_t *) arg = segs[0].ds_addr;
 }
