@@ -791,11 +791,12 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 	/* Write VERB byte and trigger command execution. */
 	if (old_ver) {
-		wmb();
+		dmb(oshst);
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
+		dsb(oshst);
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
-		wmb();
+		dmb(oshst);
 
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
