@@ -209,8 +209,8 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0); /* EQCR_CI stashing priority enable */
 
 		reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
-		    1 << DPAA2_SWP_CFG_VPM_SHIFT |  /* VDQCR read trig. mode */
-		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
+		    1 << DPAA2_SWP_CFG_VPM_SHIFT; /* VDQCR read trig. mode */
+		    /* 1 << DPAA2_SWP_CFG_CPM_SHIFT;   /\* CR read trig. mode *\/ */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
@@ -221,9 +221,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	/* Enable read trigger mode. */
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
-		    DPAA2_SWP_RT_MODE);
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
+		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI, */
+		/*     DPAA2_SWP_RT_MODE); */
+		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE); */
 	}
 
 	/*
@@ -794,8 +794,6 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 	} else {
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
-
 		bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
 		    BUS_SPACE_BARRIER_WRITE);
 
@@ -803,9 +801,15 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 		cpu_dcache_wb_range((vm_offset_t) swp->cena_map->r_vaddr,
 		    rman_get_size(swp->cena_res));
 
+		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
+
+		/* Flush 64 bytes of the command to memory. */
+		cpu_dcache_wb_range((vm_offset_t) swp->cena_map->r_vaddr,
+		    rman_get_size(swp->cena_res));
+
 		/* Ask QBMan to read the command from memory. */
-		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
-		    DPAA2_SWP_RT_MODE); 
+		/* dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT, */
+		/*     DPAA2_SWP_RT_MODE);  */
 	}
 }
 
