@@ -182,8 +182,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	}
 
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
-		reg = dpaa2_swp_set_cfg(p->dqrr.ring_size,
-		    1, /* Writes Non-cacheable */
+		reg = dpaa2_swp_set_cfg(
+		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
+		    1, /* writes are enabled in the CINH portion of the portal */
 		    0, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -193,12 +194,14 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    1, /* mem stashing enable */
 		    1, /* dequeue stashing priority enable */
 		    0, /* dequeue stashing enable enable */
-		    0); /* EQCR_CI stashing priority enable */
+		    0  /* EQCR_CI stashing priority enable */
+		);
 	} else {
 		bus_set_region_4(p->cena_map, 0, 0,
 		    rman_get_size(p->cena_res) / 4);
-		reg = dpaa2_swp_set_cfg(p->dqrr.ring_size,
-		    1, /* Writes Non-cacheable */
+		reg = dpaa2_swp_set_cfg(
+		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
+		    0, /* writes are enabled in the CENA portion of the portal */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -208,11 +211,13 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    1, /* mem stashing enable */
 		    1, /* dequeue stashing priority enable */
 		    0, /* dequeue stashing enable */
-		    0); /* EQCR_CI stashing priority enable */
+		    0  /* EQCR_CI stashing priority enable */
+		);
 
-		/* reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /\* memory-backed mode *\/ */
-		/*     1 << DPAA2_SWP_CFG_VPM_SHIFT |  /\* VDQCR read trig. mode *\/ */
-		/*     1 << DPAA2_SWP_CFG_CPM_SHIFT;   /\* CR read trig. mode *\/ */
+		reg |=
+		    1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
+		    1 << DPAA2_SWP_CFG_VPM_SHIFT  | /* VDQCR read trig. mode */
+		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
@@ -796,8 +801,7 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	} else {
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
 		wmb();
-
-		/* Ask QBMan to read the command from memory. */
+		/* Trigger QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
 		    DPAA2_SWP_RT_MODE);
 	}
