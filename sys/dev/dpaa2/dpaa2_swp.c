@@ -208,9 +208,10 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* dequeue stashing enable */
 		    0); /* EQCR_CI stashing priority enable */
 
-		reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
-		    1 << DPAA2_SWP_CFG_VPM_SHIFT |  /* VDQCR read trig. mode */
-		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
+		reg |= 1 << DPAA2_SWP_CFG_VPM_SHIFT; /* VDQCR read trig. mode */
+		/* reg |= 1 << DPAA2_SWP_CFG_CPBS_SHIFT | /\* memory-backed mode *\/ */
+		/*     1 << DPAA2_SWP_CFG_VPM_SHIFT |  /\* VDQCR read trig. mode *\/ */
+		/*     1 << DPAA2_SWP_CFG_CPM_SHIFT;   /\* CR read trig. mode *\/ */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
@@ -221,9 +222,9 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	/* Enable read trigger mode. */
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
-		    DPAA2_SWP_RT_MODE);
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
+		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI, */
+		/*     DPAA2_SWP_RT_MODE); */
+		/* dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE); */
 	}
 
 	/*
@@ -755,8 +756,9 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static void
 send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
-	const bool old_ver =
-	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
+	const bool old_ver = true;
+	/* const bool old_ver = */
+	/*     (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
 	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
 	const uint32_t offset = old_ver ? DPAA2_SWP_CENA_CR
@@ -828,8 +830,9 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static int
 wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 {
-	const bool old_ver =
-	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000;
+	const bool old_ver = true;
+	/* const bool old_ver = */
+	/*     (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000; */
 	const uint8_t atomic_portal = swp->atomic;
 	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
@@ -879,7 +882,8 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 
 	/* For debug purposes only! */
 	if (bootverbose) {
-		printf("%s: reading response from QBMan...\n", __func__);
+		printf("%s: reading response from QBMan at offset=%x...\n",
+		    __func__, offset);
 		for (int i = 0; i <= 3; i++) {
 			for (int j = 0; j <= 15; j++) {
 				printf("%02x ", cmd_pdat8[i * 16 + j]);
