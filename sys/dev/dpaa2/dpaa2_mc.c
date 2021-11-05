@@ -689,8 +689,8 @@ dpaa2_mc_rman(device_t mcdev, int type)
 	sc = device_get_softc(mcdev);
 
 	switch (type) {
-	case SYS_RES_IRQ:
-		return (&sc->msi_rman);
+	/* case SYS_RES_IRQ: */
+	/* 	return (&sc->msi_rman); */
 	/* case SYS_RES_MEMORY: */
 	/* 	return (&sc->io_rman); */
 	case DPAA2_DEV_IO:
