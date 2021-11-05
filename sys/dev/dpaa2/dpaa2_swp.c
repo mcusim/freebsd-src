@@ -807,6 +807,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 	const uint8_t atomic_portal = swp->atomic;
 	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
+	const uint8_t  *cmd_pdat8 =  (const uint8_t *) cmd->params;
 	uint32_t i, offset;
 	uint8_t verb;
 	int rc;
@@ -849,6 +850,19 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
 		cmd->params[i] = bus_read_8(swp->cena_map,
 		    offset + i * sizeof(uint64_t));
+
+	/* For debug purposes only! */
+	if (bootverbose) {
+		printf("%s: reading response from QBMan...\n", __func__);
+		for (int i = 0; i <= 3; i++) {
+			for (int j = 0; j <= 15; j++) {
+				printf("%02x ", cmd_pdat8[i * 16 + j]);
+				if (((j + 1) % 8) == 0)
+					printf(" ");
+			}
+			printf("\n");
+		}
+	}
 
 	return (rc);
 }
