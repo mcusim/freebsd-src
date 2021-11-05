@@ -763,6 +763,10 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	    : DPAA2_SWP_CENA_CR_MEM;
 
 	/* For debug purposes only! */
+	uint64_t buf[8];
+	const uint8_t *buf_pdat8 = (const uint8_t *) buf;
+
+	/* For debug purposes only! */
 	if (bootverbose) {
 		printf("%s: sending command to QBMan...\n", __func__);
 		for (int i = 0; i <= 3; i++) {
@@ -792,6 +796,24 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
 		bus_barrier(swp->cena_map, offset, sizeof(struct dpaa2_swp_cmd),
 		    BUS_SPACE_BARRIER_WRITE);
+
+		/* For debug purposes only! */
+		if (bootverbose) {
+			for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+				buf[i] = bus_read_8(swp->cena_map,
+				    offset + i * sizeof(uint64_t));
+
+			printf("%s: read from CENA at offset=%x...\n", __func__,
+			    offset);
+			for (int i = 0; i <= 3; i++) {
+				for (int j = 0; j <= 15; j++) {
+					printf("%02x ", buf_pdat8[i * 16 + j]);
+					if (((j + 1) % 8) == 0)
+						printf(" ");
+				}
+				printf("\n");
+			}
+		}
 
 		/* Ask QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
