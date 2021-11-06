@@ -40,6 +40,7 @@
 
 #define DPAA2_SWP_TIMEOUT		100000	/* us */
 #define DPAA2_SWP_CMD_PARAMS_N		8u
+#define DPAA2_SWP_RSP_PARAMS_N		8u
 
 /* Versions of the QBMan software portals. */
 #define DPAA2_SWP_REV_4000		0x04000000
@@ -226,17 +227,22 @@ typedef struct {
 } dpaa2_swp_desc_t;
 
 /**
- * @brief Command object holds data to be written to the software portal.
- *
- * params:	Parts of the command to write to the software portal. Might keep
- *		command execution results.
+ * @brief Command holds data to be written to the software portal.
  */
 struct dpaa2_swp_cmd {
 	uint64_t	params[DPAA2_SWP_CMD_PARAMS_N];
 };
 
+/**
+ * @brief Command response holds data received from the software portal.
+ */
+struct dpaa2_swp_rsp {
+	uint64_t	params[DPAA2_SWP_RSP_PARAMS_N];
+};
+
 typedef struct dpaa2_swp *dpaa2_swp_t;
 typedef struct dpaa2_swp_cmd *dpaa2_swp_cmd_t;
+typedef struct dpaa2_swp_rsp *dpaa2_swp_rsp_t;
 
 /**
  * @brief Helper object to interact with the QBMan software portal.
@@ -272,7 +278,12 @@ struct dpaa2_swp {
 	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
 	uint32_t		 sdq;
-	uint8_t			 atomic;
+
+	struct {
+		bool		 atomic;
+		bool		 writes_cinh;
+		bool		 mem_backed;
+	} cfg; /* Software portal configuration. */
 
 	struct {
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */

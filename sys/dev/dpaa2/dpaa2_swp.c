@@ -96,7 +96,7 @@ MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp_memory", "DPAA2 QBMan Software Portal "
 /* Forward declarations. */
 
 static int	swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-		    const uint16_t flags, const uint8_t atomic);
+		    const uint16_t flags, const bool atomic);
 static int	swp_enq_direct(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 		    const dpaa2_fd_t *fd);
 static int	swp_enq_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
@@ -109,10 +109,11 @@ static uint8_t	cyc_diff(const uint8_t ringsize, const uint8_t first,
 		    const uint8_t last);
 
 static int	exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
-		    const uint8_t cmdid);
+		    dpaa2_swp_rsp_t rsp, const uint8_t cmdid);
 static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    const uint8_t cmdid);
-static int	wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd);
+static int	wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+		    dpaa2_swp_rsp_t rsp);
 
 /* Management routines. */
 
@@ -120,19 +121,19 @@ int
 dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
     const uint16_t flags)
 {
-	return (swp_init_portal(swp, desc, flags, 0));
+	return (swp_init_portal(swp, desc, flags, false));
 }
 
 int
 dpaa2_swp_init_atomic(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
     const uint16_t flags)
 {
-	return (swp_init_portal(swp, desc, flags, 0xFF));
+	return (swp_init_portal(swp, desc, flags, true));
 }
 
 static int
 swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
-    const uint16_t flags, const uint8_t atomic)
+    const uint16_t flags, const bool atomic)
 {
 	const int mflags = flags & DPAA2_SWP_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
@@ -159,9 +160,12 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		cv_init(&p->cv, "QBMan portal cv");
 	}
 
+	p->cfg.atomic = atomic;
+	p->cfg.mem_backed = false;
+	p->cfg.writes_cinh = true;
+
 	p->desc = desc;
 	p->flags = flags;
-	p->atomic = atomic;
 	p->mc.valid_bit = DPAA2_SWP_VALID_BIT;
 	p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
 
@@ -184,7 +188,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    1, /* writes are enabled in the CINH portion of the portal */
+		    1, /* writes enabled in the CINH memory only */
 		    0, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -201,7 +205,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    rman_get_size(p->cena_res) / 4);
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    0, /* writes are enabled in the CENA portion of the portal */
+		    1, /* writes enabled in the CINH memory only */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -213,24 +217,12 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* dequeue stashing enable */
 		    0  /* EQCR_CI stashing priority enable */
 		);
-
-		reg |=
-		    1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
-		    1 << DPAA2_SWP_CFG_VPM_SHIFT  | /* VDQCR read trig. mode */
-		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
 	if (!reg) {
 		free(p, M_DPAA2_SWP);
 		return (DPAA2_SWP_STAT_PORTAL_DISABLED);
-	}
-
-	/* Enable read trigger mode. */
-	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
-		    DPAA2_SWP_RT_MODE);
-		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
 	}
 
 	/*
@@ -243,11 +235,10 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 
 	p->enq = swp_enq_direct;
 	p->enq_mult = swp_enq_mult_direct;
-
 	p->eqcr.pi_ring_size = 8;
+
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
 		p->eqcr.pi_ring_size = 32;
-
 		p->enq = swp_enq_memback;
 		p->enq_mult = swp_enq_mult_memback;
 		/* qbman_swp_enqueue_multiple_desc_ptr = */
@@ -525,6 +516,12 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		uint64_t	ctx;
 		uint8_t		_reserved3[48];
 	} cmd;
+	struct __packed cdan_cfg_rsp {
+		uint8_t		verb;
+		uint8_t		result;
+		uint16_t	chan_id;
+		uint8_t		_reserved[60];
+	} rsp;
 	int error;
 
 	memset(&cmd, 0, sizeof(cmd));
@@ -533,7 +530,7 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	cmd.ctrl = cdan_en ? 1 : 0;
 	cmd.ctx = ctx;
 
-	error = exec_command(swp, (dpaa2_swp_cmd_t) &cmd,
+	error = exec_command(swp, (dpaa2_swp_cmd_t) &cmd, (dpaa2_swp_rsp_t) &rsp,
 	    CMDID_SWP_WQCHAN_CONFIGURE);
 	if (error) {
 		printf("%s: WQ channel configuration failed: error=%d\n",
@@ -732,7 +729,8 @@ cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
 }
 
 static int
-exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
+exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
+    const uint8_t cmdid)
 {
 	uint16_t flags;
 	int error;
@@ -749,7 +747,7 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 
 	/* Send a command to QBMan and wait for the result. */
 	send_command(swp, cmd, cmdid);
-	error = wait_for_command(swp, cmd);
+	error = wait_for_command(swp, cmd, rsp);
 	if (error) {
 		dpaa2_swp_unlock(swp);
 		return (error);
@@ -764,9 +762,10 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
 	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
-	const uint32_t offset =
-	    (swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000
-	    ? DPAA2_SWP_CENA_CR : DPAA2_SWP_CENA_CR_MEM;
+	const uint32_t offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_CR_MEM
+	    : DPAA2_SWP_CENA_CR;
+	struct resource_map *map = swp->cfg.writes_cinh ? swp->cinh_map
+	    : swp->cena_map;
 
 	/* For debug purposes only! */
 	if (bootverbose) {
@@ -782,63 +781,55 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	}
 
 	/* Write command bytes (without VERB byte). */
-
-	/* bytes from 8 to 64 */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
-		bus_write_8(swp->cena_map, offset + sizeof(uint64_t) * i,
-		    cmd->params[i]);
-	/* bytes from 4 to 7 */
-	bus_write_4(swp->cena_map, offset + 4, cmd_pdat32[1]);
-	/* bytes from 1 to 3 */
+		bus_write_8(map, offset + sizeof(uint64_t) * i, cmd->params[i]);
+	bus_write_4(map, offset + 4, cmd_pdat32[1]);
 	for (uint32_t i = 1; i <= 3; i++)
-		bus_write_1(swp->cena_map, offset + i, cmd_pdat8[i]);
+		bus_write_1(map, offset + i, cmd_pdat8[i]);
 
 	/* Write VERB byte and trigger command execution. */
-	if ((swp->desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
+	if (swp->cfg.mem_backed) {
+		bus_write_1(map, offset, cmdid | swp->mr.valid_bit);
 		wmb();
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mc.valid_bit);
-	} else {
-		wmb();
-		bus_write_1(swp->cena_map, offset, cmdid | swp->mr.valid_bit);
-		dsb(st);
-		/* Trigger QBMan to read the command from memory. */
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_CR_RT,
 		    DPAA2_SWP_RT_MODE);
+	} else {
+		wmb();
+		bus_write_1(map, offset, cmdid | swp->mc.valid_bit);
 	}
 }
 
 static int
-wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
+wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 {
-	const uint8_t atomic = swp->atomic;
-	const uint32_t atmps = atomic ? CMD_SPIN_ATTEMPTS : CMD_SLEEP_ATTEMPTS;
-	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
+	const uint8_t *pdat8 = (const uint8_t *) rsp->params;
+	const uint32_t attempts = swp->cfg.atomic ? CMD_SPIN_ATTEMPTS
+	    : CMD_SLEEP_ATTEMPTS;
+	struct resource_map *map = swp->cena_map;
 	uint32_t i, offset;
 	uint8_t verb;
 	int rc;
 
 	/* Wait for a command response from QBMan. */
-	for (i = 1; i <= atmps; i++) {
-		if ((swp->desc->swp_version & DPAA2_SWP_REV_MASK) <
-		    DPAA2_SWP_REV_5000) {
-			/* Command response to be read from RR0/RR1. */
-			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
-
-			verb = bus_read_1(swp->cena_map, offset);
-			if (!(verb & ~DPAA2_SWP_VALID_BIT))
-				goto wait;
-			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
-		} else {
+	for (i = 1; i <= attempts; i++) {
+		if (swp->cfg.mem_backed) {
 			/* Command response to be read from the only RR. */
 			offset = DPAA2_SWP_CENA_RR_MEM;
 
-			dsb(ld);
-			verb = bus_read_1(swp->cena_map, offset);
+			verb = bus_read_1(map, offset);
 			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
 			if (!(verb & ~DPAA2_SWP_VALID_BIT))
 				goto wait;
 			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
+		} else {
+			/* Command response to be read from RR0/RR1. */
+			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
+
+			verb = bus_read_1(map, offset);
+			if (!(verb & ~DPAA2_SWP_VALID_BIT))
+				goto wait;
+			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		}
 		break;
  wait:
@@ -848,12 +839,11 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 			pause("dpaa2", CMD_SLEEP_TIMEOUT);
 	}
 	/* Return an error on expired timeout. */
-	rc = i > atmps ? ETIMEDOUT : 0;
+	rc = i > attempts ? ETIMEDOUT : 0;
 
 	/* Read command response. */
-	for (i = 0; i < DPAA2_SWP_CMD_PARAMS_N; i++)
-		cmd->params[i] = bus_read_8(swp->cena_map,
-		    offset + i * sizeof(uint64_t));
+	for (i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
+		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
 
 	/* For debug purposes only! */
 	if (bootverbose) {
@@ -861,7 +851,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd)
 		    __func__, offset);
 		for (int i = 0; i <= 3; i++) {
 			for (int j = 0; j <= 15; j++) {
-				printf("%02x ", cmd_pdat8[i * 16 + j]);
+				printf("%02x ", pdat8[i * 16 + j]);
 				if (((j + 1) % 8) == 0)
 					printf(" ");
 			}
