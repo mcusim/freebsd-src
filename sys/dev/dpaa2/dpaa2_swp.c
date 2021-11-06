@@ -269,7 +269,7 @@ dpaa2_swp_free_portal(dpaa2_swp_t swp)
 	uint16_t flags;
 
 	if (swp) {
-		if (swp->atomic) {
+		if (swp->cfg.atomic) {
 			mtx_destroy(&swp->lock);
 			free(swp, M_DPAA2_SWP);
 		} else {
@@ -297,7 +297,7 @@ dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags)
 {
 	mtx_assert(&swp->lock, MA_NOTOWNED);
 
-	if (swp->atomic) {
+	if (swp->cfg.atomic) {
 		mtx_lock_spin(&swp->lock);
 		*flags = swp->flags;
 	} else {
@@ -313,7 +313,7 @@ dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags)
 void
 dpaa2_swp_unlock(dpaa2_swp_t swp)
 {
-	if (swp->atomic) {
+	if (swp->cfg.atomic) {
 		mtx_unlock_spin(&swp->lock);
 	} else {
 		mtx_lock(&swp->lock);
@@ -833,7 +833,7 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 		}
 		break;
  wait:
-		if (atomic)
+		if (swp->cfg.atomic)
 			DELAY(CMD_SPIN_TIMEOUT);
 		else
 			pause("dpaa2", CMD_SLEEP_TIMEOUT);
