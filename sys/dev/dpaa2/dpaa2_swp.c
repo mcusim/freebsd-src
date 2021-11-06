@@ -541,10 +541,9 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	KASSERT((rsp.verb & 0x7f) == CMDID_SWP_WQCHAN_CONFIGURE,
 	    ("unexpected VERB byte in response"));
 
-	/* Determine success or failure */
-	if (cmd.result != QBMAN_CMD_RC_OK) {
+	if (rsp.result != QBMAN_CMD_RC_OK) {
 		printf("%s: WQ channel configuration error: channel_id=%d, "
-		    "result=0x%02x\n", __func__, chan_id, cmd.result);
+		    "result=0x%02x\n", __func__, chan_id, rsp.result);
 		return (EIO);
 	}
 
