@@ -767,19 +767,6 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	struct resource_map *map = swp->cfg.writes_cinh ? swp->cinh_map
 	    : swp->cena_map;
 
-	/* For debug purposes only! */
-	if (bootverbose) {
-		printf("%s: sending command to QBMan...\n", __func__);
-		for (int i = 0; i <= 3; i++) {
-			for (int j = 0; j <= 15; j++) {
-				printf("%02x ", cmd_pdat8[i * 16 + j]);
-				if (((j + 1) % 8) == 0)
-					printf(" ");
-			}
-			printf("\n");
-		}
-	}
-
 	/* Write command bytes (without VERB byte). */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
 		bus_write_8(map, offset + sizeof(uint64_t) * i, cmd->params[i]);
@@ -802,7 +789,6 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 static int
 wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 {
-	const uint8_t *pdat8 = (const uint8_t *) rsp->params;
 	const uint32_t attempts = swp->cfg.atomic ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
 	struct resource_map *map = swp->cena_map;
@@ -845,18 +831,5 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 	for (i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
 		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
 
-	/* For debug purposes only! */
-	if (bootverbose) {
-		printf("%s: reading response from QBMan at offset=%x...\n",
-		    __func__, offset);
-		for (int i = 0; i <= 3; i++) {
-			for (int j = 0; j <= 15; j++) {
-				printf("%02x ", pdat8[i * 16 + j]);
-				if (((j + 1) % 8) == 0)
-					printf(" ");
-			}
-			printf("\n");
-		}
-	}
 	return (rc);
 }
