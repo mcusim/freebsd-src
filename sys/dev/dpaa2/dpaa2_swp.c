@@ -538,7 +538,7 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		return (EIO);
 	}
 
-	KASSERT((cmd.verb & 0x7f) == CMDID_SWP_WQCHAN_CONFIGURE,
+	KASSERT((rsp.verb & 0x7f) == CMDID_SWP_WQCHAN_CONFIGURE,
 	    ("unexpected VERB byte in response"));
 
 	/* Determine success or failure */
