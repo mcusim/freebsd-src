@@ -308,7 +308,7 @@ dpaa2_io_conf_wq_channel(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
 	if (ctx->cdan_en)
 		return (dpaa2_swp_conf_wq_channel(sc->swp, ctx->fq_chan_id,
 		    DPAA2_WQCHAN_WE_EN | DPAA2_WQCHAN_WE_CTX, ctx->cdan_en,
-		    ectx->qman_ctx));
+		    ctx->qman_ctx));
 
 	return (0);
 }
