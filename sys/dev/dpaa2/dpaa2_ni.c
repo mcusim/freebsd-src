@@ -682,7 +682,8 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		}
 
 		/* Open data path concentrator object. */
-		error = DPAA2_CMD_CON_OPEN(dev, cmd, con_info->id, &con_token);
+		error = DPAA2_CMD_CON_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token),
+		    con_info->id, &con_token);
 		if (error) {
 			device_printf(dev, "Failed to open DPCON: id=%d, "
 			    "error=%d\n", con_info->id, error);
