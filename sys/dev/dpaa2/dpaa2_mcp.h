@@ -416,6 +416,15 @@ typedef struct {
 	uint8_t		prior_num;
 } dpaa2_con_attr_t;
 
+/**
+ * @brief Configuration of the channel data availability notification (CDAN).
+ */
+typedef struct {
+	uint64_t	qman_ctx;
+	uint32_t	dpio_id;
+	uint8_t		prior;
+} dpaa2_con_notif_cfg_t;
+
 typedef struct dpaa2_mcp *dpaa2_mcp_t;
 typedef struct dpaa2_cmd *dpaa2_cmd_t;
 

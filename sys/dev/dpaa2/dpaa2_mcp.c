@@ -55,8 +55,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp_memory", "DPAA2 Management Complex Portal "
-    "memory");
+MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp", "DPAA2 Management Complex Portal");
 
 /* Forward declarations. */
 

@@ -554,6 +554,16 @@ CODE {
 				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
+	static int
+	bypass_con_set_notif(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_con_notif_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_CON_SET_NOTIF(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
 
 };
 
@@ -901,3 +911,9 @@ METHOD int con_get_attributes {
 	dpaa2_cmd_t	  cmd;
 	dpaa2_con_attr_t *attr;
 } DEFAULT bypass_con_get_attributes;
+
+METHOD int con_set_notif {
+	device_t	  dev;
+	dpaa2_cmd_t	  cmd;
+	dpaa2_con_notif_cfg_t *cfg;
+} DEFAULT bypass_con_set_notif;
