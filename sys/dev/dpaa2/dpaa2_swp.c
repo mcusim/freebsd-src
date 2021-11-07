@@ -791,6 +791,9 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 	uint8_t verb;
 	int rc;
 
+	/* An attempt to sync cachable memory between core and QBMan. */
+	dsb(oshst);
+
 	/* Wait for a command response from QBMan. */
 	for (i = 1; i <= attempts; i++) {
 		if (swp->cfg.mem_backed) {

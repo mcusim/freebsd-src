@@ -418,6 +418,11 @@ typedef struct {
 
 /**
  * @brief Configuration of the channel data availability notification (CDAN).
+ *
+ * qman_ctx:	Context value provided with each CDAN message.
+ * dpio_id:	DPIO object ID configured with a notification channel.
+ * prior:	Priority selection within the DPIO channel; valid values
+ *		are 0-7, depending on the number of priorities in that channel.
  */
 typedef struct {
 	uint64_t	qman_ctx;
