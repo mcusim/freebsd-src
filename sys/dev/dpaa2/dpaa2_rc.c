@@ -2107,7 +2107,7 @@ dpaa2_rc_con_set_notif(device_t rcdev, dpaa2_cmd_t cmd,
 	args = (struct set_notif_args *) &cmd->params[0];
 	args->dpio_id = cfg->dpio_id;
 	args->prior = cfg->prior;
-	args->ctx = cfg->ctx;
+	args->ctx = cfg->qman_ctx;
 
 	return (exec_command(sc->portal, cmd, CMDID_CON_SET_NOTIF));
 }
