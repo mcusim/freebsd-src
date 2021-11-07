@@ -67,6 +67,12 @@ __FBSDID("$FreeBSD$");
 
 #define IORT_DEVICE_NAME		"MCE"
 
+/* MC Registers */
+#define MC_REG_GCR1			0x00u
+#define GCR1_P1_STOP			0x80000000
+#define MC_REG_GSR			0x08u
+#define MC_REG_FAPR			0x28u
+
 /**
  * @brief Structure to describe a DPAA2 device as resource which cannot be
  * allocated, i.e. there is no rman for such devices.
@@ -77,7 +83,7 @@ struct dpaa2_mc_devinfo {
 	uint32_t	flags;
 };
 
-MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc_memory", "DPAA2 Management Complex memory");
+MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc", "DPAA2 Management Complex");
 
 static struct resource_spec dpaa2_mc_spec[] = {
 	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },

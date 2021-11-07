@@ -48,14 +48,6 @@
 #define DPAA2_IO_MSI_COUNT	1
 
 /*
- * MC Registers
- */
-#define MC_REG_GCR1		0x00u
-#define GCR1_P1_STOP		0x80000000
-#define MC_REG_GSR		0x08u
-#define MC_REG_FAPR		0x28u
-
-/*
  * Flags for DPAA2 devices as resources.
  */
 #define DPAA2_MC_DEV_ALLOCATABLE	0x01u

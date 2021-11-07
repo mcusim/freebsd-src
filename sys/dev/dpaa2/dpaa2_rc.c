@@ -192,7 +192,7 @@ __FBSDID("$FreeBSD$");
 
 /* ------------------------- End of command IDs ----------------------------- */
 
-MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc_memory", "DPAA2 Resource Container memory");
+MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc", "DPAA2 Resource Container");
 
 /**
  * @brief Helper object to access fields of the DPAA2 object information
