@@ -690,7 +690,7 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		}
 
 		/* Register DPCON notification with MC. */
-		notif_cfg.dpio_id = ctx->dpio_id;
+		notif_cfg.dpio_id = io_info->id;
 		notif_cfg.prior = 0;
 		notif_cfg.qman_ctx = ctx->qman_ctx;
 		error = DPAA2_CMD_CON_SET_NOTIF(dev, cmd, &notif_cfg);
