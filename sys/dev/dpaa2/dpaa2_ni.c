@@ -667,7 +667,7 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		ctx = &channel->ctx;
 		ctx->cb = dpni_cdan_cb;
 		ctx->qman_ctx = (uint64_t) ctx;
-		ctx->is_cdan = true;
+		ctx->cdan_en = true;
 		ctx->fq_chan_id = channel->id;
 		ctx->io_dev = channel->io_dev;
 
