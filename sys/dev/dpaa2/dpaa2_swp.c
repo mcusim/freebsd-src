@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 #define CMD_SPIN_TIMEOUT		10u	/* us */
 #define CMD_SPIN_ATTEMPTS		15u	/* max. 150 us */
 
-#define CMD_VERB_MASK			(7Fu)
+#define CMD_VERB_MASK			(0x7Fu)
 
 /* Shifts in the VERB byte of the enqueue command descriptor. */
 #define ENQ_CMD_ORP_ENABLE_SHIFT	2
@@ -740,7 +740,8 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
 
 	r = (struct with_verb *) rsp;
 	KASSERT((r->verb & CMD_VERB_MASK) == cmdid,
-	    ("wrong VERB byte in response: resp=0x%02x, expected=0x%02x"));
+	    ("wrong VERB byte in response: resp=0x%02x, expected=0x%02x",
+	    r->verb, cmdid));
 
 	return (0);
 }
