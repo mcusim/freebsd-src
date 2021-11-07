@@ -630,6 +630,8 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	struct dpaa2_devinfo *con_info;
 	dpaa2_ni_channel_t *channel;
 	dpaa2_io_notif_ctx_t *ctx;
+	dpaa2_con_notif_cfg_t notif_cfg;
+	uint16_t con_token;
 	int error;
 
 	sc->num_chan = calc_channels_num(sc);
@@ -679,22 +681,41 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 			return (ENXIO);
 		}
 
-		/* Register DPCON notification with MC. */
+		/* Open data path concentrator object. */
+		error = DPAA2_CMD_CON_OPEN(dev, cmd, con_info->id, &con_token);
+		if (error) {
+			device_printf(dev, "Failed to open DPCON: id=%d, "
+			    "error=%d\n", con_info->id, error);
+			return (ENXIO);
+		}
 
-		/* dpcon_notif_cfg.dpio_id = nctx->dpio_id; */
-		/* dpcon_notif_cfg.priority = 0; */
-		/* dpcon_notif_cfg.user_ctx = nctx->qman64; */
-		/* err = dpcon_set_notification(priv->mc_io, 0, */
-		/*     channel->dpcon->mc_handle, &dpcon_notif_cfg); */
-		/* if (err) { */
-		/* 	dev_err(dev, "dpcon_set_notification failed()\n"); */
-		/* 	goto err_set_cdan; */
-		/* } */
+		/* Register DPCON notification with MC. */
+		notif_cfg.dpio_id = ctx->dpio_id;
+		notif_cfg.prior = 0;
+		notif_cfg.qman_ctx = ctx->qman_ctx;
+		error = DPAA2_CMD_CON_SET_NOTIF(dev, cmd, &notif_cfg);
+		if (error) {
+			device_printf(dev, "Failed to set DPCON notification: "
+			    "id=%d, error=%d\n", con_info->id, error);
+			goto err_close_con;
+		}
+
+		/* Close data path concentrator object. */
+		error = DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(cmd, con_token));
+		if (error)
+			device_printf(dev, "Failed to close DPCON: id=%d, "
+			    "error=%d\n", con_info->id, error);
 	}
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
-
 	return (0);
+ err_close_con:
+	error = DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(cmd, con_token));
+	if (error)
+		device_printf(dev, "Failed to close DPCON: id=%d, error=%d\n",
+		    con_info->id, error);
+
+	return (ENXIO);
 }
 
 /**

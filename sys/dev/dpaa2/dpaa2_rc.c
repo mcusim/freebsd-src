@@ -2084,6 +2084,34 @@ dpaa2_rc_con_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 	return (error);
 }
 
+static int
+dpaa2_rc_con_set_notif(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_con_notif_cfg_t *cfg)
+{
+	struct __packed set_notif_args {
+		uint32_t	dpio_id;
+		uint8_t		prior;
+		uint8_t		_reserved1;
+		uint16_t	_reserved2;
+		uint64_t	ctx;
+		uint64_t	_reserved3[5];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct set_notif_args *) &cmd->params[0];
+	args->dpio_id = cfg->dpio_id;
+	args->prior = cfg->prior;
+	args->ctx = cfg->ctx;
+
+	return (exec_command(sc->portal, cmd, CMDID_CON_SET_NOTIF));
+}
+
 /*
  * Internal functions.
  */
@@ -2767,6 +2795,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_con_enable,		dpaa2_rc_con_enable),
 	DEVMETHOD(dpaa2_cmd_con_disable,	dpaa2_rc_con_disable),
 	DEVMETHOD(dpaa2_cmd_con_get_attributes,	dpaa2_rc_con_get_attributes),
+	DEVMETHOD(dpaa2_cmd_con_set_notif,	dpaa2_rc_con_set_notif),
 
 	DEVMETHOD_END
 };
