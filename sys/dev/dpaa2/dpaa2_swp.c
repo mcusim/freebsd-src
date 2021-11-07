@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 #define CMD_SPIN_TIMEOUT		10u	/* us */
 #define CMD_SPIN_ATTEMPTS		15u	/* max. 150 us */
 
+#define CMD_VERB_MASK			(7Fu)
+
 /* Shifts in the VERB byte of the enqueue command descriptor. */
 #define ENQ_CMD_ORP_ENABLE_SHIFT	2
 #define ENQ_CMD_IRQ_ON_DISPATCH_SHIFT	3
@@ -78,11 +80,6 @@ __FBSDID("$FreeBSD$");
 #define ENQ_DCA_IDXMASK			(0x0Fu)
 #define ENQ_FLAG_DCA			(1ull << 31)
 
-/* Write Enable bitmask for a command to configure SWP WQ Channel.*/
-#define CDAN_WE_EN			(0x1u)
-#define CDAN_WE_ICD			(0x1u) /* Interrupt Coalescing Disable */
-#define CDAN_WE_CTX			(0x4u)
-
 /* QBMan portal command codes. */
 #define CMDID_SWP_MC_ACQUIRE		(0x30)
 #define CMDID_SWP_WQCHAN_CONFIGURE	(0x46)
@@ -90,8 +87,7 @@ __FBSDID("$FreeBSD$");
 /* QBMan portal command result codes. */
 #define QBMAN_CMD_RC_OK			(0xF0)
 
-MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp_memory", "DPAA2 QBMan Software Portal "
-    "memory");
+MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
 /* Forward declarations. */
 
@@ -483,30 +479,15 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
 }
 
 /**
- * @brief
+ * @brief Configure the channel data availability notification (CDAN)
+ * in a particular WQ channel.
  */
 int
-dpaa2_swp_cdan_set_ctx_enable(dpaa2_swp_t swp, uint16_t chan_id, uint64_t ctx)
+dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
+    bool cdan_en, uint64_t ctx)
 {
-	return (dpaa2_swp_cdan_set(swp, chan_id, CDAN_WE_EN | CDAN_WE_CTX, 1,
-	    ctx));
-}
-
-/**
- * @brief
- */
-int
-dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
-    uint8_t cdan_en, uint64_t ctx)
-{
-	/*
-	 * This command is used to enable and configure the channel data
-	 * availability notification (CDAN) feature in a particular software
-	 * portal WQ channel.
-	 *
-	 * NOTE: 64 bytes.
-	 */
-	struct __packed cdan_cfg {
+	/* NOTE: 64 bytes command. */
+	struct __packed {
 		uint8_t		verb;
 		uint8_t		result; /* in response only! */
 		uint16_t	chan_id;
@@ -516,7 +497,7 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		uint64_t	ctx;
 		uint8_t		_reserved3[48];
 	} cmd;
-	struct __packed cdan_cfg_rsp {
+	struct __packed {
 		uint8_t		verb;
 		uint8_t		result;
 		uint16_t	chan_id;
@@ -537,9 +518,6 @@ dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		    __func__, error);
 		return (EIO);
 	}
-
-	KASSERT((rsp.verb & 0x7f) == CMDID_SWP_WQCHAN_CONFIGURE,
-	    ("unexpected VERB byte in response"));
 
 	if (rsp.result != QBMAN_CMD_RC_OK) {
 		printf("%s: WQ channel configuration error: channel_id=%d, "
@@ -727,10 +705,17 @@ cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
 		return (2 * ringsize) - (first - last);
 }
 
+/**
+ * @internal
+ */
 static int
 exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
     const uint8_t cmdid)
 {
+	struct __packed with_verb {
+		uint8_t	verb;
+		uint8_t	_reserved[63];
+	} *r;
 	uint16_t flags;
 	int error;
 
@@ -753,9 +738,16 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
 	}
 	dpaa2_swp_unlock(swp);
 
+	r = (struct with_verb *) rsp;
+	KASSERT((r->verb & CMD_VERB_MASK) == cmdid,
+	    ("wrong VERB byte in response: resp=0x%02x, expected=0x%02x"));
+
 	return (0);
 }
 
+/**
+ * @internal
+ */
 static void
 send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
@@ -785,6 +777,9 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 	}
 }
 
+/**
+ * @internal
+ */
 static int
 wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 {

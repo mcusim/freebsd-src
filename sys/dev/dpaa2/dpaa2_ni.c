@@ -145,7 +145,7 @@ __FBSDID("$FreeBSD$");
  */
 #define DPNI_OPT_HAS_KEY_MASKING		0x000010
 
-MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni_memory", "DPAA2 Network Interface memory");
+MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
 /*
  * Macros to calculate DPAA2 resource IDs.
@@ -663,7 +663,7 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 			    "channel_id=%d\n", io_info->id, con_info->id,
 			    channel->id);
 
-		/* Setup channel notification context. */
+		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
 		ctx->cb = dpni_cdan_cb;
 		ctx->qman_ctx = (uint64_t) ctx;
@@ -672,14 +672,14 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		ctx->io_dev = channel->io_dev;
 
 		/* Register the new notification context. */
-		error = DPAA2_SWP_REGISTER_NOTIF(channel->io_dev, ctx);
+		error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
 		if (error) {
 			device_printf(dev, "Failed to register notification: "
 			    "error=%d\n", error);
 			return (ENXIO);
 		}
 
-		/* Register DPCON notification with MC */
+		/* Register DPCON notification with MC. */
 
 		/* dpcon_notif_cfg.dpio_id = nctx->dpio_id; */
 		/* dpcon_notif_cfg.priority = 0; */

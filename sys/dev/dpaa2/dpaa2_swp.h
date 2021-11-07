@@ -123,6 +123,19 @@
  */
 #define DPAA2_SWP_RT_MODE		((uint32_t)0x100)
 
+/* Interrupt Enable Register bits. */
+#define DPAA2_SWP_INTR_EQRI		0x01
+#define DPAA2_SWP_INTR_EQDI		0x02
+#define DPAA2_SWP_INTR_DQRI		0x04
+#define DPAA2_SWP_INTR_RCRI		0x08
+#define DPAA2_SWP_INTR_RCDI		0x10
+#define DPAA2_SWP_INTR_VDCI		0x20
+
+/* "Write Enable" bitmask for a command to configure SWP WQ Channel.*/
+#define DPAA2_WQCHAN_WE_EN		(0x1u)
+#define DPAA2_WQCHAN_WE_ICD		(0x1u) /* Interrupt Coalescing Disable */
+#define DPAA2_WQCHAN_WE_CTX		(0x4u)
+
 /*
  * Portal flags.
  *
@@ -139,14 +152,6 @@
 #define DPAA2_SWP_STAT_PORTAL_DISABLED	0xFD	/* QBMan portal disabled */
 #define DPAA2_SWP_STAT_EINVAL		0xFE	/* Invalid argument */
 #define DPAA2_SWP_STAT_ERR		0xFF	/* General error */
-
-/* Interrupt Enable Register bits. */
-#define DPAA2_SWP_INTR_EQRI		0x01
-#define DPAA2_SWP_INTR_EQDI		0x02
-#define DPAA2_SWP_INTR_DQRI		0x04
-#define DPAA2_SWP_INTR_RCRI		0x08
-#define DPAA2_SWP_INTR_RCDI		0x10
-#define DPAA2_SWP_INTR_VDCI		0x20
 
 /*
  * Public types.
@@ -340,9 +345,7 @@ uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
 uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
 void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
 void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
-int	 dpaa2_swp_cdan_set_ctx_enable(dpaa2_swp_t swp, uint16_t chan_id,
-	     uint64_t ctx);
-int	 dpaa2_swp_cdan_set(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
-	     uint8_t cdan_en, uint64_t ctx);
+int	 dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id,
+	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
 
 #endif /* _DPAA2_SWP_H */

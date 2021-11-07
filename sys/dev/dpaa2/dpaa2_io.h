@@ -37,14 +37,16 @@
 #include "dpaa2_mcp.h"
 
 /**
- * @brief
+ * @brief Context used by DPIO to configure data availability notifications
+ * (CDAN) on a particular WQ channel.
  */
 typedef struct dpaa2_io_notif_ctx {
 	void (*cb)(struct dpaa2_io_notif_ctx *ctx);
-	device_t io_dev;
-	uint64_t qman_ctx;
-	uint16_t fq_chan_id;
-	bool is_cdan;
+
+	device_t	io_dev;
+	uint64_t	qman_ctx;
+	uint16_t	fq_chan_id;
+	bool		cdan_en;
 } dpaa2_io_notif_ctx_t;
 
 #endif /* _DPAA2_IO_H */

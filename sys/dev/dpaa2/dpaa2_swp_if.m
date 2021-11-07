@@ -57,9 +57,13 @@ METHOD int enq_multiple_fq {
 }
 
 /**
- * @brief
+ * @brief Configure the channel data availability notification (CDAN)
+ * in a particular WQ channel paired with DPIO.
+ *
+ * dev:		DPIO device.
+ * ctx:		Context to configure data availability notifications (CDAN).
  */
-METHOD int register_notif {
+METHOD int conf_wq_channel {
 	device_t		 dev;
 	dpaa2_io_notif_ctx_t	*ctx;
 };
