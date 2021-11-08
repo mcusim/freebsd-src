@@ -197,11 +197,14 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0  /* EQCR_CI stashing priority enable */
 		);
 	} else {
+		p->cfg.mem_backed = true;
+		p->cfg.writes_cinh = false;
+
 		bus_set_region_4(p->cena_map, 0, 0,
 		    rman_get_size(p->cena_res) / 4);
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    1, /* writes enabled in the CINH memory only */
+		    0, /* writes enabled in the CENA memory only */
 		    1, /* EQCR_CI stashing threshold */
 		    3, /* RPM: RCR in array mode */
 		    2, /* DCM: Discrete consumption ack */
@@ -213,12 +216,24 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* dequeue stashing enable */
 		    0  /* EQCR_CI stashing priority enable */
 		);
+
+		reg |=
+		    1 << DPAA2_SWP_CFG_CPBS_SHIFT | /* memory-backed mode */
+		    1 << DPAA2_SWP_CFG_VPM_SHIFT  | /* VDQCR read trig. mode */
+		    1 << DPAA2_SWP_CFG_CPM_SHIFT;   /* CR read trig. mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
 	if (!reg) {
 		free(p, M_DPAA2_SWP);
 		return (DPAA2_SWP_STAT_PORTAL_DISABLED);
+	}
+
+	/* Enable read trigger mode. */
+	if (p->cfg.mem_backed) {
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_EQCR_PI,
+		    DPAA2_SWP_RT_MODE);
+		dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_RCR_PI, DPAA2_SWP_RT_MODE);
 	}
 
 	/*
