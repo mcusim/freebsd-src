@@ -99,7 +99,7 @@ SUBDIR=	\
 	dc \
 	dcons \
 	dcons_crom \
-	dpaa2 \
+	${_dpaa2} \
 	${_dpdk_lpm4} \
 	${_dpdk_lpm6} \
 	${_dpms} \
@@ -614,6 +614,7 @@ _em=		em
 _enetc=		enetc
 _felix=		felix
 _rockchip=	rockchip
+_dpaa2=		dpaa2
 .endif
 
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "arm"
