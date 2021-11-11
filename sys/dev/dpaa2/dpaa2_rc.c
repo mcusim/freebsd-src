@@ -2203,7 +2203,7 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	/* Add managed devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
 		/* For debug purposes only! */
-		device_printf(rcdev, "adding managed device %u\n", obj_count);
+		device_printf(rcdev, "adding managed device %u\n", i);
 
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
 		if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ && bootverbose) {
