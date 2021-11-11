@@ -2278,8 +2278,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	dev = device_add_child(rcdev, devclass, -1);
 	if (dev == NULL) {
 		device_printf(rcdev, "Failed to add a child device for DPAA2 "
-		    "object: type=%s, id=%u\n", (const char *)obj->type,
-		    obj->id);
+		    "object: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
 		return (ENXIO);
 	}
 
@@ -2288,8 +2287,7 @@ add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
 		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-		    "for: type=%s, id=%u\n", (const char *)obj->type,
-		    obj->id);
+		    "for: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
 		return (ENXIO);
 	}
 	device_set_ivars(dev, dinfo);
@@ -2376,7 +2374,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	if (dev == NULL) {
 		device_printf(rcdev, "Failed to add a child device for "
 		    "managed DPAA2 object: type=%s, id=%u\n",
-		    (const char *)obj->type, obj->id);
+		    dpaa2_ttos(obj->type), obj->id);
 		return (ENXIO);
 	}
 
@@ -2385,8 +2383,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
 		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-		    "for: type=%s, id=%u\n", (const char *)obj->type,
-		    obj->id);
+		    "for: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
 		return (ENXIO);
 	}
 	device_set_ivars(dev, dinfo);
@@ -2413,7 +2410,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		if (error) {
 			device_printf(rcdev, "Failed to obtain memory region "
 			    "for type=%s, id=%u, reg_idx=%u: error=%d\n",
-			    (const char *)obj->type, obj->id, i, error);
+			    dpaa2_ttos(obj->type), obj->id, i, error);
 			continue;
 		}
 		count = reg.size;
@@ -2428,7 +2425,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	error = DPAA2_MC_MANAGE_DEV(rcdev, dev, flags);
 	if (error) {
 		device_printf(rcdev, "Failed to add a managed DPAA2 device: "
-		    "type=%s, id=%u, error=%d\n", (const char *)obj->type,
+		    "type=%s, id=%u, error=%d\n", dpaa2_ttos(obj->type),
 		    obj->id, error);
 		return (ENXIO);
 	}
