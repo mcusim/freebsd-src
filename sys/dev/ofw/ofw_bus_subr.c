@@ -460,15 +460,8 @@ ofw_bus_msimap(phandle_t node, uint16_t pci_rid, phandle_t *msi_parent,
 		}
 		if (msi_rid != NULL)
 			*msi_rid = pci_rid;
-
-		/* For debug purposes only! */
-		printf("%s: len < 0, returning 0\n", __func__);
-
 		return (0);
 	}
-
-	/* For debug purposes only! */
-	printf("%s: len >= 0\n", __func__);
 
 	err = ENOENT;
 	mask = 0xffffffff;
@@ -494,9 +487,6 @@ ofw_bus_msimap(phandle_t node, uint16_t pci_rid, phandle_t *msi_parent,
 	}
 
 	free(map, M_OFWPROP);
-
-	/* For debug purposes only! */
-	printf("%s: returning err=%d\n", __func__, err);
 
 	return (err);
 }
