@@ -625,6 +625,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
+			/* FDT-based driver. */
 			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
 			    dinfo->icid, &msi_parent, NULL);
 			if (error)
@@ -632,8 +633,9 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 			return ((u_int) msi_parent);
 		} else {
 			/*
-			 * The first named component from the IORT table with
-			 * the given name (as a substring) will be used.
+			 * ACPI-based driver: The first named component from the
+			 * IORT table with the given name (as a substring) will
+			 * be used.
 			 */
 			error = acpi_iort_map_named_msi(IORT_DEVICE_NAME,
 			    dinfo->icid, &xref, &devid);
