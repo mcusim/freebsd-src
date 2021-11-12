@@ -377,9 +377,17 @@ int
 dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
+	u_int xref;
+
 #if defined(INTRNG)
-	return (intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
-	    count, maxcount, irqs));
+	xref = dpaa2_mc_get_xref(mcdev, child);
+	if (!xref)
+		return (ENXIO);
+
+	/* For debug purposes only! */
+	printf("%s: xref=%d\n", __func__, xref);
+
+	return (intr_alloc_msi(mcdev, child, xref, count, maxcount, irqs));
 #else
 	return (ENXIO);
 #endif
