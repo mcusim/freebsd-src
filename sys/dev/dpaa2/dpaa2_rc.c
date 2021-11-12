@@ -2202,30 +2202,18 @@ discover_objects(struct dpaa2_rc_softc *sc)
 
 	/* Add managed devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
-		/* For debug purposes only! */
-		device_printf(rcdev, "adding managed device %u\n", i);
-
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
 		if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ && bootverbose) {
-			/* For debug purposes only! */
-			device_printf(rcdev, "unsupported DPAA2 object\n");
-
 			device_printf(rcdev, "Skip unsupported DPAA2 object: "
 			    "index=%u, objects=%u\n", i, obj_count);
 			continue;
 		} else if (rc) {
-			/* For debug purposes only! */
-			device_printf(rcdev, "failed to get object\n");
-
 			device_printf(rcdev, "Failed to get object: index=%u, "
 			    "error=%d\n", i, rc);
 			continue;
 		}
 		add_managed_child(sc, cmd, &obj);
 	}
-
-	/* For debug purposes only! */
-	device_printf(rcdev, "managed devices added\n");
 
 	/* Probe and attach managed devices properly. */
 	bus_generic_probe(rcdev);
@@ -2235,9 +2223,6 @@ discover_objects(struct dpaa2_rc_softc *sc)
 		dpaa2_mcp_free_command(cmd);
 		return (rc);
 	}
-
-	/* For debug purposes only! */
-	device_printf(rcdev, "managed devices probed and attached\n");
 
 	/* Add other devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
@@ -2387,9 +2372,6 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
 	if (dev == NULL) {
-		/* For debug purposes only! */
-		device_printf(rcdev, "failed to add child device\n");
-
 		device_printf(rcdev, "Failed to add a child device for "
 		    "managed DPAA2 object: type=%s, id=%u\n",
 		    dpaa2_ttos(obj->type), obj->id);
@@ -2400,18 +2382,11 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
-		/* For debug purposes only! */
-		device_printf(rcdev, "failed to alloc devinfo for child "
-		    "device\n");
-
 		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
 		    "for: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
 		return (ENXIO);
 	}
 	device_set_ivars(dev, dinfo);
-
-	/* For debug purposes only! */
-	device_printf(rcdev, "initializing devinfo\n");
 
 	dinfo->pdev = rcdev;
 	dinfo->dev = dev;
@@ -2428,17 +2403,11 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	/* Initialize a resource list for the child. */
 	resource_list_init(&dinfo->resources);
 
-	/* For debug purposes only! */
-	device_printf(rcdev, "adding memory regions\n");
-
 	/* Add memory regions to the resource list. */
 	for (uint8_t i = 0; i < obj->reg_count; i++) {
 		error = DPAA2_CMD_RC_GET_OBJ_REGION(rcdev, cmd, obj->id, i,
 		    obj->type, &reg);
 		if (error) {
-			/* For debug purposes only! */
-			device_printf(rcdev, "failed to obtain memory region\n");
-
 			device_printf(rcdev, "Failed to obtain memory region "
 			    "for type=%s, id=%u, reg_idx=%u: error=%d\n",
 			    dpaa2_ttos(obj->type), obj->id, i, error);
@@ -2452,15 +2421,9 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    i, start, end, count);
 	}
 
-	/* For debug purposes only! */
-	device_printf(rcdev, "going to inform MC about managed device\n");
-
 	/* Inform MC about a new managed device. */
 	error = DPAA2_MC_MANAGE_DEV(rcdev, dev, flags);
 	if (error) {
-		/* For debug purposes only! */
-		device_printf(rcdev, "failed to add managed DPAA2 device\n");
-
 		device_printf(rcdev, "Failed to add a managed DPAA2 device: "
 		    "type=%s, id=%u, error=%d\n", dpaa2_ttos(obj->type),
 		    obj->id, error);
