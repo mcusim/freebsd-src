@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_mc_if.h"
 
 /*
  * Device interface.
