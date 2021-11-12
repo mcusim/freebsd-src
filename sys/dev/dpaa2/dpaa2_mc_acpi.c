@@ -59,7 +59,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc_if.h"
 
 /*
- * Device interface
+ * Device interface.
  */
 
 static int
@@ -80,6 +80,11 @@ dpaa2_mc_acpi_probe(device_t dev)
 static int
 dpaa2_mc_acpi_attach(device_t dev)
 {
+	struct dpaa2_mc_softc *sc;
+
+	sc = device_get_softc(dev);
+	sc->acpi_based = true;
+
 	return (dpaa2_mc_attach(dev));
 }
 
@@ -90,7 +95,7 @@ dpaa2_mc_acpi_detach(device_t dev)
 }
 
 /*
- * Pseudo-PCIB interface
+ * Pseudo-PCIB interface.
  */
 
 static int

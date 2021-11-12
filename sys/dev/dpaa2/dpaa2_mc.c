@@ -54,6 +54,11 @@ __FBSDID("$FreeBSD$");
 #include <contrib/dev/acpica/include/acpi.h>
 #include <dev/acpica/acpivar.h>
 
+#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_pci.h>
+
 #include "pcib_if.h"
 #include "pci_if.h"
 
@@ -153,28 +158,6 @@ dpaa2_mc_attach(device_t dev)
 	    &req, &sc->map[0]);
 	if (error) {
 		device_printf(dev, "Failed to map MC portal memory\n");
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
-	}
-
-	/* Initialize resource manager for DPAA2 I/O memory. */
-	sc->io_rman.rm_type = RMAN_ARRAY;
-	sc->io_rman.rm_descr = "DPAA2 I/O memory";
-	error = rman_init(&sc->io_rman);
-	if (error) {
-		device_printf(dev, "Failed to initialize a resource manager for "
-		    "DPAA2 I/O memory: error=%d\n", error);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
-	}
-
-	/* Initialize resource manager for DPAA2 MSI. */
-	sc->msi_rman.rm_type = RMAN_ARRAY;
-	sc->msi_rman.rm_descr = "DPAA2 MSI";
-	error = rman_init(&sc->msi_rman);
-	if (error) {
-		device_printf(dev, "Failed to initialize a resource manager for "
-		    "DPAA2 MSI: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
@@ -634,24 +617,30 @@ dpaa2_stot(const char *str)
 static u_int
 dpaa2_mc_get_xref(device_t mcdev, device_t child)
 {
-	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	phandle_t msi_parent;
 	u_int xref, devid;
 	int error;
 
-	dinfo = device_get_ivars(child);
-	if (dinfo) {
-		/*
-		 * The first named components from IORT table with the given
-		 * name (as a substring) will be used.
-		 *
-		 * TODO: Find a way to form a device name based on "mcdev", i.e.
-		 *       dpaa2_mcX -> MCEx?
-		 */
-		error = acpi_iort_map_named_msi(IORT_DEVICE_NAME, dinfo->icid,
-		    &xref, &devid);
-		if (error)
-			return (0);
-		return (xref);
+	if (sc && dinfo) {
+		if (!sc->acpi_based) {
+			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
+			    dinfo->icid, &msi_parent, NULL);
+			if (error)
+				return (0);
+			return ((u_int) msi_parent);
+		} else {
+			/*
+			 * The first named component from the IORT table with
+			 * the given name (as a substring) will be used.
+			 */
+			error = acpi_iort_map_named_msi(IORT_DEVICE_NAME,
+			    dinfo->icid, &xref, &devid);
+			if (error)
+				return (0);
+			return (xref);
+		}
 	}
 	return (0);
 }
@@ -699,10 +688,6 @@ dpaa2_mc_rman(device_t mcdev, int type)
 	sc = device_get_softc(mcdev);
 
 	switch (type) {
-	/* case SYS_RES_IRQ: */
-	/* 	return (&sc->msi_rman); */
-	/* case SYS_RES_MEMORY: */
-	/* 	return (&sc->io_rman); */
 	case DPAA2_DEV_IO:
 		return (&sc->dpio_rman);
 	case DPAA2_DEV_BP:

@@ -61,10 +61,9 @@ struct dpaa2_mc_devinfo;
  *
  * dev:		Device associated with this software context.
  * rcdev:	Child device associated with the root resource container.
+ * acpi_based:	Attached using ACPI (true) or FDT (false).
  * res:		Unmapped MC command portal and control registers resources.
  * map:		Mapped MC command portal and control registers resources.
- * io_rman:	I/O memory resource manager.
- * msi_rman:	Message-signalled interrupts resource manager.
  * dpni_rman:	Data Path I/O objects resource manager.
  * dpbp_rman:	Data Path Buffer Pools resource manager.
  * dpcon_rman:	Data Path Concentrators resource manager.
@@ -72,13 +71,12 @@ struct dpaa2_mc_devinfo;
 struct dpaa2_mc_softc {
 	device_t		 dev;
 	device_t		 rcdev;
+	bool			 acpi_based;
 
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
 
 	/* For managed and allocatable DPAA2 objects. */
-	struct rman		 io_rman;
-	struct rman		 msi_rman;
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
 	struct rman		 dpcon_rman;
