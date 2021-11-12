@@ -639,7 +639,11 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 			    dinfo->icid, &msi_parent, NULL);
 			if (error)
 				return (0);
-			return ((u_int) msi_parent);
+			/* return ((u_int) msi_parent); */
+
+			/* For debug purposes only! */
+			/* for TEN64 board only! */
+			return (12u);
 		} else {
 			/*
 			 * ACPI-based driver: The first named component from the
