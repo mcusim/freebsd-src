@@ -387,13 +387,8 @@ ssize_t
 OF_getprop(phandle_t package, const char *propname, void *buf, size_t buflen)
 {
 
-	if (ofw_def_impl == NULL) {
-		/* For debug purposes only! */
-		printf("%s: ofw_def_impl is NULL\n", __func__);
+	if (ofw_def_impl == NULL)
 		return (-1);
-	}
-	/* For debug purposes only! */
-	printf("%s: ofw_def_impl is not NULL\n", __func__);
 
 	return (OFW_GETPROP(ofw_obj, package, propname, buf, buflen));
 }
@@ -409,6 +404,7 @@ OF_getencprop(phandle_t node, const char *propname, pcell_t *buf, size_t len)
 	retval = OF_getprop(node, propname, buf, len);
 
 	/* For debug purposes only! */
+	printf("%s: ofw_def_impl=%#jx\n", __func__, ofw_def_impl);
 	printf("%s: node=%d, propname=%s, len=%zu, retval=%zd\n", __func__,
 	    node, propname, len, retval);
 
