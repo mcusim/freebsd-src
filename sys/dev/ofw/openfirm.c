@@ -387,8 +387,13 @@ ssize_t
 OF_getprop(phandle_t package, const char *propname, void *buf, size_t buflen)
 {
 
-	if (ofw_def_impl == NULL)
+	if (ofw_def_impl == NULL) {
+		/* For debug purposes only! */
+		printf("%s: package=%d, propname=%s, len=%zu\n", __func__,
+		    package, propname, buflen);
+
 		return (-1);
+	}
 
 	return (OFW_GETPROP(ofw_obj, package, propname, buf, buflen));
 }
