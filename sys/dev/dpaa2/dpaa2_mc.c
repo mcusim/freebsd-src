@@ -631,6 +631,9 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
+			/* For debug purposes only! */
+			printf("%s: calling ofw_bus_msimap()...\n", __func__);
+
 			/* FDT-based driver. */
 			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
 			    dinfo->icid, &msi_parent, NULL);
