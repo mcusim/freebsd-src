@@ -402,6 +402,11 @@ OF_getencprop(phandle_t node, const char *propname, pcell_t *buf, size_t len)
 	KASSERT(len % 4 == 0, ("Need a multiple of 4 bytes"));
 
 	retval = OF_getprop(node, propname, buf, len);
+
+	/* For debug purposes only! */
+	printf("%s: node=%d, propname=%s, len=%d, retval=%d\n", __func__,
+	    node, propname, len, retval);
+
 	if (retval <= 0)
 		return (retval);
 
