@@ -632,7 +632,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	/* For debug purposes only! */
 	char propname[64];
 	const char *prevprop = NULL;
-	char *node_name;
+	char *node_name, *pos;
 	phandle_t node;
 
 	if (sc && dinfo) {
@@ -645,25 +645,28 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 				if (error > 0) {
 					printf("%s: node=%d, name=%s\n",
 					    __func__, node, node_name);
+					pos = strcmp(node_name, "fsl-mc");
+					if (pos)
+						break;
+
 					OF_prop_free(node_name);
 				} else {
 					printf("%s: node=%d\n", __func__,
 					    node);
 				}
 			}
-			while (OF_nextprop(ofw_bus_get_node(mcdev), prevprop,
-			    propname, 64) > 0) {
+			while (OF_nextprop(node, prevprop, propname, 64) > 0) {
 				printf("%s:\tpropname=%s\n", __func__, propname);
 				prevprop = propname;
 			}
 
 			/* FDT-based driver. */
-			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
-			    dinfo->icid, &msi_parent, NULL);
+			error = ofw_bus_msimap(node, dinfo->icid, &msi_parent,
+			    NULL);
 
 			/* For debug purposes only! */
 			printf("%s: prop=msi-parent, proplen=%zd\n", __func__,
-			    OF_getproplen(ofw_bus_get_node(mcdev), "msi-parent"));
+			    OF_getproplen(node, "msi-parent"));
 
 			if (error)
 				return (0);
