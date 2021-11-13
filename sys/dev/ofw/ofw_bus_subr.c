@@ -460,11 +460,6 @@ ofw_bus_msimap(phandle_t node, uint16_t pci_rid, phandle_t *msi_parent,
 		}
 		if (msi_rid != NULL)
 			*msi_rid = pci_rid;
-
-		/* For debug purposes only! */
-		printf("%s: node=%d, pci_rid=%d, msi_parent=%d\n", __func__,
-		    node, pci_rid, *msi_parent);
-
 		return (0);
 	}
 

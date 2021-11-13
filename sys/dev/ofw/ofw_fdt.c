@@ -384,15 +384,9 @@ ofw_fdt_nextprop(ofw_t ofw, phandle_t package, const char *previous, char *buf,
 	const char *name;
 	int offset;
 
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	offset = fdt_phandle_offset(package);
-	if (offset < 0) {
-		/* For debug purposes only! */
-		printf("%s: place 1\n", __func__);
+	if (offset < 0)
 		return (-1);
-	}
 
 	if (previous == NULL)
 		/* Find the first prop in the node */
@@ -400,11 +394,8 @@ ofw_fdt_nextprop(ofw_t ofw, phandle_t package, const char *previous, char *buf,
 	else {
 		fdt_for_each_property_offset(offset, fdtp, offset) {
 			prop = fdt_getprop_by_offset(fdtp, offset, &name, NULL);
-			if (prop == NULL) {
-				/* For debug purposes only! */
-				printf("%s: place 2\n", __func__);
+			if (prop == NULL)
 				return (-1); /* Internal error */
-			}
 			/* Skip until we find 'previous', then bail out */
 			if (strcmp(name, previous) != 0)
 				continue;
@@ -413,18 +404,12 @@ ofw_fdt_nextprop(ofw_t ofw, phandle_t package, const char *previous, char *buf,
 		}
 	}
 
-	if (offset < 0) {
-		/* For debug purposes only! */
-		printf("%s: place 3\n", __func__);
+	if (offset < 0)
 		return (0); /* No properties */
-	}
 
 	prop = fdt_getprop_by_offset(fdtp, offset, &name, &offset);
-	if (prop == NULL) {
-		/* For debug purposes only! */
-		printf("%s: place 4\n", __func__);
+	if (prop == NULL)
 		return (-1); /* Internal error */
-	}
 
 	strncpy(buf, name, size);
 
