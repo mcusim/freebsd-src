@@ -377,17 +377,14 @@ int
 dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
+#if defined(INTRNG)
 	u_int xref = 0;
 
-#if defined(INTRNG)
 	xref = dpaa2_mc_get_xref(mcdev, child);
-
 	/* For debug purposes only! */
 	printf("%s: xref=%d\n", __func__, xref);
-
 	if (!xref)
 		return (ENXIO);
-
 	return (intr_alloc_msi(mcdev, child, xref, count, maxcount, irqs));
 #else
 	return (ENXIO);
@@ -639,11 +636,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 			    dinfo->icid, &msi_parent, NULL);
 			if (error)
 				return (0);
-			/* return ((u_int) msi_parent); */
-
-			/* For debug purposes only! */
-			/* for TEN64 board only! */
-			return (12u);
+			return ((u_int) msi_parent);
 		} else {
 			/*
 			 * ACPI-based driver: The first named component from the
