@@ -373,9 +373,6 @@ ofw_std_nextprop(ofw_t ofw, phandle_t package, const char *previous, char *buf,
 		1,
 	};
 
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	args.package = package;
 	args.previous = (cell_t)previous;
 	args.buf = (cell_t)buf;
