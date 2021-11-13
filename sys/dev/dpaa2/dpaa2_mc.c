@@ -636,8 +636,8 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
 			/* For debug purposes only! */
-			OF_getprop(ofw_bus_get_node(mcdev), "name", propname,
-			    64);
+			propname[63] = 0;
+			OF_getprop(ofw_bus_get_node(mcdev), "name", propname, 63);
 			printf("%s: node=%d, name=%s\n", __func__,
 			    ofw_bus_get_node(mcdev), propname);
 			while (OF_nextprop(ofw_bus_get_node(mcdev), prevprop,
