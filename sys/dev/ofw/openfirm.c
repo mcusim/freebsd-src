@@ -404,7 +404,7 @@ OF_getencprop(phandle_t node, const char *propname, pcell_t *buf, size_t len)
 	retval = OF_getprop(node, propname, buf, len);
 
 	/* For debug purposes only! */
-	printf("%s: ofw_def_impl=%#jx\n", __func__, ofw_def_impl);
+	printf("%s: ofw_def_impl=%#jx\n", __func__, (uintmax_t) ofw_def_impl);
 	printf("%s: node=%d, propname=%s, len=%zu, retval=%zd\n", __func__,
 	    node, propname, len, retval);
 
