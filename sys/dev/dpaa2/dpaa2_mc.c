@@ -643,30 +643,17 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 				error = OF_getprop_alloc(node, "name",
 				    (void **)&node_name);
 				if (error > 0) {
-					printf("%s: node=%d, name=%s\n",
-					    __func__, node, node_name);
 					pos = strstr(node_name, "fsl-mc");
-					if (pos)
+					if (pos) {
+						OF_prop_free(node_name);
 						break;
-
+					}
 					OF_prop_free(node_name);
-				} else {
-					printf("%s: node=%d\n", __func__,
-					    node);
 				}
 			}
-			while (OF_nextprop(node, prevprop, propname, 64) > 0) {
-				printf("%s:\tpropname=%s\n", __func__, propname);
-				prevprop = propname;
-			}
-
 			/* FDT-based driver. */
 			error = ofw_bus_msimap(node, dinfo->icid, &msi_parent,
 			    NULL);
-
-			/* For debug purposes only! */
-			printf("%s: prop=msi-parent, proplen=%zd\n", __func__,
-			    OF_getproplen(node, "msi-parent"));
 
 			if (error)
 				return (0);
