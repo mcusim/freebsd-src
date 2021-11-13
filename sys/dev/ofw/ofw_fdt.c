@@ -384,6 +384,9 @@ ofw_fdt_nextprop(ofw_t ofw, phandle_t package, const char *previous, char *buf,
 	const char *name;
 	int offset;
 
+	/* For debug purposes only! */
+	printf("%s: called\n");
+
 	offset = fdt_phandle_offset(package);
 	if (offset < 0)
 		return (-1);
