@@ -638,7 +638,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
 			/* For debug purposes only! */
-			node = ofw_bus_get_node(mcdev);
+			node = ofw_bus_get_node(device_get_parent(mcdev));
 			for (node = OF_child(node); node != 0; node = OF_peer(node)) {
 				error = OF_getprop_alloc(node, "name",
 				    (void **)&node_name);
