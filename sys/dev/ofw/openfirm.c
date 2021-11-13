@@ -404,7 +404,7 @@ OF_getencprop(phandle_t node, const char *propname, pcell_t *buf, size_t len)
 	retval = OF_getprop(node, propname, buf, len);
 
 	/* For debug purposes only! */
-	printf("%s: node=%d, propname=%s, len=%d, retval=%d\n", __func__,
+	printf("%s: node=%d, propname=%s, len=%zu, retval=%zd\n", __func__,
 	    node, propname, len, retval);
 
 	if (retval <= 0)
