@@ -629,18 +629,28 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	u_int xref, devid;
 	int error;
 
+	/* For debug purposes only! */
+	char propname[64];
+	const char *prevprop = NULL;
+
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
 			/* For debug purposes only! */
-			printf("%s: calling ofw_bus_msimap()...\n", __func__);
+			printf("%s: node=%d\n", __func__, ofw_bus_get_node(mcdev));
+			while (OF_nextprop(ofw_bus_get_node(mcdev), prevprop,
+			    propname, 64) > 0) {
+				printf("%s:\tpropname=%s\n", __func__, propname);
+				prevprop = propname;
+			}
 
 			/* FDT-based driver. */
 			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
 			    dinfo->icid, &msi_parent, NULL);
 
 			/* For debug purposes only! */
-			printf("%s: prop=msi-parent, proplen=%zd", __func__,
+			printf("%s: prop=msi-parent, proplen=%zd\n", __func__,
 			    OF_getproplen(ofw_bus_get_node(mcdev), "msi-parent"));
+
 			if (error)
 				return (0);
 			return ((u_int) msi_parent);
