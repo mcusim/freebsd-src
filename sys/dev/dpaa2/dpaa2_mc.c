@@ -637,6 +637,10 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 			/* FDT-based driver. */
 			error = ofw_bus_msimap(ofw_bus_get_node(mcdev),
 			    dinfo->icid, &msi_parent, NULL);
+
+			/* For debug purposes only! */
+			printf("%s: prop=msi-parent, proplen=%zd", __func__,
+			    OF_getproplen(ofw_bus_get_node(mcdev), "msi-parent"));
 			if (error)
 				return (0);
 			return ((u_int) msi_parent);
