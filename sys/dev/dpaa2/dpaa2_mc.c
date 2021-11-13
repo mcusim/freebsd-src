@@ -645,7 +645,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 				if (error > 0) {
 					printf("%s: node=%d, name=%s\n",
 					    __func__, node, node_name);
-					pos = strcmp(node_name, "fsl-mc");
+					pos = strstr(node_name, "fsl-mc");
 					if (pos)
 						break;
 
