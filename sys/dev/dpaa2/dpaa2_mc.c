@@ -632,20 +632,24 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	/* For debug purposes only! */
 	char propname[64];
 	const char *prevprop = NULL;
-	char *mc_name;
+	char *node_name;
+	phandle_t node;
 
 	if (sc && dinfo) {
 		if (!sc->acpi_based) {
 			/* For debug purposes only! */
-			error = OF_getprop_alloc(ofw_bus_get_node(mcdev),
-			    "name", (void **)&mc_name);
-			if (error > 0) {
-				printf("%s: node=%d, name=%s\n", __func__,
-				    ofw_bus_get_node(mcdev), mc_name);
-				OF_prop_free(mc_name);
-			} else {
-				printf("%s: node=%d\n", __func__,
-				    ofw_bus_get_node(mcdev));
+			node = ofw_bus_get_node(mcdev);
+			for (node = OF_child(node); node != 0; node = OF_peer(node)) {
+				error = OF_getprop_alloc(node, "name",
+				    (void **)&node_name);
+				if (error > 0) {
+					printf("%s: node=%d, name=%s\n",
+					    __func__, node, node_name);
+					OF_prop_free(node_name);
+				} else {
+					printf("%s: node=%d\n", __func__,
+					    node);
+				}
 			}
 			while (OF_nextprop(ofw_bus_get_node(mcdev), prevprop,
 			    propname, 64) > 0) {
