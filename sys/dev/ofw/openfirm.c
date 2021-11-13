@@ -389,11 +389,11 @@ OF_getprop(phandle_t package, const char *propname, void *buf, size_t buflen)
 
 	if (ofw_def_impl == NULL) {
 		/* For debug purposes only! */
-		printf("%s: package=%d, propname=%s, len=%zu\n", __func__,
-		    package, propname, buflen);
-
+		printf("%s: ofw_def_impl is NULL\n", __func__);
 		return (-1);
 	}
+	/* For debug purposes only! */
+	printf("%s: ofw_def_impl is not NULL\n", __func__);
 
 	return (OFW_GETPROP(ofw_obj, package, propname, buf, buflen));
 }
