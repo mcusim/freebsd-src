@@ -66,6 +66,16 @@ CODE {
 				dpaa2_dev, devtype, obj_id));
 		return (ENXIO);
 	}
+
+	static int
+	bypass_get_shared_dev(device_t dev, device_t *dpaa2_dev,
+		enum dpaa2_dev_type devtype)
+	{
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_MC_GET_SHARED_DEV(device_get_parent(dev),
+				dpaa2_dev, devtype));
+		return (ENXIO);
+	}
 }
 
 METHOD int manage_dev {
@@ -86,3 +96,9 @@ METHOD int get_dev {
 	enum dpaa2_dev_type devtype;
 	uint32_t	 obj_id;
 } DEFAULT bypass_get_dev;
+
+METHOD int get_shared_dev {
+	device_t	 dev;
+	device_t	*dpaa2_dev;
+	enum dpaa2_dev_type devtype;
+} DEFAULT bypass_get_shared_dev;
