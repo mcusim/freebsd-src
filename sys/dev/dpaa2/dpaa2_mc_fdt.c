@@ -91,7 +91,7 @@ dpaa2_mc_fdt_attach(device_t dev)
  * OFW bus interface.
  */
 
-const char *
+static const char *
 dpaa2_mc_fdt_get_compat(device_t bus, device_t dev)
 {
 	struct dpaa2_mc_softc *sc = device_get_softc(dev);
@@ -103,7 +103,7 @@ dpaa2_mc_fdt_get_compat(device_t bus, device_t dev)
 	return (NULL);
 }
 
-const char *
+static const char *
 dpaa2_mc_fdt_get_name(device_t bus, device_t dev)
 {
 	struct dpaa2_mc_softc *sc = device_get_softc(dev);
@@ -115,14 +115,15 @@ dpaa2_mc_fdt_get_name(device_t bus, device_t dev)
 	return (NULL);
 }
 
-phandle_t
+static phandle_t
 dpaa2_mc_fdt_get_node(device_t bus, device_t dev)
 {
-	struct dpaa2_mc_softc *sc;
+	struct dpaa2_mc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 
-	sc = device_get_softc(dev);
-
-	return (sc->ofw_node);
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_MC)
+		return (sc->ofw_node);
+	return (-1);
 }
 
 static device_method_t dpaa2_mc_fdt_methods[] = {
