@@ -93,6 +93,12 @@ ofw_bus_gen_child_pnpinfo(device_t cbdev, device_t child, struct sbuf *sb)
 	if (!ofw_bus_status_okay(child))
 		return (0);
 
+	/* For debug purposes only! */
+	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
+	if (dinfo)
+		printf("%s: devtype=%s, id=%d\n", __func__,
+		    dpaa2_ttos(dinfo->dtype), dinfo->id);
+
 	if (ofw_bus_get_name(child) != NULL) {
 		sbuf_printf(sb, "name=%s ", ofw_bus_get_name(child));
 	}
