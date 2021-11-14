@@ -110,7 +110,6 @@ dpaa2_mc_attach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
 	struct resource_map_request req;
-	struct dpaa2_devinfo *dinfo = NULL;
 	uint32_t val;
 	int error;
 
