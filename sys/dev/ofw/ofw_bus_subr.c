@@ -91,6 +91,33 @@ ofw_bus_gen_destroy_devinfo(struct ofw_bus_devinfo *obd)
 		free(obd->obd_status, M_OFWPROP);
 }
 
+/* For debug purposes only! */
+static const char *
+dpaa2_ttos(enum dpaa2_dev_type type)
+{
+	switch (type) {
+	case DPAA2_DEV_MC:
+		return ("mc"); /* NOTE: to print as information only. */
+	case DPAA2_DEV_RC:
+		return ("dprc");
+	case DPAA2_DEV_IO:
+		return ("dpio");
+	case DPAA2_DEV_NI:
+		return ("dpni");
+	case DPAA2_DEV_MCP:
+		return ("dpmcp");
+	case DPAA2_DEV_BP:
+		return ("dpbp");
+	case DPAA2_DEV_CON:
+		return ("dpcon");
+	case DPAA2_DEV_MAC:
+		return ("dpmac");
+	default:
+		break;
+	}
+	return ("notype");
+}
+
 int
 ofw_bus_gen_child_pnpinfo(device_t cbdev, device_t child, struct sbuf *sb)
 {
