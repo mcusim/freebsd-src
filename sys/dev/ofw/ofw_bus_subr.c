@@ -46,14 +46,14 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/openfirm.h>
 
-#include "ofw_bus_if.h"
-
 /* For debug purposes only! */
-#include "dpaa2_mcp.h"
-#include "dpaa2_mc.h"
-#include "dpaa2_ni.h"
-#include "dpaa2_mc_if.h"
-#include "dpaa2_cmd_if.h"
+#include <dev/dpaa2/dpaa2_mcp.h>
+#include <dev/dpaa2/dpaa2_mc.h>
+#include <dev/dpaa2/dpaa2_ni.h>
+#include <dev/dpaa2/dpaa2_mc_if.h>
+#include <dev/dpaa2/dpaa2_cmd_if.h>
+
+#include "ofw_bus_if.h"
 
 #define	OFW_COMPAT_LEN	255
 #define	OFW_STATUS_LEN	16
