@@ -88,132 +88,31 @@ dpaa2_mc_acpi_attach(device_t dev)
 	return (dpaa2_mc_attach(dev));
 }
 
-static int
-dpaa2_mc_acpi_detach(device_t dev)
-{
-	return (dpaa2_mc_detach(dev));
-}
-
-/*
- * Pseudo-PCIB interface.
- */
-
-static int
-dpaa2_mc_acpi_alloc_msi(device_t mcdev, device_t child, int count,
-    int maxcount, int *irqs)
-{
-	return (dpaa2_mc_alloc_msi(mcdev, child, count, maxcount, irqs));
-}
-
-static int
-dpaa2_mc_acpi_release_msi(device_t mcdev, device_t child, int count, int *irqs)
-{
-	return (dpaa2_mc_release_msi(mcdev, child, count, irqs));
-}
-
-static int
-dpaa2_mc_acpi_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
-    uint32_t *data)
-{
-	return (dpaa2_mc_map_msi(mcdev, child, irq, addr, data));
-}
-
-static int
-dpaa2_mc_acpi_get_id(device_t mcdev, device_t child, enum pci_id_type type,
-    uintptr_t *id)
-{
-	return (dpaa2_mc_get_id(mcdev, child, type, id));
-}
-
-/*
- * Bus interface
- */
-
-static struct resource *
-dpaa2_mc_acpi_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
-    rman_res_t start, rman_res_t end, rman_res_t count, u_int flags)
-{
-	return (dpaa2_mc_alloc_resource(mcdev, child, type, rid, start, end,
-	    count, flags));
-}
-
-static int
-dpaa2_mc_acpi_adjust_resource(device_t mcdev, device_t child, int type,
-    struct resource *r, rman_res_t start, rman_res_t end)
-{
-	return (dpaa2_mc_adjust_resource(mcdev, child, type, r, start, end));
-}
-
-static int
-dpaa2_mc_acpi_release_resource(device_t mcdev, device_t child, int type,
-    int rid, struct resource *r)
-{
-	return (dpaa2_mc_release_resource(mcdev, child, type, rid, r));
-}
-
-static int
-dpaa2_mc_acpi_activate_resource(device_t mcdev, device_t child, int type,
-    int rid, struct resource *r)
-{
-	return (dpaa2_mc_activate_resource(mcdev, child, type, rid, r));
-}
-
-static int
-dpaa2_mc_acpi_deactivate_resource(device_t mcdev, device_t child, int type,
-    int rid, struct resource *r)
-{
-	return (dpaa2_mc_deactivate_resource(mcdev, child, type, rid, r));
-}
-
-/*
- * DPAA2 Management Complex bus driver interface
- */
-
-static int
-dpaa2_mc_acpi_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
-{
-	return (dpaa2_mc_manage_dev(mcdev, dpaa2_dev, flags));
-}
-
-static int
-dpaa2_mc_acpi_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
-    enum dpaa2_dev_type devtype)
-{
-	return (dpaa2_mc_get_free_dev(mcdev, dpaa2_dev, devtype));
-}
-
-static int
-dpaa2_mc_acpi_get_dev(device_t mcdev, device_t *dpaa2_dev,
-    enum dpaa2_dev_type devtype, uint32_t obj_id)
-{
-	return (dpaa2_mc_get_dev(mcdev, dpaa2_dev, devtype, obj_id));
-}
-
 static device_method_t dpaa2_mc_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_acpi_probe),
 	DEVMETHOD(device_attach,	dpaa2_mc_acpi_attach),
-	DEVMETHOD(device_detach,	dpaa2_mc_acpi_detach),
+	DEVMETHOD(device_detach,	dpaa2_mc_detach),
 
 	/* Bus interface */
-	DEVMETHOD(bus_alloc_resource,	dpaa2_mc_acpi_alloc_resource),
-	DEVMETHOD(bus_adjust_resource,	dpaa2_mc_acpi_adjust_resource),
-	DEVMETHOD(bus_release_resource,	dpaa2_mc_acpi_release_resource),
-	DEVMETHOD(bus_activate_resource, dpaa2_mc_acpi_activate_resource),
-	DEVMETHOD(bus_deactivate_resource, dpaa2_mc_acpi_deactivate_resource),
+	DEVMETHOD(bus_alloc_resource,	dpaa2_mc_alloc_resource),
+	DEVMETHOD(bus_adjust_resource,	dpaa2_mc_adjust_resource),
+	DEVMETHOD(bus_release_resource,	dpaa2_mc_release_resource),
+	DEVMETHOD(bus_activate_resource, dpaa2_mc_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, dpaa2_mc_deactivate_resource),
 	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
 
 	/* Pseudo-PCIB interface */
-	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_acpi_alloc_msi),
-	DEVMETHOD(pcib_release_msi,	dpaa2_mc_acpi_release_msi),
-	DEVMETHOD(pcib_map_msi,		dpaa2_mc_acpi_map_msi),
-	DEVMETHOD(pcib_get_id,		dpaa2_mc_acpi_get_id),
+	DEVMETHOD(pcib_alloc_msi,	dpaa2_mc_alloc_msi),
+	DEVMETHOD(pcib_release_msi,	dpaa2_mc_release_msi),
+	DEVMETHOD(pcib_map_msi,		dpaa2_mc_map_msi),
+	DEVMETHOD(pcib_get_id,		dpaa2_mc_get_id),
 
 	/* DPAA2 MC bus driver interface */
-	DEVMETHOD(dpaa2_mc_manage_dev,	dpaa2_mc_acpi_manage_dev),
-	DEVMETHOD(dpaa2_mc_get_free_dev,dpaa2_mc_acpi_get_free_dev),
-	DEVMETHOD(dpaa2_mc_get_dev,	dpaa2_mc_acpi_get_dev),
+	DEVMETHOD(dpaa2_mc_manage_dev,	dpaa2_mc_manage_dev),
+	DEVMETHOD(dpaa2_mc_get_free_dev,dpaa2_mc_get_free_dev),
+	DEVMETHOD(dpaa2_mc_get_dev,	dpaa2_mc_get_dev),
 
 	DEVMETHOD_END
 };
