@@ -290,8 +290,8 @@ dpaa2_rc_attach(device_t dev)
 		pdev = device_get_parent(dev);
 		mcsc = device_get_softc(pdev);
 
-		KASSERT(strcmp(device_get_name(pdev), "dpaa2_mc") == 0, "root "
-		    "DPRC should be attached to the MC bus");
+		KASSERT(strcmp(device_get_name(pdev), "dpaa2_mc") == 0,
+		    ("root DPRC should be attached to the MC bus"));
 
 		/*
 		 * Allocate devinfo to let the parent MC bus access ICID of the
