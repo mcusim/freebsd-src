@@ -78,9 +78,6 @@ static int
 dpaa2_mc_fdt_attach(device_t dev)
 {
 	struct dpaa2_mc_softc *sc;
-	char *node_name;
-	phandle_t node;
-	int error;
 
 	sc = device_get_softc(dev);
 	sc->acpi_based = false;
