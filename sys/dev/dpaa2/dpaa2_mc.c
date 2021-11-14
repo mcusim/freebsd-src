@@ -199,19 +199,6 @@ dpaa2_mc_attach(device_t dev)
 	mtx_init(&sc->mdev_lock, "MC portal mdev lock", NULL, MTX_DEF);
 	STAILQ_INIT(&sc->mdev_list);
 
-	/* Allocate devinfo to keep information about the MC bus itself. */
-	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_MC,
-	    M_WAITOK | M_ZERO);
-	if (!dinfo) {
-		device_printf(dev, "Failed to allocate dpaa2_devinfo\n");
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
-	}
-	device_set_ivars(dev, dinfo);
-	dinfo->pdev = device_get_parent(dev);
-	dinfo->dev = dev;
-	dinfo->dtype = DPAA2_DEV_MC;
-
 	/*
 	 * Add a root resource container as the only child of the bus. All of
 	 * the direct descendant containers will be attached to the root one
@@ -412,13 +399,11 @@ int
 dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id)
 {
-	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 
-	mcinfo = device_get_ivars(mcdev);
 	dinfo = device_get_ivars(child);
 
-	if (mcinfo->dtype != DPAA2_DEV_MC)
+	if (strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
 		return (ENXIO);
 
 	if (type == PCI_ID_MSI)
@@ -436,17 +421,15 @@ int
 dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 {
 	struct dpaa2_mc_softc *sc;
-	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_mc_devinfo *di;
 	struct rman *rm;
 	int error;
 
 	sc = device_get_softc(mcdev);
-	mcinfo = device_get_ivars(mcdev);
 	dinfo = device_get_ivars(dpaa2_dev);
 
-	if (!sc || !mcinfo || !dinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (!sc || !dinfo || strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
 		return (EINVAL);
 
 	di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
@@ -492,14 +475,11 @@ int
 dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
-	struct dpaa2_devinfo *mcinfo;
 	struct rman *rm;
 	rman_res_t start, end;
 	int error;
 
-	mcinfo = device_get_ivars(mcdev);
-
-	if (!mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
 		return (EINVAL);
 
 	/* Select resource manager based on a type of the DPAA2 device. */
@@ -532,15 +512,13 @@ dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype, uint32_t obj_id)
 {
 	struct dpaa2_mc_softc *sc;
-	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_mc_devinfo *di;
 	int error = ENOENT;
 
 	sc = device_get_softc(mcdev);
-	mcinfo = device_get_ivars(mcdev);
 
-	if (!sc || !mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (!sc || strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
 		return (EINVAL);
 
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
@@ -566,15 +544,13 @@ dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype)
 {
 	struct dpaa2_mc_softc *sc;
-	struct dpaa2_devinfo *mcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_mc_devinfo *di;
 	int error = ENOENT;
 
 	sc = device_get_softc(mcdev);
-	mcinfo = device_get_ivars(mcdev);
 
-	if (!sc || !mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+	if (!sc || strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
 		return (EINVAL);
 
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);

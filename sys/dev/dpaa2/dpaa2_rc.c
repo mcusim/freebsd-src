@@ -289,13 +289,9 @@ dpaa2_rc_attach(device_t dev)
 		/* Root DPRC should be attached directly to the MC bus. */
 		pdev = device_get_parent(dev);
 		mcsc = device_get_softc(pdev);
-		dinfo = device_get_ivars(pdev);
-		if (dinfo && dinfo->dtype != DPAA2_DEV_MC) {
-			device_printf(dev, "Root DPRC attached not to the MC "
-			    "bus: dtype=%d\n", dinfo->dtype);
-			return (ENXIO);
-		}
-		dinfo = NULL;
+
+		KASSERT(strcmp(device_get_name(pdev), "dpaa2_mc") == 0, "root "
+		    "DPRC should be attached to the MC bus");
 
 		/*
 		 * Allocate devinfo to let the parent MC bus access ICID of the
