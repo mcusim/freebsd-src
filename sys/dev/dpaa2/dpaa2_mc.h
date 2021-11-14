@@ -220,5 +220,7 @@ int dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
 int dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype, uint32_t obj_id);
+int dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype);
 
 #endif /* _DPAA2_MC_H */
