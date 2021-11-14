@@ -378,14 +378,8 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
 #if defined(INTRNG)
-	u_int xref = 0;
-
-	xref = dpaa2_mc_get_xref(mcdev, child);
-	/* For debug purposes only! */
-	printf("%s: xref=%d\n", __func__, xref);
-	if (!xref)
-		return (ENXIO);
-	return (intr_alloc_msi(mcdev, child, xref, count, maxcount, irqs));
+	return (intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
+	    count, maxcount, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -629,43 +623,24 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	u_int xref, devid;
 	int error;
 
-	/* For debug purposes only! */
-	char *node_name;
-	phandle_t node;
-
 	if (sc && dinfo) {
-		if (!sc->acpi_based) {
-			/* For debug purposes only! */
-			node = ofw_bus_get_node(device_get_parent(mcdev));
-			for (node = OF_child(node); node != 0; node = OF_peer(node)) {
-				error = OF_getprop_alloc(node, "name",
-				    (void **)&node_name);
-				if (error > 0) {
-					if (strstr(node_name, "fsl-mc")) {
-						OF_prop_free(node_name);
-						break;
-					}
-					OF_prop_free(node_name);
-				}
-			}
-			/* FDT-based driver. */
-			error = ofw_bus_msimap(node, dinfo->icid, &msi_parent,
-			    NULL);
-
-			if (error)
-				return (0);
-			return ((u_int) msi_parent);
-		} else {
+		if (sc->acpi_based) {
 			/*
-			 * ACPI-based driver: The first named component from the
-			 * IORT table with the given name (as a substring) will
-			 * be used.
+			 * NOTE: The first named component from the IORT table
+			 * with the given name (as a substring) will be used.
 			 */
 			error = acpi_iort_map_named_msi(IORT_DEVICE_NAME,
 			    dinfo->icid, &xref, &devid);
 			if (error)
 				return (0);
 			return (xref);
+		} else {
+			/* FDT-based driver. */
+			error = ofw_bus_msimap(sc->ofw_node, dinfo->icid,
+			    &msi_parent, NULL);
+			if (error)
+				return (0);
+			return ((u_int) msi_parent);
 		}
 	}
 	return (0);
@@ -686,9 +661,6 @@ dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id)
 		/*
 		 * The first named components from IORT table with the given
 		 * name (as a substring) will be used.
-		 *
-		 * TODO: Find a way to form a device name based on "mcdev", i.e.
-		 *       dpaa2_mcX -> MCEx?
 		 */
 		error = acpi_iort_map_named_msi(IORT_DEVICE_NAME, dinfo->icid,
 		    &xref, &devid);
