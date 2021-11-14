@@ -630,9 +630,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 	int error;
 
 	/* For debug purposes only! */
-	char propname[64];
-	const char *prevprop = NULL;
-	char *node_name, *pos;
+	char *node_name;
 	phandle_t node;
 
 	if (sc && dinfo) {
@@ -643,8 +641,7 @@ dpaa2_mc_get_xref(device_t mcdev, device_t child)
 				error = OF_getprop_alloc(node, "name",
 				    (void **)&node_name);
 				if (error > 0) {
-					pos = strstr(node_name, "fsl-mc");
-					if (pos) {
+					if (strstr(node_name, "fsl-mc")) {
 						OF_prop_free(node_name);
 						break;
 					}
