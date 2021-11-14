@@ -64,7 +64,7 @@ struct dpaa2_mc_devinfo;
  * dev:		Device associated with this software context.
  * rcdev:	Child device associated with the root resource container.
  * acpi_based:	Attached using ACPI (true) or FDT (false).
- * ofw_node:	Flattened Device Tree node of the MC (FDT-based only).
+ * ofw_node:	FDT node of the Management Complex (acpi_based == false).
  * res:		Unmapped MC command portal and control registers resources.
  * map:		Mapped MC command portal and control registers resources.
  * dpni_rman:	Data Path I/O objects resource manager.
