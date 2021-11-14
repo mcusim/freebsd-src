@@ -87,6 +87,44 @@ dpaa2_mc_fdt_attach(device_t dev)
 	return (dpaa2_mc_attach(dev));
 }
 
+/*
+ * OFW bus interface.
+ */
+
+const char *
+dpaa2_mc_fdt_get_compat(device_t bus, device_t dev)
+{
+	struct dpaa2_mc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+
+	/* TODO: Hardcoded string for now. */
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_MC)
+		return ("fsl,qoriq-mc");
+	return (NULL);
+}
+
+const char *
+dpaa2_mc_fdt_get_name(device_t bus, device_t dev)
+{
+	struct dpaa2_mc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+
+	/* TODO: Hardcoded string for now. */
+	if (sc && dinfo && dinfo->dtype == DPAA2_DEV_MC)
+		return ("fsl-mc");
+	return (NULL);
+}
+
+phandle_t
+dpaa2_mc_fdt_get_node(device_t bus, device_t dev)
+{
+	struct dpaa2_mc_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	return (sc->ofw_node);
+}
+
 static device_method_t dpaa2_mc_fdt_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_mc_fdt_probe),
@@ -107,6 +145,11 @@ static device_method_t dpaa2_mc_fdt_methods[] = {
 	DEVMETHOD(pcib_release_msi,	dpaa2_mc_release_msi),
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_map_msi),
 	DEVMETHOD(pcib_get_id,		dpaa2_mc_get_id),
+
+	/* OFW bus interface */
+	DEVMETHOD(ofw_bus_get_compat,	dpaa2_mc_fdt_get_compat),
+	DEVMETHOD(ofw_bus_get_name,	dpaa2_mc_fdt_get_name),
+	DEVMETHOD(ofw_bus_get_node,	dpaa2_mc_fdt_get_node),
 
 	/* DPAA2 MC bus driver interface */
 	DEVMETHOD(dpaa2_mc_manage_dev,	dpaa2_mc_manage_dev),
