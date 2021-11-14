@@ -46,10 +46,7 @@ CODE {
 	static void
 	panic_on_mc(device_t dev)
 	{
-		struct dpaa2_devinfo *dinfo;
-
-		dinfo = device_get_ivars(dev);
-		if (dinfo != NULL && dinfo->dtype == DPAA2_DEV_MC)
+		if (strcmp(device_get_name(dev), "dpaa2_mc") == 0)
 			panic("No one can handle a command above DPAA2 MC");
 	}
 
