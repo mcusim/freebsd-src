@@ -86,67 +86,12 @@ ofw_bus_gen_destroy_devinfo(struct ofw_bus_devinfo *obd)
 		free(obd->obd_status, M_OFWPROP);
 }
 
-/* For debug purposes only! */
-enum dpaa2_dev_type {
-	DPAA2_DEV_MC = 7500,	/* Management Complex (firmware bus) */
-	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
-	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
-	DPAA2_DEV_NI,		/* Network Interface */
-	DPAA2_DEV_MCP,		/* MC portal configuration */
-	DPAA2_DEV_BP,		/* Buffer Pool */
-	DPAA2_DEV_CON,		/* Concentrator */
-	DPAA2_DEV_MAC,		/* MAC object */
-
-	DPAA2_DEV_NOTYPE	/* Shouldn't be assigned to any DPAA2 device. */
-};
-struct dpaa2_devinfo {
-	device_t		 pdev;
-	device_t		 dev;
-	uint32_t		 id;
-	uint32_t		 portal_id;
-	uint16_t		 icid;
-	enum dpaa2_dev_type	 dtype;
-};
-static const char *
-dpaa2_ttos(enum dpaa2_dev_type type)
-{
-	switch (type) {
-	case DPAA2_DEV_MC:
-		return ("mc"); /* NOTE: to print as information only. */
-	case DPAA2_DEV_RC:
-		return ("dprc");
-	case DPAA2_DEV_IO:
-		return ("dpio");
-	case DPAA2_DEV_NI:
-		return ("dpni");
-	case DPAA2_DEV_MCP:
-		return ("dpmcp");
-	case DPAA2_DEV_BP:
-		return ("dpbp");
-	case DPAA2_DEV_CON:
-		return ("dpcon");
-	case DPAA2_DEV_MAC:
-		return ("dpmac");
-	default:
-		break;
-	}
-	return ("notype");
-}
-
 int
 ofw_bus_gen_child_pnpinfo(device_t cbdev, device_t child, struct sbuf *sb)
 {
 
 	if (!ofw_bus_status_okay(child))
 		return (0);
-
-	/* For debug purposes only! */
-	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
-	if (dinfo) {
-		printf("%s: devtype=%s, id=%d, ofw_node=%d\n", __func__,
-		    dpaa2_ttos(dinfo->dtype), dinfo->id,
-		    ofw_bus_get_node(child));
-	}
 
 	if (ofw_bus_get_name(child) != NULL) {
 		sbuf_printf(sb, "name=%s ", ofw_bus_get_name(child));
