@@ -2643,11 +2643,22 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 
 	/* Request a free DPAA2 device of the given type from MC. */
 	error = DPAA2_MC_GET_FREE_DEV(rcdev, &dpaa2_dev, devtype);
-	if (error) {
+	if (error && !(flags & RF_SHAREABLE)) {
 		device_printf(rcdev, "Failed to obtain a free %s (rid=%d) for: "
 		    "%s (id=%u)\n", dpaa2_ttos(devtype), *rid,
 		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (error);
+	}
+
+	/* Request a shared DPAA2 device of the given type from MC. */
+	if (error) {
+		error = DPAA2_MC_GET_DEV(rcdev, &dpaa2_dev, devtype, *rid);
+		if (error) {
+			device_printf(rcdev, "Failed to obtain a shared "
+			    "%s (rid=%d) for: %s (id=%u)\n", dpaa2_ttos(devtype),
+			    *rid, dpaa2_ttos(dinfo->dtype), dinfo->id);
+			return (error);
+		}
 	}
 
 	/* Add DPAA2 device to the resource list of the child device. */
@@ -2712,32 +2723,32 @@ reset_cmd_params(dpaa2_cmd_t cmd)
 
 static device_method_t dpaa2_rc_methods[] = {
 	/* Device interface */
-	DEVMETHOD(device_probe,		dpaa2_rc_probe),
-	DEVMETHOD(device_attach,	dpaa2_rc_attach),
-	DEVMETHOD(device_detach,	dpaa2_rc_detach),
+	DEVMETHOD(device_probe,			dpaa2_rc_probe),
+	DEVMETHOD(device_attach,		dpaa2_rc_attach),
+	DEVMETHOD(device_detach,		dpaa2_rc_detach),
 
 	/* Bus interface */
-	DEVMETHOD(bus_get_resource_list,dpaa2_rc_get_resource_list),
-	DEVMETHOD(bus_set_resource,	bus_generic_rl_set_resource),
-	DEVMETHOD(bus_get_resource,	bus_generic_rl_get_resource),
-	DEVMETHOD(bus_delete_resource,	dpaa2_rc_delete_resource),
-	DEVMETHOD(bus_alloc_resource,	dpaa2_rc_alloc_resource),
-	DEVMETHOD(bus_adjust_resource,	bus_generic_adjust_resource),
-	DEVMETHOD(bus_release_resource,	dpaa2_rc_release_resource),
-	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
-	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
-	DEVMETHOD(bus_child_deleted,	dpaa2_rc_child_deleted),
-	DEVMETHOD(bus_child_detached,	dpaa2_rc_child_detached),
-	DEVMETHOD(bus_setup_intr,	dpaa2_rc_setup_intr),
-	DEVMETHOD(bus_teardown_intr,	dpaa2_rc_teardown_intr),
-	DEVMETHOD(bus_print_child,	dpaa2_rc_print_child),
-	DEVMETHOD(bus_add_child,	device_add_child_ordered),
+	DEVMETHOD(bus_get_resource_list,	dpaa2_rc_get_resource_list),
+	DEVMETHOD(bus_delete_resource,		dpaa2_rc_delete_resource),
+	DEVMETHOD(bus_alloc_resource,		dpaa2_rc_alloc_resource),
+	DEVMETHOD(bus_release_resource,		dpaa2_rc_release_resource),
+	DEVMETHOD(bus_child_deleted,		dpaa2_rc_child_deleted),
+	DEVMETHOD(bus_child_detached,		dpaa2_rc_child_detached),
+	DEVMETHOD(bus_setup_intr,		dpaa2_rc_setup_intr),
+	DEVMETHOD(bus_teardown_intr,		dpaa2_rc_teardown_intr),
+	DEVMETHOD(bus_print_child,		dpaa2_rc_print_child),
+	DEVMETHOD(bus_add_child,		device_add_child_ordered),
+	DEVMETHOD(bus_set_resource,		bus_generic_rl_set_resource),
+	DEVMETHOD(bus_get_resource,		bus_generic_rl_get_resource),
+	DEVMETHOD(bus_activate_resource, 	bus_generic_activate_resource),
+	DEVMETHOD(bus_deactivate_resource, 	bus_generic_deactivate_resource),
+	DEVMETHOD(bus_adjust_resource,		bus_generic_adjust_resource),
 
 	/* Pseudo-PCI interface */
-	DEVMETHOD(pci_alloc_msi,	dpaa2_rc_alloc_msi),
-	DEVMETHOD(pci_release_msi,	dpaa2_rc_release_msi),
-	DEVMETHOD(pci_msi_count,	dpaa2_rc_msi_count),
-	DEVMETHOD(pci_get_id,		dpaa2_rc_get_id),
+	DEVMETHOD(pci_alloc_msi,		dpaa2_rc_alloc_msi),
+	DEVMETHOD(pci_release_msi,		dpaa2_rc_release_msi),
+	DEVMETHOD(pci_msi_count,		dpaa2_rc_msi_count),
+	DEVMETHOD(pci_get_id,			dpaa2_rc_get_id),
 
 	/* DPAA2 MC command interface */
 	DEVMETHOD(dpaa2_cmd_mng_get_version,	dpaa2_rc_mng_get_version),

@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
  * SoCs (LX2160A, for example) and provides an access to the specialized
  * hardware objects used in network-oriented packet processing applications.
  */
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>

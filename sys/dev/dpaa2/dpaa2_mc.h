@@ -80,12 +80,12 @@ struct dpaa2_mc_softc {
 	struct resource 	*res[2];
 	struct resource_map	 map[2];
 
-	/* For managed and allocatable DPAA2 objects. */
+	/* For allocatable managed DPAA2 objects. */
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
 	struct rman		 dpcon_rman;
 
-	/* For managed and non-allocatable DPAA2 objects. */
+	/* For managed DPAA2 objects. */
 	struct mtx		 mdev_lock;
 	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
 };

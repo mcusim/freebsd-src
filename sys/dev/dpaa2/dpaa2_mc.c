@@ -449,6 +449,20 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 	if (!sc || !mcinfo || !dinfo || mcinfo->dtype != DPAA2_DEV_MC)
 		return (EINVAL);
 
+	di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
+	if (!di) {
+		device_printf(mcdev, "Failed to allocate dpaa2_mc_devinfo\n");
+		return (ENOMEM);
+	}
+	di->dpaa2_dev = dpaa2_dev;
+	di->flags = flags;
+
+	/* Append a new managed DPAA2 device to the queue. */
+	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+	mtx_lock(&sc->mdev_lock);
+	STAILQ_INSERT_TAIL(&sc->mdev_list, di, link);
+	mtx_unlock(&sc->mdev_lock);
+
 	if (flags & DPAA2_MC_DEV_ALLOCATABLE) {
 		/* Select rman based on a type of the DPAA2 device. */
 		rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
@@ -469,23 +483,7 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 			    error);
 			return (error);
 		}
-	} else if (flags & DPAA2_MC_DEV_ASSOCIATED) {
-		/* Prepare information about non-allocatable DPAA2 device. */
-		di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
-		if (!di) {
-			device_printf(mcdev, "Failed to allocate "
-			    "dpaa2_mc_devinfo\n");
-			return (ENOMEM);
-		}
-		di->dpaa2_dev = dpaa2_dev;
-		di->flags = flags;
-
-		mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
-		mtx_lock(&sc->mdev_lock);
-		STAILQ_INSERT_TAIL(&sc->mdev_list, di, link);
-		mtx_unlock(&sc->mdev_lock);
-	} else
-		panic("Please, specify a type of the DPAA2 device to manage!");
+	}
 
 	return (0);
 }
