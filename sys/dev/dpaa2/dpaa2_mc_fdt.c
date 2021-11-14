@@ -82,12 +82,13 @@ dpaa2_mc_fdt_attach(device_t dev)
 	struct dpaa2_mc_softc *sc;
 	char *node_name;
 	phandle_t node;
+	int error;
 
 	sc = device_get_softc(dev);
 	sc->acpi_based = false;
 
 	node = ofw_bus_get_node(dev);
-	printf("%s: mcdev node=%d\n", node);
+	device_printf(dev, "mcdev node=%d\n", node);
 
 	/*
 	 * NOTE: Workaround for TEN64 board.
@@ -107,7 +108,7 @@ dpaa2_mc_fdt_attach(device_t dev)
 			OF_prop_free(node_name);
 		}
 	}
-	printf("%s: fsl-mc node=%d\n", node);
+	device_printf(dev, "fsl-mc node=%d\n", node);
 
 	sc->ofw_node = node;
 
