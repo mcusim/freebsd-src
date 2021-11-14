@@ -57,8 +57,6 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_mc_if.h"
 
-#define FDT_DEVICE_NAME		"fsl-mc"
-
 /*
  * Device interface.
  */
@@ -86,31 +84,7 @@ dpaa2_mc_fdt_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->acpi_based = false;
-
-	node = ofw_bus_get_node(dev);
-	device_printf(dev, "mcdev node=%d\n", node);
-
-	/*
-	 * NOTE: Workaround for TEN64 board.
-	 *
-	 * Node returned by ofw_bus_get_node(dev) might be incorrect and does
-	 * not describe the "fsl-mc" device. Look for a correct node among the
-	 * siblings of the dev node.
-	 */
-	node = ofw_bus_get_node(device_get_parent(dev));
-	for (node = OF_child(node); node != 0; node = OF_peer(node)) {
-		error = OF_getprop_alloc(node, "name", (void **)&node_name);
-		if (error > 0) {
-			if (strstr(node_name, FDT_DEVICE_NAME)) {
-				OF_prop_free(node_name);
-				break;
-			}
-			OF_prop_free(node_name);
-		}
-	}
-	device_printf(dev, "fsl-mc node=%d\n", node);
-
-	sc->ofw_node = node;
+	sc->ofw_node = ofw_bus_get_node(dev);
 
 	return (dpaa2_mc_attach(dev));
 }
