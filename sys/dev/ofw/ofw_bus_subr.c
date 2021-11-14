@@ -46,11 +46,6 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/ofw/openfirm.h>
 
-/* For debug purposes only! */
-#include <dev/dpaa2/dpaa2_mcp.h>
-#include <dev/dpaa2/dpaa2_mc.h>
-#include <dev/dpaa2/dpaa2_ni.h>
-
 #include "ofw_bus_if.h"
 
 #define	OFW_COMPAT_LEN	255
@@ -92,6 +87,26 @@ ofw_bus_gen_destroy_devinfo(struct ofw_bus_devinfo *obd)
 }
 
 /* For debug purposes only! */
+enum dpaa2_dev_type {
+	DPAA2_DEV_MC = 7500,	/* Management Complex (firmware bus) */
+	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
+	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
+	DPAA2_DEV_NI,		/* Network Interface */
+	DPAA2_DEV_MCP,		/* MC portal configuration */
+	DPAA2_DEV_BP,		/* Buffer Pool */
+	DPAA2_DEV_CON,		/* Concentrator */
+	DPAA2_DEV_MAC,		/* MAC object */
+
+	DPAA2_DEV_NOTYPE	/* Shouldn't be assigned to any DPAA2 device. */
+};
+struct dpaa2_devinfo {
+	device_t		 pdev;
+	device_t		 dev;
+	uint32_t		 id;
+	uint32_t		 portal_id;
+	uint16_t		 icid;
+	enum dpaa2_dev_type	 dtype;
+};
 static const char *
 dpaa2_ttos(enum dpaa2_dev_type type)
 {
