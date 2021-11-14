@@ -2652,7 +2652,7 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 
 	/* Request a shared DPAA2 device of the given type from MC. */
 	if (error) {
-		error = DPAA2_MC_GET_DEV(rcdev, &dpaa2_dev, devtype, *rid);
+		error = DPAA2_MC_GET_SHARED_DEV(rcdev, &dpaa2_dev, devtype);
 		if (error) {
 			device_printf(rcdev, "Failed to obtain a shared "
 			    "%s (rid=%d) for: %s (id=%u)\n", dpaa2_ttos(devtype),

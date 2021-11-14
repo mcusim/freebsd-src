@@ -543,20 +543,47 @@ dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
 	if (!sc || !mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
 		return (EINVAL);
 
-	/* For debug purposes only! */
-	printf("%s: looking for %s (id=%d)\n", __func__, dpaa2_ttos(devtype),
-	    obj_id);
-
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
 	mtx_lock(&sc->mdev_lock);
 
 	/* Find DPAA2 device with the given devtype and ID. */
 	STAILQ_FOREACH(di, &sc->mdev_list, link) {
 		dinfo = device_get_ivars(di->dpaa2_dev);
-		/* For debug purposes only! */
-		printf("%s: trying %s (id=%d)\n", __func__,
-		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		if (dinfo->dtype == devtype && dinfo->id == obj_id) {
+			*dpaa2_dev = di->dpaa2_dev;
+			error = 0;
+			break;
+		}
+	}
+
+	mtx_unlock(&sc->mdev_lock);
+
+	return (error);
+}
+
+int
+dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	struct dpaa2_mc_softc *sc;
+	struct dpaa2_devinfo *mcinfo;
+	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_mc_devinfo *di;
+	int error = ENOENT;
+
+	sc = device_get_softc(mcdev);
+	mcinfo = device_get_ivars(mcdev);
+
+	if (!sc || !mcinfo || mcinfo->dtype != DPAA2_DEV_MC)
+		return (EINVAL);
+
+	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+	mtx_lock(&sc->mdev_lock);
+
+	/* Find DPAA2 device with the given devtype. */
+	STAILQ_FOREACH(di, &sc->mdev_list, link) {
+		dinfo = device_get_ivars(di->dpaa2_dev);
+		if (dinfo->dtype == devtype) {
 			*dpaa2_dev = di->dpaa2_dev;
 			error = 0;
 			break;
