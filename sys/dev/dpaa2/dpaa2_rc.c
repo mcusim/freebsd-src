@@ -686,10 +686,10 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 		    irqs[i], irqs[i], 1);
 
 	if (bootverbose) {
-		if (actual == 1)
+		if (actual == 1) {
 			/* TODO: Enable debug output via sysctl. */
 			/* device_printf(child, "Using IRQ %d for MSI\n", irqs[0]); */
-		else {
+		} else {
 			/*
 			 * Be fancy and try to print contiguous runs
 			 * of IRQ values as ranges.  'run' is true if
