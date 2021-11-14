@@ -131,12 +131,15 @@ dpaa2_mac_attach(device_t dev)
 	if (error)
 		device_printf(dev, "Failed to get physical address: error=%d\n",
 		    error);
-	if (bootverbose) {
-		device_printf(dev, "ether %6D\n", sc->addr, ":");
-		device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n",
-		    sc->attr.max_rate, etf_if_to_str(sc->attr.eth_if),
-		    link_type_to_str(sc->attr.link_type));
-	}
+	/*
+	 * TODO: Enable debug output via sysctl.
+	 */
+	/* if (bootverbose) { */
+	/* 	device_printf(dev, "ether %6D\n", sc->addr, ":"); */
+	/* 	device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n", */
+	/* 	    sc->attr.max_rate, etf_if_to_str(sc->attr.eth_if), */
+	/* 	    link_type_to_str(sc->attr.link_type)); */
+	/* } */
 
 	/* Close the DPMAC object and the resource container. */
 	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
