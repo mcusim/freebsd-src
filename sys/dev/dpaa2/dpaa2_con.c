@@ -128,9 +128,12 @@ dpaa2_con_attach(device_t dev)
 		    "error=%d\n", dinfo->id, error);
 		goto err_free_cmd;
 	}
-	if (bootverbose)
-		device_printf(dev, "channel_id=%d, priorities=%d\n",
-		    sc->attr.chan_id, sc->attr.prior_num);
+	/*
+	 * TODO: Enable debug output via sysctl (to reduce output).
+	 */
+	/* if (bootverbose) */
+	/* 	device_printf(dev, "channel_id=%d, priorities=%d\n", */
+	/* 	    sc->attr.chan_id, sc->attr.prior_num); */
 
 	error = DPAA2_CMD_CON_ENABLE(dev, cmd);
 	if (error) {
