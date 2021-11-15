@@ -34,6 +34,7 @@
 #include <sys/mutex.h>
 
 #include "dpaa2_types.h"
+#include "dpaa2_ni.h"
 
 /*
  * DPAA2 MC command interface helper routines.
@@ -103,13 +104,6 @@ enum dpaa2_rc_region_type {
 enum dpaa2_io_chan_mode {
 	DPAA2_IO_NO_CHANNEL,
 	DPAA2_IO_LOCAL_CHANNEL
-};
-
-enum dpaa2_ni_queue_type {
-	DPAA2_NI_QUEUE_RX,
-	DPAA2_NI_QUEUE_TX,
-	DPAA2_NI_QUEUE_TX_CONF,
-	DPAA2_NI_QUEUE_RX_ERR
 };
 
 enum dpaa2_mac_eth_if {

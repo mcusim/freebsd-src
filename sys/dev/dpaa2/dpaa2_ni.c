@@ -184,6 +184,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 
 static int	setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
 static int	setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
+static int	setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -296,8 +297,14 @@ dpaa2_ni_attach(device_t dev)
 	error = setup_dpni(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
+
 	/* Configure QBMan channels. */
 	error = setup_channels(dev, cmd, rc_token);
+	if (error)
+		goto err_free_cmd;
+
+	/* Configure frame queues. */
+	error = setup_fqs(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
 
@@ -717,6 +724,16 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    con_info->id, error);
 
 	return (ENXIO);
+}
+
+/**
+ * @internal
+ * @brief Сonfigure frame queues.
+ */
+static int
+setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
+{
+	return (0);
 }
 
 /**
