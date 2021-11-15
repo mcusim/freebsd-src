@@ -37,6 +37,7 @@
 
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
+#include "dpaa2_swp.h"
 #include "dpaa2_io.h"
 
 /* Maximum number of resources per DPNI. */
