@@ -109,7 +109,7 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 	DEVMETHOD(pcib_map_msi,		dpaa2_mc_map_msi),
 	DEVMETHOD(pcib_get_id,		dpaa2_mc_get_id),
 
-	/* DPAA2 MC bus driver interface */
+	/* DPAA2 MC bus interface */
 	DEVMETHOD(dpaa2_mc_manage_dev,	dpaa2_mc_manage_dev),
 	DEVMETHOD(dpaa2_mc_get_free_dev,dpaa2_mc_get_free_dev),
 	DEVMETHOD(dpaa2_mc_get_dev,	dpaa2_mc_get_dev),

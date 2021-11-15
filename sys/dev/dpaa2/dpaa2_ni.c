@@ -660,11 +660,6 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
 
-		if (bootverbose)
-			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
-			    "channel_id=%d\n", io_info->id, con_info->id,
-			    channel->id);
-
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
 		ctx->cb = dpni_cdan_cb;
@@ -706,6 +701,11 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		if (error)
 			device_printf(dev, "Failed to close DPCON: id=%d, "
 			    "error=%d\n", con_info->id, error);
+
+		if (bootverbose)
+			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
+			    "channel_id=%d\n", io_info->id, con_info->id,
+			    channel->id);
 	}
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
