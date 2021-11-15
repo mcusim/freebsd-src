@@ -281,34 +281,6 @@ typedef struct {
 } dpaa2_bp_attr_t;
 
 /**
- * @brief Attributes of the DPNI object.
- *
- * options:	 ...
- * wriop_ver:	 Revision of the underlying WRIOP hardware block.
- */
-typedef struct {
-	uint32_t		options;
-	uint16_t		wriop_ver;
-	struct {
-		uint16_t	fs;
-		uint8_t		mac;
-		uint8_t		vlan;
-		uint8_t		qos;
-	} entries;
-	struct {
-		uint8_t		queues;
-		uint8_t		rx_tcs;
-		uint8_t		tx_tcs;
-		uint8_t		channels;
-		uint8_t		cgs;
-	} num;
-	struct {
-		uint8_t		fs;
-		uint8_t		qos;
-	} key_size;
-} dpaa2_ni_attr_t;
-
-/**
  * @brief Buffer layout attributes.
  *
  * pd_size:		Size kept for private data (in bytes, max. 64)
