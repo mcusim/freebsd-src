@@ -32,8 +32,17 @@ __FBSDID("$FreeBSD$");
 /*
  * The DPAA2 Concentrator (DPCON) driver.
  *
- * The DPCON object provides advanced scheduling of ingress packets, including
- * scheduling between different network interfaces.
+ * Supports configuration of QBMan channels for advanced scheduling of ingress
+ * packets from one or more network interfaces.
+ *
+ * DPCONs are used to distribute Rx or Tx Confirmation traffic to different
+ * cores, via affine DPIO objects. The implication is that one DPCON must be
+ * available for each core where Rx or Tx Confirmation traffic should be
+ * distributed to.
+ *
+ * QBMan channel contains several work queues. The WQs within a channel have a
+ * priority relative to each other. Each channel consists of either eight or two
+ * WQs, and thus, there are either eight or two possible priorities in a channel.
  */
 
 #include <sys/param.h>
@@ -132,7 +141,7 @@ dpaa2_con_attach(device_t dev)
 	 * TODO: Enable debug output via sysctl (to reduce output).
 	 */
 	/* if (bootverbose) */
-	/* 	device_printf(dev, "channel_id=%d, priorities=%d\n", */
+	/* 	device_printf(dev, "channel_id=%d, work_queues=%d\n", */
 	/* 	    sc->attr.chan_id, sc->attr.prior_num); */
 
 	error = DPAA2_CMD_CON_ENABLE(dev, cmd);

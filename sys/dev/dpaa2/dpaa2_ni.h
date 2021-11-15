@@ -45,8 +45,27 @@
 /* Maximum number of channels to distribute Rx and Tx conf traffic to GPPs. */
 #define DPAA2_NI_MAX_CHANNELS	16
 
+#define DPAA2_NI_MAX_TCS	8 /* traffic classes */
+#define DPAA2_NI_MAX_RXQ_PER_TC	16
+#define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
+#define DPAA2_NI_MAX_RXEQ	1 /* Rx error queue */
+#define DPAA2_NI_MAX_TXQ	16
+
+/* Maximum number of queues associated with a DPNI. */
+#define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
+    DPAA2_NI_MAX_RXEQ)
+
+enum dpaa2_ni_queue_type {
+	DPAA2_NI_QUEUE_RX,
+	DPAA2_NI_QUEUE_TX,
+	DPAA2_NI_QUEUE_TX_CONF,
+	DPAA2_NI_QUEUE_RX_ERR
+};
+
 /**
  * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
+ *
+ * NOTE: Several WQs are organized into a single QBMan channel.
  */
 typedef struct {
 	dpaa2_io_notif_ctx_t	 ctx;
@@ -54,6 +73,28 @@ typedef struct {
 	device_t		 con_dev;
 	uint16_t		 id;
 } dpaa2_ni_channel_t;
+
+/**
+ * @brief A frame queue is the basic queuing structure used by the QMan.
+ * It comprises a list of FDs, so it can be thought of as a queue of frames.
+ *
+ * NOTE: When the frames on a FQ are ready to be processed, the FQ is enqueued
+ * onto a work queue (WQ).
+ */
+typedef struct dpaa2_ni_fq {
+	void (*consume)(device_t nidev, dpaa2_ni_channel_t *channel,
+	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
+
+	dpaa2_ni_channel_t	*channel;
+	uint32_t		 id;
+	uint16_t		 flowid;
+	uint8_t			 tc;
+	enum dpaa2_ni_queue_type type;
+	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
+
+	uint32_t		 dq_frames;
+	uint32_t		 dq_bytes;
+} dpaa2_ni_fq_t;
 
 /**
  * @brief Software context for the DPAA2 Network Interface driver.
@@ -87,6 +128,8 @@ struct dpaa2_ni_softc {
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
 	dpaa2_ni_channel_t	*channel[DPAA2_NI_MAX_CHANNELS];
+	/* Frame queues. */
+	dpaa2_ni_fq_t		*fq[DPAA2_NI_MAX_QUEUES];
 
 	struct {
 		bus_dma_tag_t	 dtag;
