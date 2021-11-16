@@ -31,6 +31,8 @@
 
 /**
  * @brief Interface of the DPAA2 Management Complex (MC) bus driver.
+ *
+ * It helps to manipulate DPAA2-specific resources (DPIOs, DPBPs, etc.)
  */
 INTERFACE dpaa2_mc;
 
@@ -76,6 +78,26 @@ CODE {
 				dpaa2_dev, devtype));
 		return (ENXIO);
 	}
+
+	static int
+	bypass_reserve_dev(device_t dev, device_t dpaa2_dev,
+		enum dpaa2_dev_type devtype)
+	{
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_MC_RESERVE_DEV(device_get_parent(dev),
+				dpaa2_dev, devtype));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_release_dev(device_t dev, device_t dpaa2_dev,
+		enum dpaa2_dev_type devtype)
+	{
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_MC_RELEASE_DEV(device_get_parent(dev),
+				dpaa2_dev, devtype));
+		return (ENXIO);
+	}
 }
 
 METHOD int manage_dev {
@@ -102,3 +124,15 @@ METHOD int get_shared_dev {
 	device_t	*dpaa2_dev;
 	enum dpaa2_dev_type devtype;
 } DEFAULT bypass_get_shared_dev;
+
+METHOD int reserve_dev {
+	device_t	 dev;
+	device_t	 dpaa2_dev;
+	enum dpaa2_dev_type devtype;
+} DEFAULT bypass_reserve_dev;
+
+METHOD int release_dev {
+	device_t	 dev;
+	device_t	 dpaa2_dev;
+	enum dpaa2_dev_type devtype;
+} DEFAULT bypass_release_dev;

@@ -79,13 +79,13 @@ __FBSDID("$FreeBSD$");
 #define MC_REG_FAPR			0x28u
 
 /**
- * @brief Structure to describe a DPAA2 device as resource which cannot be
- * allocated, i.e. there is no rman for such devices.
+ * @brief Structure to describe a DPAA2 device as a managed resource.
  */
 struct dpaa2_mc_devinfo {
 	STAILQ_ENTRY(dpaa2_mc_devinfo) link;
 	device_t	dpaa2_dev;
 	uint32_t	flags;
+	uint32_t	owners;
 };
 
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc", "DPAA2 Management Complex");
@@ -258,7 +258,7 @@ dpaa2_mc_alloc_resource(device_t mcdev, device_t child, int type, int *rid,
 
 	/*
 	 * Skip managing DPAA2-specific resource. It must be provided to MC by
-	 * calling dpaa2_mc_manage_device() beforehand.
+	 * calling DPAA2_MC_MANAGE_DEV() beforehand.
 	 */
 	if (type <= DPAA2_DEV_MC) {
 		error = rman_manage_region(rm, start, end);
@@ -438,6 +438,7 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 	}
 	di->dpaa2_dev = dpaa2_dev;
 	di->flags = flags;
+	di->owners = 0;
 
 	/* Append a new managed DPAA2 device to the queue. */
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
@@ -523,7 +524,6 @@ dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
 	mtx_lock(&sc->mdev_lock);
 
-	/* Find DPAA2 device with the given devtype and ID. */
 	STAILQ_FOREACH(di, &sc->mdev_list, link) {
 		dinfo = device_get_ivars(di->dpaa2_dev);
 		if (dinfo->dtype == devtype && dinfo->id == obj_id) {
@@ -545,6 +545,8 @@ dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
 	struct dpaa2_mc_softc *sc;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_mc_devinfo *di;
+	device_t *dev = NULL;
+	uint32_t owners = UINT32_MAX;
 	int error = ENOENT;
 
 	sc = device_get_softc(mcdev);
@@ -555,11 +557,46 @@ dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
 	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
 	mtx_lock(&sc->mdev_lock);
 
-	/* Find DPAA2 device with the given devtype. */
 	STAILQ_FOREACH(di, &sc->mdev_list, link) {
 		dinfo = device_get_ivars(di->dpaa2_dev);
-		if (dinfo->dtype == devtype) {
-			*dpaa2_dev = di->dpaa2_dev;
+
+		if ((dinfo->dtype == devtype) &&
+		    (di->flags & DPAA2_MC_DEV_SHAREABLE) &&
+		    (di->owners < owners)) {
+			dev = di->dpaa2_dev;
+			owners = di->owners;
+		}
+	}
+	if (dev) {
+		*dpaa2_dev = dev;
+		error = 0;
+	}
+
+	mtx_unlock(&sc->mdev_lock);
+
+	return (error);
+}
+
+int
+dpaa2_mc_reserve_dev(device_t mcdev, device_t dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	struct dpaa2_mc_softc *sc;
+	struct dpaa2_mc_devinfo *di;
+	int error = ENOENT;
+
+	sc = device_get_softc(mcdev);
+
+	if (!sc || strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
+		return (EINVAL);
+
+	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+	mtx_lock(&sc->mdev_lock);
+
+	STAILQ_FOREACH(di, &sc->mdev_list, link) {
+		if (di->dpaa2_dev == dpaa2_dev &&
+		    (di->flags & DPAA2_MC_DEV_SHAREABLE)) {
+			di->owners++;
 			error = 0;
 			break;
 		}
@@ -570,6 +607,39 @@ dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
 	return (error);
 }
 
+int
+dpaa2_mc_release_dev(device_t mcdev, device_t dpaa2_dev,
+    enum dpaa2_dev_type devtype)
+{
+	struct dpaa2_mc_softc *sc;
+	struct dpaa2_mc_devinfo *di;
+	int error = ENOENT;
+
+	sc = device_get_softc(mcdev);
+
+	if (!sc || strcmp(device_get_name(mcdev), "dpaa2_mc") != 0)
+		return (EINVAL);
+
+	mtx_assert(&sc->mdev_lock, MA_NOTOWNED);
+	mtx_lock(&sc->mdev_lock);
+
+	STAILQ_FOREACH(di, &sc->mdev_list, link) {
+		if (di->dpaa2_dev == dpaa2_dev &&
+		    (di->flags & DPAA2_MC_DEV_SHAREABLE)) {
+			di->owners -= di->owners > 0 ? 1 : 0;
+			error = 0;
+			break;
+		}
+	}
+
+	mtx_unlock(&sc->mdev_lock);
+
+	return (error);
+}
+
+/**
+ * @brief Convert DPAA2 device type to string.
+ */
 const char *
 dpaa2_ttos(enum dpaa2_dev_type type)
 {
@@ -596,6 +666,9 @@ dpaa2_ttos(enum dpaa2_dev_type type)
 	return ("notype");
 }
 
+/**
+ * @brief Convert string to DPAA2 device type.
+ */
 enum dpaa2_dev_type
 dpaa2_stot(const char *str)
 {
