@@ -798,6 +798,8 @@ setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	if (bootverbose)
 		device_printf(dev, "queues: tx_conf=%d rx=%d rx_error=%d\n",
 		    txc_fqs, rx_fqs, rx_err_fqs);
+
+	return (0);
 }
 
 /**
