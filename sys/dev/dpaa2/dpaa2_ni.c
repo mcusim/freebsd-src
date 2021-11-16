@@ -224,6 +224,12 @@ static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
+static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
+		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
+static void	dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
+		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
+static void	dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
+		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 
 /*
  * Device interface.
@@ -314,12 +320,10 @@ dpaa2_ni_attach(device_t dev)
 	error = setup_dpni(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
-
 	/* Configure QBMan channels. */
 	error = setup_channels(dev, cmd, rc_token);
 	if (error)
 		goto err_free_cmd;
-
 	/* Configure frame queues. */
 	error = setup_fqs(dev, cmd, rc_token);
 	if (error)
@@ -750,7 +754,50 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 static int
 setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 {
-	return (0);
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	uint32_t txc_fqs, rx_fqs, rx_err_fqs;
+	int i, j;
+
+	sc->num_fqs = 0;
+
+	/*
+	 * There is one Tx confirmation FQ per Tx flow. Number of Tx and Rx
+	 * queues is the same. Tx conf. queues come first in the FQ array.
+	 */
+	for (i = 0; i < sc->num_chan; i++) {
+		sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_TX_CONF;
+		sc->fq[sc->num_fqs].flowid = (uint16_t) i;
+		sc->fq[sc->num_fqs].consume = dpni_consume_tx_conf;
+		sc->num_fqs++;
+	}
+	txc_fqs = sc->num_chan;
+
+	for (j = 0; j < sc->attr.num.rx_tcs; j++) {
+		for (i = 0; i < sc->num_chan; i++) {
+			sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX;
+			sc->fq[sc->num_fqs].tc = (uint8_t) j;
+			sc->fq[sc->num_fqs].flowid = (uint16_t) i;
+			sc->fq[sc->num_fqs].consume = dpni_consume_rx;
+			sc->num_fqs++;
+		}
+	}
+	rx_fqs = sc->attr.num.rx_tcs * sc->num_chan;
+
+	/* There is exactly one Rx error queue per DPNI. */
+	sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX_ERR;
+	sc->fq[sc->num_fqs].consume = dpni_consume_rx_err;
+	sc->num_fqs++;
+	rx_err_fqs = 1;
+
+	/* Assign a channel for each FQ. */
+	for (i = 0, j = 0; i < sc->num_fqs; i++) {
+		j = (j == sc->num_chan) ? 0 : j;
+		sc->fq[i].channel = sc->channel[j++];
+	}
+
+	if (bootverbose)
+		device_printf(dev, "queues: tx_conf=%d rx=%d rx_error=%d\n",
+		    txc_fqs, rx_fqs, rx_err_fqs);
 }
 
 /**
@@ -1133,6 +1180,36 @@ dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 	 * configuration buffer.
 	 */
 	*(bus_addr_t *) arg = segs[0].ds_addr;
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
+    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+{
+	/* TBD */
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
+    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+{
+	/* TBD */
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
+    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+{
+	/* TBD */
 }
 
 /**
