@@ -113,6 +113,8 @@ static device_method_t dpaa2_mc_fdt_methods[] = {
 	DEVMETHOD(dpaa2_mc_get_free_dev,dpaa2_mc_get_free_dev),
 	DEVMETHOD(dpaa2_mc_get_dev,	dpaa2_mc_get_dev),
 	DEVMETHOD(dpaa2_mc_get_shared_dev, dpaa2_mc_get_shared_dev),
+	DEVMETHOD(dpaa2_mc_reserve_dev,	dpaa2_mc_reserve_dev),
+	DEVMETHOD(dpaa2_mc_release_dev, dpaa2_mc_release_dev),
 
 	DEVMETHOD_END
 };

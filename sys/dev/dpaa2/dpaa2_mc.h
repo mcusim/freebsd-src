@@ -52,10 +52,11 @@
 /*
  * Flags for DPAA2 devices as resources.
  */
-#define DPAA2_MC_DEV_ALLOCATABLE	0x01u
-#define DPAA2_MC_DEV_ASSOCIATED		0x02u
+#define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to manage by DPAA2-specific rman */
+#define DPAA2_MC_DEV_ASSOCIATED	 0x02u /* to obtain info about DPAA2 device  */
+#define DPAA2_MC_DEV_SHAREABLE	 0x04u /* to be shared among DPAA2 devices */
 
-/* An element in the list of managed and non-allocatable DPAA2 objects. */
+/* An element in the queue of the managed DPAA2 devices. */
 struct dpaa2_mc_devinfo;
 
 /**
@@ -221,6 +222,10 @@ int dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
 int dpaa2_mc_get_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype, uint32_t obj_id);
 int dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
+    enum dpaa2_dev_type devtype);
+int dpaa2_mc_reserve_dev(device_t mcdev, device_t dpaa2_dev,
+    enum dpaa2_dev_type devtype);
+int dpaa2_mc_release_dev(device_t mcdev, device_t dpaa2_dev,
     enum dpaa2_dev_type devtype);
 
 #endif /* _DPAA2_MC_H */

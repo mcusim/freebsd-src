@@ -2351,7 +2351,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 	switch (obj->type) {
 	case DPAA2_DEV_IO:
 		devclass = "dpaa2_io";
-		flags = DPAA2_MC_DEV_ALLOCATABLE;
+		flags = DPAA2_MC_DEV_ALLOCATABLE | DPAA2_MC_DEV_SHAREABLE;
 		break;
 	case DPAA2_DEV_BP:
 		devclass = "dpaa2_bp";
@@ -2635,6 +2635,7 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	device_t dpaa2_dev;
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 	struct resource *res;
+	bool shared = false;
 	int error;
 
 	/* Request a free DPAA2 device of the given type from MC. */
@@ -2655,6 +2656,7 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 			    *rid, dpaa2_ttos(dinfo->dtype), dinfo->id);
 			return (error);
 		}
+		shared = true;
 	}
 
 	/* Add DPAA2 device to the resource list of the child device. */
@@ -2670,6 +2672,17 @@ add_dpaa2_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 		    "(id=%u)\n", dpaa2_ttos(devtype), *rid,
 		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (EBUSY);
+	}
+
+	/* Reserve a shared DPAA2 device of the given type. */
+	if (shared) {
+		error = DPAA2_MC_RESERVE_DEV(rcdev, dpaa2_dev, devtype);
+		if (error) {
+			device_printf(rcdev, "Failed to reserve a shared "
+			    "%s (rid=%d) for: %s (id=%u)\n", dpaa2_ttos(devtype),
+			    *rid, dpaa2_ttos(dinfo->dtype), dinfo->id);
+			return (error);
+		}
 	}
 
 	return (0);
