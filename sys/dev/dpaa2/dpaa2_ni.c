@@ -540,10 +540,10 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    sc->attr.options,
 		    sc->attr.num.queues, sc->attr.num.channels,
 		    sc->attr.wriop_ver,
-		    sc->attr.num.rx_tcs + 1, sc->attr.num.tx_tcs + 8,
+		    sc->attr.num.rx_tcs, sc->attr.num.tx_tcs,
 		    sc->attr.num.cgs,
-		    sc->attr.entries.mac + 16, sc->attr.entries.vlan,
-		    sc->attr.entries.qos + 64, sc->attr.entries.fs + 64,
+		    sc->attr.entries.mac, sc->attr.entries.vlan,
+		    sc->attr.entries.qos, sc->attr.entries.fs,
 		    sc->attr.key_size.qos, sc->attr.key_size.fs);
 
 	/* Configure buffer layouts of the DPNI queues. */
