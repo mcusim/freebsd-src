@@ -111,7 +111,7 @@ typedef struct {
  * onto a work queue (WQ).
  */
 typedef struct dpaa2_ni_fq {
-	void (*consume)(device_t nidev, dpaa2_ni_channel_t *channel,
+	void (*consume)(device_t dev, dpaa2_ni_channel_t *channel,
 	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 
 	dpaa2_ni_channel_t	*channel;
@@ -119,10 +119,6 @@ typedef struct dpaa2_ni_fq {
 	uint16_t		 flowid;
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
-	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
-
-	uint32_t		 dq_frames;
-	uint32_t		 dq_bytes;
 } dpaa2_ni_fq_t;
 
 /**
@@ -157,8 +153,9 @@ struct dpaa2_ni_softc {
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
 	dpaa2_ni_channel_t	*channel[DPAA2_NI_MAX_CHANNELS];
-	/* Frame queues. */
-	dpaa2_ni_fq_t		*fq[DPAA2_NI_MAX_QUEUES];
+ 	/* Frame queues. */
+	uint32_t		 num_fqs;
+	dpaa2_ni_fq_t		 fq[DPAA2_NI_MAX_QUEUES];
 
 	struct {
 		bus_dma_tag_t	 dtag;
