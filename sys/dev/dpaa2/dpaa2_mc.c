@@ -545,7 +545,7 @@ dpaa2_mc_get_shared_dev(device_t mcdev, device_t *dpaa2_dev,
 	struct dpaa2_mc_softc *sc;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_mc_devinfo *di;
-	device_t *dev = NULL;
+	device_t dev = NULL;
 	uint32_t owners = UINT32_MAX;
 	int error = ENOENT;
 
