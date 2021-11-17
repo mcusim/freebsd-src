@@ -326,12 +326,16 @@ dpaa2_mc_acpi_get_phy_dev(device_t dev, device_t *phy_dev, uint32_t id)
 	device_t mdev, pdev;
 
 	mdev = dpaa2_mc_acpi_find_dpaa2_mac_dev(dev, id);
-	if (mdev == NULL)
+	if (mdev == NULL) {
+		printf("%s: error stage 1\n", __func__);
 		return (ENXIO);
+	}
 
 	pdev = dpaa2_mac_dev_get_phy_dev(mdev);
-	if (pdev == NULL)
+	if (pdev == NULL) {
+		printf("%s: error stage 2\n", __func__);
 		return (ENXIO);
+	}
 
 	if (phy_dev != NULL)
 		*phy_dev = pdev;
