@@ -100,14 +100,18 @@ memacphy_acpi_attach(device_t dev)
 static int
 memacphy_miibus_readreg(device_t dev, int phy, int reg)
 {
+#ifdef 0
 	device_printf(dev, "phy read %d:%d\n", phy, reg);
+#endif
 	return (MIIBUS_READREG(device_get_parent(dev), phy, reg));
 }
 
 static int
 memacphy_miibus_writereg(device_t dev, int phy, int reg, int data)
 {
+#ifdef 0
 	device_printf(dev, "phy write %d:%d\n", phy, reg);
+#endif
 	return (MIIBUS_WRITEREG(device_get_parent(dev), phy, reg, data));
 }
 
@@ -358,7 +362,9 @@ memac_miibus_readreg(device_t dev, int phy, int reg)
 	val = memac_read_4(sc, MDIO_DATA);
 	val &= 0xffff;
 
+#ifdef 0
 	device_printf(dev, "phy read %d:%d = %#06x\n", phy, reg, val);
+#endif
 
         return (val);
 }
@@ -371,7 +377,9 @@ memac_miibus_writereg(device_t dev, int phy, int reg, int data)
 
 	sc = device_get_softc(dev);
 
+#ifdef 0
 	device_printf(dev, "phy write %d:%d\n", phy, reg);
+#endif
 
 	/* Set proper Clause 45 mode. */
 	cfg = memac_read_4(sc, MDIO_CFG);
