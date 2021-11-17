@@ -599,10 +599,8 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 			error = DPAA2_MC_GET_PHY_DEV(device_get_parent(dev),
 			    &sc->mac.phy_dev, sc->mac.dpmac_id);
 			if (error == 0) {
-#if 0
 				device_printf(dev, "MAC PHY device is '%s'\n",
 				    device_get_nameunit(sc->mac.phy_dev));
-#endif
 
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
