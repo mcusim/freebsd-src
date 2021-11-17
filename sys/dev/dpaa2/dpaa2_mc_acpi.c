@@ -244,13 +244,13 @@ dpaa2_mc_acpi_probe_child(ACPI_HANDLE h, device_t *dev, int level, void *arg)
 	ctx = (struct dpaa2_mc_acpi_prxx_walk_ctx *)arg;
 	ctx->count++;
 
-#ifdef 0
+#if 0
 	device_printf(ctx->dev, "%s: %s level %d count %d\n", __func__, acpi_name(h), level, ctx->count);
 #endif
 
 	if (ACPI_FAILURE(acpi_GetInteger(h, "_UID", &uid)))
 		return (AE_OK);
-#ifdef 0
+#if 0
 	if (bootverbose)
 		device_printf(ctx->dev, "%s: Found child Ports _UID %u\n",
 		    __func__, uid);
@@ -291,7 +291,7 @@ dpaa2_mc_acpi_attach(device_t dev)
 	ACPI_SCAN_CHILDREN(device_get_parent(dev), dev, 2,
 	    dpaa2_mc_acpi_probe_child, &ctx);
 
-#ifdef 0
+#if 0
 	device_printf(dev, "Found %d child Ports in ASL, %d ok\n",
 	    ctx.count, ctx.countok);
 #endif
