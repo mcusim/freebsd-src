@@ -58,6 +58,155 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_mc_if.h"
 
+
+/* -------------------------------------------------------------------------- */
+
+struct dpaa2_mac_dev_softc {
+	int			uid;
+	uint64_t		reg;
+	char			managed[64];
+	char			phy_conn_type[64];
+	char			phy_mode[64];
+	ACPI_HANDLE		phy_channel;
+	device_t		phy_dev;
+};
+
+static int
+dpaa2_mac_dev_probe(device_t dev)
+{
+	uint64_t reg;
+	ssize_t s;
+
+	s = device_get_property(dev, "reg", &reg, sizeof(reg));
+	if (s == -1)
+		return (ENXIO);
+
+	device_set_desc(dev, "DPAA2 MAC DEV");
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+dpaa2_mac_dev_attach(device_t dev)
+{
+	struct dpaa2_mac_dev_softc *sc;
+	ACPI_HANDLE h;
+	ACPI_OBJECT *hobj, *pobj;
+	ssize_t s;
+
+	sc = device_get_softc(dev);
+	h = acpi_get_handle(dev);
+	if (h == NULL)
+		return (ENXIO);
+
+	s = acpi_GetInteger(h, "_UID", &sc->uid);
+	if (ACPI_FAILURE(s)) {
+		device_printf(dev, "Cannot find '_UID' property: %zd\n", s);
+		return (ENXIO);
+	}
+
+	s = device_get_property(dev, "reg", &sc->reg, sizeof(sc->reg));
+	if (s == -1) {
+		device_printf(dev, "Cannot find 'reg' property: %zd\n", s);
+		return (ENXIO);
+	}
+
+	s = device_get_property(dev, "managed", sc->managed,
+	    sizeof(sc->managed));
+	s = device_get_property(dev, "phy-connection-type", sc->phy_conn_type,
+	    sizeof(sc->phy_conn_type));
+	s = device_get_property(dev, "phy-mode", sc->phy_mode,
+	    sizeof(sc->phy_mode));
+
+	hobj = NULL;
+	s = device_get_property(dev, "phy-handle", &hobj, sizeof(hobj));
+	if (s > 0) {
+		if (hobj->Type != ACPI_TYPE_PACKAGE) {
+			device_printf(dev, "Cannot get 'phy-handle' package obj, not ACPI_TYPE_PACKAGE\n");
+			goto out;
+		}
+		if (hobj->Package.Count != 1) {
+			device_printf(dev, "Cannot get 'phy-handle' package obj, count %d\n", hobj->Package.Count);
+			goto out;
+		}
+		pobj = &hobj->Package.Elements[0];
+		if (pobj == NULL) {
+			device_printf(dev, "Cannot get 'phy-handle' package pobj is NULL\n");
+			goto out;
+		}
+		if (pobj->Type != ACPI_TYPE_LOCAL_REFERENCE) {
+			device_printf(dev, "Cannot get 'phy-handle' package pobj, no ACPI_TYPE_LOCAL_REFERENCE\n");
+			goto out;
+		}
+		sc->phy_channel = acpi_GetReference(NULL, pobj);
+		if (sc->phy_channel == NULL) {
+			device_printf(dev, "Cannot get 'phy-handle' reference handle ph is NULL\n");
+			goto out;
+		}
+
+		sc->phy_dev = acpi_get_device(sc->phy_channel);
+	}
+out:
+
+	if (bootverbose)
+		device_printf(dev, "UID %#04x reg %#04jx managed '%s' "
+		    "phy-connection-type '%s' phy-mode '%s' "
+		    "phy-handle '%s' on '%s'\n",
+		    sc->uid, sc->reg, sc->managed[0] != '\0' ? sc->managed : "",
+		    sc->phy_conn_type[0] != '\0' ? sc->phy_conn_type : "",
+		    sc->phy_mode[0] != '\0' ? sc->phy_mode : "",
+		    sc->phy_channel != NULL ? acpi_name(sc->phy_channel) : "",
+		    sc->phy_dev != NULL ? device_get_nameunit(sc->phy_dev) : "");
+
+	return (0);
+}
+
+static bool
+dpaa2_mac_dev_match_id(device_t dev, uint32_t id)
+{
+	struct dpaa2_mac_dev_softc *sc;
+
+	if (dev == NULL)
+		return (false);
+
+	sc = device_get_softc(dev);
+	if (sc->uid == id)
+		return (true);
+
+	return (false);
+}
+
+static device_t
+dpaa2_mac_dev_get_phy_dev(device_t dev)
+{
+	struct dpaa2_mac_dev_softc *sc;
+
+	if (dev == NULL)
+		return (NULL);
+
+	sc = device_get_softc(dev);
+	return (sc->phy_dev);
+}
+
+static device_method_t dpaa2_mac_dev_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		dpaa2_mac_dev_probe),
+	DEVMETHOD(device_attach,	dpaa2_mac_dev_attach),
+	DEVMETHOD(device_detach,	bus_generic_detach),
+
+	DEVMETHOD_END
+};
+
+DEFINE_CLASS_0(dpaa2_mac_dev, dpaa2_mac_dev_driver, dpaa2_mac_dev_methods,
+    sizeof(struct dpaa2_mac_dev_softc));
+
+static devclass_t dpaa2_mac_dev_devclass;
+
+DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver,
+    dpaa2_mac_dev_devclass, 0, 0);
+
+
+/* -------------------------------------------------------------------------- */
+
 /*
  * Device interface.
  */
@@ -77,6 +226,55 @@ dpaa2_mc_acpi_probe(device_t dev)
 	return (rc);
 }
 
+/* Context for walking PRxx child devices. */
+struct dpaa2_mc_acpi_prxx_walk_ctx {
+	device_t	dev;
+	int		count;
+	int		countok;
+};
+
+static ACPI_STATUS
+dpaa2_mc_acpi_probe_child(ACPI_HANDLE h, device_t *dev, int level, void *arg)
+{
+	struct dpaa2_mc_acpi_prxx_walk_ctx *ctx;
+	struct acpi_device *ad;
+	device_t child;
+	uint32_t uid;
+
+	ctx = (struct dpaa2_mc_acpi_prxx_walk_ctx *)arg;
+	ctx->count++;
+#if 0
+	device_printf(ctx->dev, "%s: %s level %d count %d\n", __func__, acpi_name(h), level, ctx->count);
+#endif
+
+	if (ACPI_FAILURE(acpi_GetInteger(h, "_UID", &uid)))
+		return (AE_OK);
+#if 0
+	if (bootverbose)
+		device_printf(ctx->dev, "%s: Found child Ports _UID %u\n",
+		    __func__, uid);
+#endif
+
+	/* Technically M_ACPIDEV */
+	if ((ad = malloc(sizeof(*ad), M_DEVBUF, M_NOWAIT | M_ZERO)) == NULL)
+		return (AE_OK);
+
+	child = device_add_child(ctx->dev, "dpaa2_mac_dev", -1);
+	if (child == NULL) {
+		free(ad, M_DEVBUF);
+		return (AE_OK);
+	}
+	ad->ad_handle = h;
+	ad->ad_cls_class = 0xffffff;
+	resource_list_init(&ad->ad_rl);
+	device_set_ivars(child, ad);
+	*dev = child;
+
+	ctx->countok++;
+	return (AE_OK);
+}
+
+
 static int
 dpaa2_mc_acpi_attach(device_t dev)
 {
@@ -85,7 +283,79 @@ dpaa2_mc_acpi_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->acpi_based = true;
 
+	struct dpaa2_mc_acpi_prxx_walk_ctx ctx;
+	ctx.dev = dev;
+	ctx.count = 0;
+	ctx.countok = 0;
+	ACPI_SCAN_CHILDREN(device_get_parent(dev), dev, 2,
+	    dpaa2_mc_acpi_probe_child, &ctx);
+#if 0
+	device_printf(dev, "Found %d child Ports in ASL, %d ok\n",
+	    ctx.count, ctx.countok);
+#endif
+
 	return (dpaa2_mc_attach(dev));
+}
+
+/*
+ * ACPI compar layer.
+ */
+
+static device_t
+dpaa2_mc_acpi_find_dpaa2_mac_dev(device_t dev, uint32_t id)
+{
+	int devcount, error, i;
+	device_t *devlist, mdev;
+
+	error = device_get_children(dev, &devlist, &devcount);
+	if (error != 0)
+		return (NULL);
+
+	for (i = 0; i < devcount; i++) {
+		mdev = devlist[i];
+		if (device_get_devclass(mdev) != dpaa2_mac_dev_devclass)
+			continue;
+		if (!device_is_attached(mdev))
+			continue;
+		if (dpaa2_mac_dev_match_id(mdev, id))
+			return (mdev);
+	}
+
+	return (NULL);
+}
+
+static int
+dpaa2_mc_acpi_get_phy_dev(device_t dev, device_t *phy_dev, uint32_t id)
+{
+	device_t mdev, pdev;
+
+	mdev = dpaa2_mc_acpi_find_dpaa2_mac_dev(dev, id);
+	if (mdev == NULL)
+		return (ENXIO);
+
+	pdev = dpaa2_mac_dev_get_phy_dev(mdev);
+	if (pdev == NULL)
+		return (ENXIO);
+
+	if (phy_dev != NULL)
+		*phy_dev = pdev;
+
+	return (0);
+}
+
+static ssize_t
+dpaa2_mc_acpi_get_property(device_t dev, device_t child, const char *propname,
+    void *propvalue, size_t size)
+{
+
+	return (acpi_bus_get_prop(dev, child, propname, propvalue, size));
+}
+
+static int
+dpaa2_mc_acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
+{
+
+	return (acpi_read_ivar(dev, child, index, result));
 }
 
 static device_method_t dpaa2_mc_acpi_methods[] = {
@@ -116,6 +386,11 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 	DEVMETHOD(dpaa2_mc_get_shared_dev, dpaa2_mc_get_shared_dev),
 	DEVMETHOD(dpaa2_mc_reserve_dev,	dpaa2_mc_reserve_dev),
 	DEVMETHOD(dpaa2_mc_release_dev, dpaa2_mc_release_dev),
+	DEVMETHOD(dpaa2_mc_get_phy_dev,	dpaa2_mc_acpi_get_phy_dev),
+
+	/* ACPI compar layer. */
+	DEVMETHOD(bus_read_ivar,	dpaa2_mc_acpi_read_ivar),
+	DEVMETHOD(bus_get_property,	dpaa2_mc_acpi_get_property),
 
 	DEVMETHOD_END
 };
@@ -125,5 +400,6 @@ DEFINE_CLASS_1(dpaa2_mc, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_methods,
 
 static devclass_t dpaa2_mc_acpi_devclass;
 
+MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);
 DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_devclass,
     0, 0);

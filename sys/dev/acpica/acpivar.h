@@ -505,6 +505,11 @@ int		acpi_wakeup_machdep(struct acpi_softc *sc, int state,
 int		acpi_table_quirks(int *quirks);
 int		acpi_machdep_quirks(int *quirks);
 int		acpi_pnpinfo(ACPI_HANDLE handle, struct sbuf *sb);
+int		acpi_read_ivar(device_t dev, device_t child, int index,
+                        uintptr_t *result);
+ssize_t		acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
+			void *propvalue, size_t size);
+
 
 uint32_t	hpet_get_uid(device_t dev);
 

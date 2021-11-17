@@ -70,15 +70,19 @@ __FBSDID("$FreeBSD$");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
+#include <dev/mdio/mdio.h>
+
 #include "pcib_if.h"
 #include "pci_if.h"
 
 #include "miibus_if.h"
+#include "mdio_if.h"
 
 #include "dpaa2_mc.h"
 #include "dpaa2_ni.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
+#include "dpaa2_mc_if.h"
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
@@ -318,12 +322,17 @@ dpaa2_ni_attach(device_t dev)
 
 	/* Setup network interface object. */
 	error = setup_dpni(dev, cmd, rc_token);
-	if (error)
+	if (error) {
+		device_printf(dev, "Failed to setup DPNI: error %d\n", error);
 		goto err_free_cmd;
+	}
 	/* Configure QBMan channels. */
 	error = setup_channels(dev, cmd, rc_token);
-	if (error)
+	if (error) {
+		device_printf(dev, "Failed to setup QBMan channels: error %d\n", error);
 		goto err_free_cmd;
+	}
+
 	/* Configure frame queues. */
 	error = setup_fqs(dev, cmd, rc_token);
 	if (error)
@@ -576,7 +585,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		if (ep2_desc.type == DPAA2_DEV_MAC) {
 			/*
 			 * This is the simplest case when DPNI is connected to
-			 * DPMAC directly. Let's attach miibus then.
+			 * DPMAC directly. Let's attach mdio/miibus then.
 			 */
 			sc->mac.dpmac_id = ep2_desc.obj_id;
 
@@ -586,14 +595,20 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 				device_printf(dev, "Failed to obtain a MAC "
 				    "address of the connected DPMAC: error=%d\n",
 				    error);
-			else {
-				device_printf(dev, "ether %6D\n", sc->mac.addr,
-				    ":");
 
-				error = mii_attach(dev, &sc->miibus, sc->ifp,
+			error = DPAA2_MC_GET_PHY_DEV(device_get_parent(dev),
+			    &sc->mac.phy_dev, sc->mac.dpmac_id);
+			if (error == 0) {
+#if 0
+				device_printf(dev, "MAC PHY device is '%s'\n",
+				    device_get_nameunit(sc->mac.phy_dev));
+#endif
+
+				error = mii_attach(sc->mac.phy_dev,
+				    &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
 				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
-				if (error)
+				if (error != 0)
 					device_printf(dev, "Failed to attach "
 					    "miibus: error=%d\n", error);
 				else
@@ -634,7 +649,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 
 	return (0);
 
- err_close_ni:
+err_close_ni:
 	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error)
 		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",

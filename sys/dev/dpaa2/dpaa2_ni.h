@@ -167,6 +167,7 @@ struct dpaa2_ni_softc {
 	struct {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
+		device_t	 phy_dev;
 	} mac; /* Info about connected DPMAC (if exists) */
 
 	struct {
