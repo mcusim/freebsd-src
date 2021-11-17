@@ -19,16 +19,16 @@ SRCS+=	dpaa2_swp_if.c dpaa2_swp_if.h
 SRCS+=	dpaa2_mc_if.c dpaa2_mc_if.h
 
 SRCS+=	bus_if.h device_if.h miibus_if.h opt_platform.h
+SRCS+=	pcib_if.h pci_if.h
 
 .if ${MACHINE_CPUARCH} == "aarch64" || \
     ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
 SRCS+=	dpaa2_mc_acpi.c \
+	memac_mdio_acpi.c \
 	opt_acpi.h \
 	acpi_if.h \
-	acpi_bus_if.h \
-	pcib_if.h \
-	pci_if.h
+	acpi_bus_if.h
 .endif
 
 .if !empty(OPT_FDT)

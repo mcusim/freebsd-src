@@ -124,8 +124,6 @@ static int	acpi_print_child(device_t bus, device_t child);
 static void	acpi_probe_nomatch(device_t bus, device_t child);
 static void	acpi_driver_added(device_t dev, driver_t *driver);
 static void	acpi_child_deleted(device_t dev, device_t child);
-static int	acpi_read_ivar(device_t dev, device_t child, int index,
-			uintptr_t *result);
 static int	acpi_write_ivar(device_t dev, device_t child, int index,
 			uintptr_t value);
 static struct resource_list *acpi_get_rlist(device_t dev, device_t child);
@@ -144,8 +142,6 @@ static void	acpi_delete_resource(device_t bus, device_t child, int type,
 		    int rid);
 static uint32_t	acpi_isa_get_logicalid(device_t dev);
 static int	acpi_isa_get_compatid(device_t dev, uint32_t *cids, int count);
-static ssize_t acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
-		    void *propvalue, size_t size, device_property_type_t type);
 static int	acpi_device_id_probe(device_t bus, device_t dev, char **ids, char **match);
 static ACPI_STATUS acpi_device_eval_obj(device_t bus, device_t dev,
 		    ACPI_STRING pathname, ACPI_OBJECT_LIST *parameters,
@@ -156,7 +152,7 @@ static ACPI_STATUS acpi_device_scan_cb(ACPI_HANDLE h, UINT32 level,
 		    void *context, void **retval);
 static ACPI_STATUS acpi_device_scan_children(device_t bus, device_t dev,
 		    int max_depth, acpi_scan_cb_t user_fn, void *arg);
-static ACPI_STATUS acpi_find_dsd(device_t bus, device_t dev);
+static ACPI_STATUS acpi_find_dsd(struct acpi_device *ad);
 static int	acpi_isa_pnp_probe(device_t bus, device_t child,
 		    struct isa_pnp_id *ids);
 static void	acpi_platform_osc(device_t dev);
@@ -1023,7 +1019,7 @@ acpi_child_deleted(device_t dev, device_t child)
 /*
  * Handle per-device ivars
  */
-static int
+int
 acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 {
     struct acpi_device	*ad;
@@ -1865,7 +1861,7 @@ acpi_device_get_prop(device_t bus, device_t dev, ACPI_STRING propname,
 		return (AE_BAD_PARAMETER);
 	if (ad->dsd_pkg == NULL) {
 		if (ad->dsd.Pointer == NULL) {
-			status = acpi_find_dsd(bus, dev);
+			status = acpi_find_dsd(ad);
 			if (ACPI_FAILURE(status))
 				return (status);
 		} else {
@@ -1894,18 +1890,16 @@ acpi_device_get_prop(device_t bus, device_t dev, ACPI_STRING propname,
 }
 
 static ACPI_STATUS
-acpi_find_dsd(device_t bus, device_t dev)
+acpi_find_dsd(struct acpi_device *ad)
 {
 	const ACPI_OBJECT *dsd, *guid, *pkg;
-	struct acpi_device *ad;
 	ACPI_STATUS status;
 
-	ad = device_get_ivars(dev);
 	ad->dsd.Length = ACPI_ALLOCATE_BUFFER;
 	ad->dsd.Pointer = NULL;
 	ad->dsd_pkg = NULL;
 
-	status = ACPI_EVALUATE_OBJECT(bus, dev, "_DSD", NULL, &ad->dsd);
+	status = AcpiEvaluateObject(ad->ad_handle, "_DSD", NULL, &ad->dsd);
 	if (ACPI_FAILURE(status))
 		return (status);
 
@@ -1926,7 +1920,7 @@ acpi_find_dsd(device_t bus, device_t dev)
 	return (AE_NOT_FOUND);
 }
 
-static ssize_t
+ssize_t
 acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
     void *propvalue, size_t size, device_property_type_t type)
 {
@@ -1974,6 +1968,25 @@ acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
 			memcpy(propvalue, obj->Buffer.Pointer,
 			    MIN(size, obj->Buffer.Length));
 		return (obj->Buffer.Length);
+
+	case ACPI_TYPE_PACKAGE:
+		/* XXX-BZ handle this case better! */
+		if (propvalue != NULL && size >= sizeof(ACPI_OBJECT *))
+			*((ACPI_OBJECT **) propvalue) = __DECONST(ACPI_OBJECT *, obj);
+		return (sizeof(ACPI_OBJECT *));
+
+	case ACPI_TYPE_LOCAL_REFERENCE:
+		if (propvalue != NULL && size >= sizeof(ACPI_HANDLE)) {
+			ACPI_HANDLE h;
+
+			h = acpi_GetReference(NULL,
+			    __DECONST(ACPI_OBJECT *, obj));
+			memcpy(propvalue, h, sizeof(ACPI_HANDLE));
+		}
+		return (sizeof(ACPI_HANDLE));
+	default:
+		return (0);
+	}
 
 	default:
 		return (0);
@@ -2300,6 +2313,10 @@ acpi_probe_order(ACPI_HANDLE handle, int *order)
 		*order = 3;
 	else if (acpi_MatchHid(handle, "PNP0C0F"))
 		*order = 4;
+
+	/* Make the MDIO bus probe/attach before the driver. */
+	if (acpi_MatchHid(handle, "NXP0006"))
+		*order -= 1;
 }
 
 /*
