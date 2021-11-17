@@ -611,7 +611,11 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 					    "miibus: error=%d\n", error);
 				else
 					sc->mii = device_get_softc(sc->miibus);
-			}
+			} else
+				device_printf(dev, "Failed to obtain PHY "
+				    "device: error=%d, dpmac_id=%d, "
+				    "mac_addr=%6D\n", error, sc->mac.dpmac_id,
+				    sc->mac.addr, ":");
 		}
 	}
 
