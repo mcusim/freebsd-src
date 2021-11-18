@@ -290,7 +290,7 @@ dpaa2_ni_attach(device_t dev)
 
 	sc->ifp = ifp;
 
-	if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
+	if_initname(ifp, "dpaa2ni", device_get_unit(sc->dev));
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
 	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM;
