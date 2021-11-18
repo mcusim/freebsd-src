@@ -1042,9 +1042,6 @@ dpni_ifmedia_change(struct ifnet *ifp)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	DPNI_LOCK(sc);
 
 	if (sc->mii) {
@@ -1065,9 +1062,6 @@ static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
 
 	DPNI_LOCK(sc);
 
@@ -1112,9 +1106,6 @@ dpni_if_init(void *arg)
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	struct ifnet *ifp = sc->ifp;
 
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	DPNI_LOCK(sc);
 
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1140,9 +1131,6 @@ dpni_if_start(struct ifnet *ifp)
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 		return;
 
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	/* ... enqueue frames here ... */
 }
 
@@ -1156,9 +1144,6 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *) data;
 	uint32_t changed = 0;
 	int error = 0;
-
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
 
 	switch (command) {
 	case SIOCSIFCAP:
@@ -1199,9 +1184,6 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 static void
 dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
 {
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	/* TBD */
 }
 
@@ -1229,9 +1211,6 @@ static void
 dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
     struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
 {
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	/* TBD */
 }
 
@@ -1242,9 +1221,6 @@ static void
 dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
     struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
 {
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	/* TBD */
 }
 
@@ -1255,9 +1231,6 @@ static void
 dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
     struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
 {
-	/* For debug purposes only! */
-	printf("%s: called\n", __func__);
-
 	/* TBD */
 }
 
