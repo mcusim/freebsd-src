@@ -432,10 +432,8 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 		return (EINVAL);
 
 	di = malloc(sizeof(*di), M_DPAA2_MC, M_WAITOK | M_ZERO);
-	if (!di) {
-		device_printf(mcdev, "Failed to allocate dpaa2_mc_devinfo\n");
+	if (!di)
 		return (ENOMEM);
-	}
 	di->dpaa2_dev = dpaa2_dev;
 	di->flags = flags;
 	di->owners = 0;
@@ -449,23 +447,13 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 	if (flags & DPAA2_MC_DEV_ALLOCATABLE) {
 		/* Select rman based on a type of the DPAA2 device. */
 		rm = dpaa2_mc_rman(mcdev, dinfo->dtype);
-		if (!rm) {
-			device_printf(mcdev, "No resource manager for %s "
-			    "objects\n", dpaa2_ttos(dinfo->dtype));
-			return (EINVAL);
-		}
-
+		if (!rm)
+			return (ENOENT);
 		/* Manage DPAA2 device as an allocatable resource. */
 		error = rman_manage_region(rm, (rman_res_t) dpaa2_dev,
 		    (rman_res_t) dpaa2_dev);
-		if (error) {
-			device_printf(mcdev, "rman_manage_region() failed for "
-			    "DPAA2 device: type=%s, start=%#jx, end=%#jx, "
-			    "error=%d\n", dpaa2_ttos(dinfo->dtype),
-			    (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev,
-			    error);
+		if (error)
 			return (error);
-		}
 	}
 
 	return (0);
@@ -484,20 +472,12 @@ dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
 
 	/* Select resource manager based on a type of the DPAA2 device. */
 	rm = dpaa2_mc_rman(mcdev, devtype);
-	if (!rm) {
-		device_printf(mcdev, "No resource manager for %s objects\n",
-		    dpaa2_ttos(devtype));
-		return (EINVAL);
-	}
-
+	if (!rm)
+		return (ENOENT);
 	/* Find first free DPAA2 device of the given type. */
 	error = rman_first_free_region(rm, &start, &end);
-	if (error) {
-		device_printf(mcdev, "rman_first_free_region() failed for DPAA2 "
-		    "device: type=%s, error=%d\n", dpaa2_ttos(devtype),
-		    error);
+	if (error)
 		return (error);
-	}
 
 	KASSERT(start == end, ("start != end, but should be the same pointer "
 	    "to the DPAA2 device: start=%jx, end=%jx", start, end));
