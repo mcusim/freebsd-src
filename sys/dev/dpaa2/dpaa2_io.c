@@ -261,7 +261,7 @@ dpaa2_io_attach(device_t dev)
  err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
  err_exit:
-	dpaa2_mc_detach(dev);
+	dpaa2_io_detach(dev);
 	return (ENXIO);
 }
 
