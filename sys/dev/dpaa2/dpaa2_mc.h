@@ -127,6 +127,7 @@ struct dpaa2_io_softc {
  */
 struct dpaa2_bp_softc {
 	device_t		 dev;
+	dpaa2_bp_attr_t		 attr;
 };
 
 /**
