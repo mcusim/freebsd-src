@@ -82,8 +82,10 @@ static struct resource_spec dpaa2_io_spec[] = {
 };
 
 /* Forward declarations. */
+
 static int	setup_msi(struct dpaa2_io_softc *sc);
 static void	msi_intr(void *arg);
+static int	dpaa2_io_detach(device_t dev);
 
 /*
  * Device interface.

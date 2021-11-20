@@ -60,6 +60,10 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
+/* Forward declarations. */
+
+static int	dpaa2_bp_detach(device_t dev);
+
 /*
  * Device interface.
  */
