@@ -323,20 +323,23 @@ dpaa2_ni_attach(device_t dev)
 	/* Setup network interface object. */
 	error = setup_dpni(dev, cmd, rc_token);
 	if (error) {
-		device_printf(dev, "Failed to setup DPNI: error %d\n", error);
+		device_printf(dev, "Failed to setup DPNI: error=%d\n", error);
 		goto err_free_cmd;
 	}
 	/* Configure QBMan channels. */
 	error = setup_channels(dev, cmd, rc_token);
 	if (error) {
-		device_printf(dev, "Failed to setup QBMan channels: error %d\n", error);
+		device_printf(dev, "Failed to setup QBMan channels: error=%d\n",
+		    error);
 		goto err_free_cmd;
 	}
-
 	/* Configure frame queues. */
 	error = setup_fqs(dev, cmd, rc_token);
-	if (error)
+	if (error) {
+		device_printf(dev, "Failed to setup frame queues: error=%d\n",
+		    error);
 		goto err_free_cmd;
+	}
 
 	/* Close resource container. */
 	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
