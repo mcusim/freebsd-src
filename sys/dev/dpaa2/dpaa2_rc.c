@@ -2207,14 +2207,18 @@ discover_objects(struct dpaa2_rc_softc *sc)
 	/* Add managed devices to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, cmd, i, &obj);
-		if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ && bootverbose) {
-			device_printf(rcdev, "Skip unsupported DPAA2 object: "
-			    "index=%u, objects=%u\n", i, obj_count);
-			continue;
-		} else if (rc) {
-			device_printf(rcdev, "Failed to get object: index=%u, "
-			    "error=%d\n", i, rc);
-			continue;
+		if (rc && bootverbose) {
+			if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ) {
+				device_printf(rcdev, "Skip unsupported DPAA2 "
+				    "object: index=%u, objects=%u\n", i,
+				    obj_count);
+				continue;
+			} else {
+				device_printf(rcdev, "Failed to get information "
+				    "about DPAA2 object: index=%u, error=%d\n",
+				    i, rc);
+				continue;
+			}
 		}
 		add_managed_child(sc, cmd, &obj);
 	}
