@@ -321,31 +321,27 @@ dpaa2_ni_attach(device_t dev)
 		goto err_free_cmd;
 	}
 
-	/* Setup network interface object. */
 	error = setup_dpni(dev, cmd, rc_token);
 	if (error) {
 		device_printf(dev, "Failed to setup DPNI: error=%d\n", error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
-	/* Configure QBMan channels. */
 	error = setup_channels(dev, cmd, rc_token);
 	if (error) {
 		device_printf(dev, "Failed to setup QBMan channels: error=%d\n",
 		    error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
-	/* Configure frame queues. */
 	error = setup_fqs(dev, cmd, rc_token);
 	if (error) {
 		device_printf(dev, "Failed to setup frame queues: error=%d\n",
 		    error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
-	/* Bind DPNI to other DPAA2 objects. */
 	error = setup_bind_dpni(dev, cmd, rc_token);
 	if (error) {
 		device_printf(dev, "Failed to bind DPNI: error=%d\n", error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
 
 	/* Close resource container. */
@@ -360,9 +356,11 @@ dpaa2_ni_attach(device_t dev)
 
 	return (0);
 
- err_free_cmd:
+err_close_rc:
+	DPAA_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
- err_exit:
+err_exit:
 	return (ENXIO);
 }
 
@@ -515,39 +513,37 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	/* Open network interface object. */
 	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
 	if (error) {
-		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-		return (ENXIO);
+		device_printf(dev, "Failed to open DPNI: id=%d\n", dinfo->id);
+		return (error);
 	}
 
 	/* Check if we can work with this DPNI object. */
 	error = DPAA2_CMD_NI_GET_API_VERSION(dev, cmd, &sc->api_major,
 	    &sc->api_minor);
 	if (error) {
-		device_printf(dev, "Failed to get DPNI API version: error=%d\n",
-		    error);
+		device_printf(dev, "Failed to get DPNI API version\n");
 		goto err_close_ni;
 	}
 	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
 		device_printf(dev, "DPNI API version %u.%u not supported, "
 		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
 		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
+		error = ENODEV;
 		goto err_close_ni;
 	}
 
 	/* Reset the DPNI object. */
 	error = DPAA2_CMD_NI_RESET(dev, cmd);
 	if (error) {
-		device_printf(dev, "Failed to reset DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
+		device_printf(dev, "Failed to reset DPNI: id=%d\n", dinfo->id);
 		goto err_close_ni;
 	}
 
 	/* Obtain attributes of the DPNI object. */
 	error = DPAA2_CMD_NI_GET_ATTRIBUTES(dev, cmd, &sc->attr);
 	if (error) {
-		device_printf(dev, "Failed to obtain DPNI attributes: id=%d, "
-		    "error=%d\n", dinfo->id, error);
+		device_printf(dev, "Failed to obtain DPNI attributes: id=%d\n",
+		    dinfo->id);
 		goto err_close_ni;
 	}
 	if (bootverbose)
@@ -568,8 +564,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	/* Configure buffer layouts of the DPNI queues. */
 	error = set_buf_layout(dev, cmd);
 	if (error) {
-		device_printf(dev, "Failed to configure buffer layout: "
-		    "error=%d\n", error);
+		device_printf(dev, "Failed to configure buffer layout\n");
 		goto err_close_ni;
 	}
 
@@ -643,8 +638,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	 */
 	error = set_pause_frame(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
-		device_printf(dev, "Failed to configure Rx/Tx pause frames: "
-		    "error=%d\n", error);
+		device_printf(dev, "Failed to configure Rx/Tx pause frames:\n");
 		goto err_close_ni;
 	}
 
@@ -656,20 +650,14 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 
 	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
-		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-		return (ENXIO);
+		device_printf(dev, "Failed to close DPNI: id=%d\n", dinfo->id);
+		return (error);
 	}
 
 	return (0);
-
 err_close_ni:
-	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
-	if (error)
-		device_printf(dev, "Failed to close DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
-
-	return (ENXIO);
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	return (error);
 }
 
 /**
@@ -840,12 +828,21 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 {
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *bp_info;
 	dpaa2_ni_pools_cfg_t cfg;
+	uint16_t ni_token;
 	int error;
 
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bp_info = device_get_ivars(bp_dev);
+
+	/* Open network interface object. */
+	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPNI: id=%d\n", dinfo->id);
+		return (error);
+	}
 
 	cfg.pools_num = 1;
 	cfg.pools[0].bp_obj_id = bp_info->id;
@@ -855,10 +852,21 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	error = DPAA2_CMD_NI_SET_POOLS(dev, cmd, &cfg);
 	if (error) {
 		device_printf(dev, "Failed to set buffer pools\n");
+		goto err_close_ni;
+	}
+
+	/* Close network interface object. */
+	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	if (error) {
+		device_printf(dev, "Failed to close DPNI: id=%d\n",
+		    con_info->id);
 		return (error);
 	}
 
 	return (0);
+err_close_ni:
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	return (error);
 }
 
 /**
