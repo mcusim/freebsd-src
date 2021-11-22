@@ -87,7 +87,11 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_cmd_if.h"
 
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
-#define ALIGN_DOWN(x, a)	((x) & ~((1 << (a)) - 1))
+
+#define	ALIGN_UP(x, y)		roundup2((x), (y))
+#define	ALIGN_DOWN(x, y)	rounddown2((x), (y))
+#define	PAGE_ALIGN(x)		ALIGN_UP((x), PAGE_SIZE)
+#define CACHE_LINE_ALIGN(x)	ALIGN_UP((x), CACHE_LINE_SIZE)
 
 #define DPNI_LOCK(sc) do {			\
 	mtx_assert(&(sc)->lock, MA_NOTOWNED);	\
@@ -125,7 +129,7 @@ __FBSDID("$FreeBSD$");
  * Rx buffer configuration.
  */
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
-#define ETH_RX_BUF_TAILROOM	ALIGN(sizeof(struct mbuf))//, CACHE_LINE_SIZE)
+#define ETH_RX_BUF_TAILROOM	CACHE_LINE_ALIGN(sizeof(struct mbuf))
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
 
 /*
