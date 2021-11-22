@@ -148,6 +148,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
 #define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
 #define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
+#define CMDID_NI_SET_POOLS			CMD_NI(0x200)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1561,6 +1562,40 @@ dpaa2_rc_ni_clear_qos_table(device_t rcdev, dpaa2_cmd_t cmd)
 }
 
 static int
+dpaa2_rc_ni_set_pools(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_pools_cfg_t *cfg)
+{
+	struct __packed set_pools_args {
+		uint8_t		pools_num;
+		uint8_t		backup_pool_mask;
+		uint8_t		_reserved1;
+		uint8_t		pool_as; /* assigning: 0 - QPRI, 1 - QDBIN */
+		uint32_t	bp_obj_id[DPAA2_NI_MAX_POOLS];
+		uint16_t	buf_sz[DPAA2_NI_MAX_POOLS];
+		uint32_t	_reserved2;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_pools_args *) &cmd->params[0];
+	args->pools_num = cfg->pools_num < DPAA2_NI_MAX_POOLS
+	    ? cfg->pools_num : DPAA2_NI_MAX_POOLS;
+	for (uint32_t i = 0; i < args->pools_num; i++) {
+		args->bp_obj_if[i] = cfg->pools[i].bp_obj_id;
+		args->buf_sz[i] = cfg->pools[i].buf_sz;
+		args->backup_pool_mask |= (cfg->pools[i].backup_flag & 1) << i;
+	}
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_POOLS));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2795,6 +2830,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_set_qos_table,	dpaa2_rc_ni_set_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
+	DEVMETHOD(dpaa2_cmd_ni_set_pools,	dpaa2_rc_ni_set_pools),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

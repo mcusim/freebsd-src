@@ -203,9 +203,10 @@ struct resource_spec dpaa2_ni_spec[] = {
 
 /* Forward declarations. */
 
-static int	setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
-static int	setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
-static int	setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token);
+static int	setup_dpni(device_t, dpaa2_cmd_t, uint16_t rc_token);
+static int	setup_channels(device_t, dpaa2_cmd_t, uint16_t rc_token);
+static int	setup_fqs(device_t, dpaa2_cmd_t, uint16_t rc_token);
+static int	setup_bind_dpni(device_t, dpaa2_cmd_t, uint16_t rc_token);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -338,6 +339,12 @@ dpaa2_ni_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to setup frame queues: error=%d\n",
 		    error);
+		goto err_free_cmd;
+	}
+	/* Bind DPNI to other DPAA2 objects. */
+	error = setup_bind_dpni(dev, cmd, rc_token);
+	if (error) {
+		device_printf(dev, "Failed to bind DPNI: error=%d\n", error);
 		goto err_free_cmd;
 	}
 
@@ -820,6 +827,36 @@ setup_fqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	if (bootverbose)
 		device_printf(dev, "frame queues: tx_conf=%d rx=%d rx_err=%d\n",
 		    txc_fqs, rx_fqs, rx_err_fqs);
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Bind DPNI to DPBPs, DPIOs, frame queues and channels.
+ */
+static int
+setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
+{
+	device_t bp_dev;
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *bp_info;
+	dpaa2_ni_pools_cfg_t cfg;
+	int error;
+
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bp_info = device_get_ivars(bp_dev);
+
+	cfg.pools_num = 1;
+	cfg.pools[0].bp_obj_id = bp_info->id;
+	cfg.pools[0].backup_flag = 0;
+	cfg.pools[0].buf_sz = sc->rx_bufsz;
+
+	error = DPAA2_CMD_NI_SET_POOLS(dev, cmd, &cfg);
+	if (error) {
+		device_printf(dev, "Failed to set buffer pools\n");
+		return (error);
+	}
 
 	return (0);
 }
