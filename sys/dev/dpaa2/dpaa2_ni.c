@@ -511,7 +511,8 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	dinfo = device_get_ivars(dev);
 
 	/* Open network interface object. */
-	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
+	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token), dinfo->id,
+	    &ni_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPNI: id=%d\n", dinfo->id);
 		return (error);
@@ -838,7 +839,8 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	bp_info = device_get_ivars(bp_dev);
 
 	/* Open network interface object. */
-	error = DPAA2_CMD_NI_OPEN(dev, cmd, dinfo->id, &ni_token);
+	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token), dinfo->id,
+	    &ni_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPNI: id=%d\n", dinfo->id);
 		return (error);
