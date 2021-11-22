@@ -357,7 +357,7 @@ dpaa2_ni_attach(device_t dev)
 	return (0);
 
 err_close_rc:
-	DPAA_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
 err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
 err_exit:
@@ -858,8 +858,7 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 	/* Close network interface object. */
 	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
-		device_printf(dev, "Failed to close DPNI: id=%d\n",
-		    con_info->id);
+		device_printf(dev, "Failed to close DPNI: id=%d\n", dinfo->id);
 		return (error);
 	}
 
