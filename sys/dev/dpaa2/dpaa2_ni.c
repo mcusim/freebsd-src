@@ -898,6 +898,8 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 * of 64 or 256 bytes depending on the WRIOP version.
 	 */
 	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, rx_buf_align);
+	if (bootverbose)
+		device_printf(dev, "RX buffer size=%d\n", sc->rx_bufsz);
 
 	/* TX buffer layout */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
