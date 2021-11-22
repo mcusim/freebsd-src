@@ -46,7 +46,10 @@
 /* Maximum number of channels to distribute Rx and Tx conf traffic to GPPs. */
 #define DPAA2_NI_MAX_CHANNELS	16
 
-#define DPAA2_NI_MAX_TCS	8 /* traffic classes */
+/* Maximum number of traffic classes per DPNI. */
+#define DPAA2_NI_MAX_TCS	8
+
+/* Queues. */
 #define DPAA2_NI_MAX_RXQ_PER_TC	16
 #define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
 #define DPAA2_NI_MAX_RXEQ	1 /* Rx error queue */
@@ -55,6 +58,9 @@
 /* Maximum number of queues associated with a DPNI. */
 #define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
     DPAA2_NI_MAX_RXEQ)
+
+/* Maximum number of buffer pools per DPNI. */
+#define DPAA2_NI_MAX_POOLS	8
 
 enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX,

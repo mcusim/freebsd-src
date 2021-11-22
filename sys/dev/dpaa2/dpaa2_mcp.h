@@ -308,6 +308,18 @@ typedef struct {
 } dpaa2_ni_buf_layout_t;
 
 /**
+ * @brief Buffer pools configuration.
+ */
+typedef struct {
+	uint8_t		pools_num;
+	struct {
+		uint32_t bp_obj_id;
+		uint16_t buf_sz;
+		int	 backup_flag; /* 0 - regular pool, 1 - backup pool */
+	} pools[DPAA2_NI_MAX_POOLS];
+} dpaa2_ni_pools_cfg_t;
+
+/**
  * @brief Link configuration.
  *
  * options:	Mask of available options.
