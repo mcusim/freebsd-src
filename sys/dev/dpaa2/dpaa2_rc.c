@@ -1587,7 +1587,7 @@ dpaa2_rc_ni_set_pools(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_pools_cfg_t *cfg
 	args->pools_num = cfg->pools_num < DPAA2_NI_MAX_POOLS
 	    ? cfg->pools_num : DPAA2_NI_MAX_POOLS;
 	for (uint32_t i = 0; i < args->pools_num; i++) {
-		args->bp_obj_if[i] = cfg->pools[i].bp_obj_id;
+		args->bp_obj_id[i] = cfg->pools[i].bp_obj_id;
 		args->buf_sz[i] = cfg->pools[i].buf_sz;
 		args->backup_pool_mask |= (cfg->pools[i].backup_flag & 1) << i;
 	}
