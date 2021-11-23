@@ -90,7 +90,6 @@ __FBSDID("$FreeBSD$");
 
 #define	ALIGN_UP(x, y)		roundup2((x), (y))
 #define	ALIGN_DOWN(x, y)	rounddown2((x), (y))
-#define	PAGE_ALIGN(x)		ALIGN_UP((x), PAGE_SIZE)
 #define CACHE_LINE_ALIGN(x)	ALIGN_UP((x), CACHE_LINE_SIZE)
 
 #define DPNI_LOCK(sc) do {			\
@@ -551,20 +550,19 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 		    dinfo->id);
 		goto err_close_ni;
 	}
-	if (bootverbose)
-		device_printf(dev,
-		    "options=%#x queues=%d tx_channels=%d wriop_version=%#x\n"
-		    "\t traffic classes: rx=%d tx=%d cgs_groups=%d\n"
-		    "\t table entries: mac=%d vlan=%d qos=%d fs=%d\n"
-		    "\t key sizes: qos=%d fs=%d\n",
-		    sc->attr.options,
-		    sc->attr.num.queues, sc->attr.num.channels,
-		    sc->attr.wriop_ver,
-		    sc->attr.num.rx_tcs, sc->attr.num.tx_tcs,
-		    sc->attr.num.cgs,
-		    sc->attr.entries.mac, sc->attr.entries.vlan,
-		    sc->attr.entries.qos, sc->attr.entries.fs,
+	if (bootverbose) {
+		device_printf(dev, "options=%#x queues=%d tx_channels=%d "
+		    "wriop_version=%#x\n", sc->attr.options, sc->attr.num.queues,
+		    sc->attr.num.channels, sc->attr.wriop_ver);
+		device_printf(dev, "\ttraffic classes: rx=%d tx=%d "
+		    "cgs_groups=%d\n", sc->attr.num.rx_tcs, sc->attr.num.tx_tcs,
+		    sc->attr.num.cgs);
+		device_printf(dev, "\ttable entries: mac=%d vlan=%d qos=%d "
+		    "fs=%d\n", sc->attr.entries.mac, sc->attr.entries.vlan,
+		    sc->attr.entries.qos, sc->attr.entries.fs);
+		device_printf(dev, "\tkey sizes: qos=%d fs=%d\n",
 		    sc->attr.key_size.qos, sc->attr.key_size.fs);
+	}
 
 	/* Configure buffer layouts of the DPNI queues. */
 	error = set_buf_layout(dev, cmd);
