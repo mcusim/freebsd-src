@@ -821,7 +821,6 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 {
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *bp_info;
 	dpaa2_ni_pools_cfg_t cfg;
 	int error;
