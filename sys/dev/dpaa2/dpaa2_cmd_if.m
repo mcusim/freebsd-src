@@ -322,6 +322,16 @@ CODE {
 				device_get_parent(dev), cmd, cfg));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_err_behavior(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_err_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_ERR_BEHAVIOR(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -764,6 +774,12 @@ METHOD int ni_set_pools {
 	dpaa2_cmd_t	 cmd;
 	dpaa2_ni_pools_cfg_t *cfg;
 } DEFAULT bypass_ni_set_pools;
+
+METHOD int ni_set_err_behavior {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_err_cfg_t *cfg;
+} DEFAULT bypass_ni_set_err_behavior;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
