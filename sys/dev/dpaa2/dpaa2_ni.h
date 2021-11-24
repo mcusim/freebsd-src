@@ -62,6 +62,44 @@
 /* Maximum number of buffer pools per DPNI. */
 #define DPAA2_NI_MAX_POOLS	8
 
+/* Error and status bits in the frame annotation status word. */
+#define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */
+#define DPAA2_NI_FAS_MS		0x40000000 /* MACSEC frame */
+#define DPAA2_NI_FAS_PTP	0x08000000
+#define DPAA2_NI_FAS_MC		0x04000000 /* Ethernet multicast frame */
+#define DPAA2_NI_FAS_BC		0x02000000 /* Ethernet broadcast frame */
+#define DPAA2_NI_FAS_KSE	0x00040000
+#define DPAA2_NI_FAS_EOFHE	0x00020000
+#define DPAA2_NI_FAS_MNLE	0x00010000
+#define DPAA2_NI_FAS_TIDE	0x00008000
+#define DPAA2_NI_FAS_PIEE	0x00004000
+#define DPAA2_NI_FAS_FLE	0x00002000 /* Frame length error */
+#define DPAA2_NI_FAS_FPE	0x00001000 /* Frame physical error */
+#define DPAA2_NI_FAS_PTE	0x00000080
+#define DPAA2_NI_FAS_ISP	0x00000040
+#define DPAA2_NI_FAS_PHE	0x00000020
+#define DPAA2_NI_FAS_BLE	0x00000010
+#define DPAA2_NI_FAS_L3CV	0x00000008 /* L3 csum validation performed */
+#define DPAA2_NI_FAS_L3CE	0x00000004 /* L3 csum error */
+#define DPAA2_NI_FAS_L4CV	0x00000002 /* L4 csum validation performed */
+#define DPAA2_NI_FAS_L4CE	0x00000001 /* L4 csum error */
+
+/* Mask for errors on the ingress path. */
+#define DPAA2_NI_FAS_RX_ERR_MASK (DPAA2_NI_FAS_KSE |	\
+    DPAA2_NI_FAS_EOFHE |				\
+    DPAA2_NI_FAS_MNLE |					\
+    DPAA2_NI_FAS_TIDE |					\
+    DPAA2_NI_FAS_PIEE |					\
+    DPAA2_NI_FAS_FLE |					\
+    DPAA2_NI_FAS_FPE |					\
+    DPAA2_NI_FAS_PTE |					\
+    DPAA2_NI_FAS_ISP |					\
+    DPAA2_NI_FAS_PHE |					\
+    DPAA2_NI_FAS_BLE |					\
+    DPAA2_NI_FAS_L3CE |					\
+    DPAA2_NI_FAS_L4CE					\
+)
+
 enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX,
 	DPAA2_NI_QUEUE_TX,

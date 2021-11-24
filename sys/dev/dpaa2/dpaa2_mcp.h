@@ -129,6 +129,15 @@ enum dpaa2_mac_link_type {
 };
 
 /**
+ * @brief DPNI behavior in case of errors.
+ */
+enum dpaa2_ni_err_action {
+	DPAA2_NI_ERR_DISCARD = 0,
+	DPAA2_NI_ERR_CONTINUE = 1,
+	DPAA2_NI_ERR_SEND_TO_ERROR_QUEUE = 2
+};
+
+/**
  * @brief Helper object to interact with the MC portal.
  *
  * res:			Unmapped portal's I/O memory.
@@ -308,7 +317,7 @@ typedef struct {
 } dpaa2_ni_buf_layout_t;
 
 /**
- * @brief Buffer pools configuration.
+ * @brief Buffer pools configuration for a network interface.
  */
 typedef struct {
 	uint8_t		pools_num;
@@ -318,6 +327,20 @@ typedef struct {
 		int	 backup_flag; /* 0 - regular pool, 1 - backup pool */
 	} pools[DPAA2_NI_MAX_POOLS];
 } dpaa2_ni_pools_cfg_t;
+
+/**
+ * @brief Errors behavior configuration for a network interface.
+ *
+ * err_mask:		The errors mask to configure.
+ * action:		Desired action for the errors selected in the mask.
+ * set_err_fas:		Set to true to mark the errors in frame annotation
+ * 			status (FAS); relevant for non-discard actions only.
+ */
+typedef struct {
+	uint32_t	err_mask;
+	enum dpaa2_ni_err_action action;
+	bool		set_err_fas;
+} dpaa2_ni_err_cfg_t;
 
 /**
  * @brief Link configuration.

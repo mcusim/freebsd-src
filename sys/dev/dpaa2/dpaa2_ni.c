@@ -822,18 +822,20 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *bp_info;
-	dpaa2_ni_pools_cfg_t cfg;
+	dpaa2_ni_pools_cfg_t pools_cfg;
+	dpaa2_ni_err_cfg_t err_cfg;
 	int error;
 
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bp_info = device_get_ivars(bp_dev);
 
-	cfg.pools_num = 1;
-	cfg.pools[0].bp_obj_id = bp_info->id;
-	cfg.pools[0].backup_flag = 0;
-	cfg.pools[0].buf_sz = sc->rx_bufsz;
+	pools_cfg.pools_num = 1;
+	pools_cfg.pools[0].bp_obj_id = bp_info->id;
+	pools_cfg.pools[0].backup_flag = 0;
+	pools_cfg.pools[0].buf_sz = sc->rx_bufsz;
 
-	error = DPAA2_CMD_NI_SET_POOLS(dev, dpaa2_mcp_tk(cmd, ni_token), &cfg);
+	error = DPAA2_CMD_NI_SET_POOLS(dev, dpaa2_mcp_tk(cmd, ni_token),
+	    &pools_cfg);
 	if (error) {
 		device_printf(dev, "Failed to set buffer pools\n");
 		return (error);
@@ -854,6 +856,17 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	/* err = dpaa2_eth_set_default_cls(priv); */
 	/* if (err && err != -EOPNOTSUPP) */
 	/* 	dev_err(dev, "Failed to configure Rx classification key\n"); */
+
+	/* Configure handling of error frames */
+	err_cfg.err_mask = DPAA2_NI_FAS_RX_ERR_MASK;
+	err_cfg.set_err_fas = false;
+	err_cfg.action = DPAA2_NI_ERR_DISCARD;
+	error = DPAA2_CMD_NI_SET_ERR_BEHAVIOR(dev, dpaa2_mcp_tk(cmd, ni_token),
+	    &err_cfg);
+	if (error) {
+		device_printf(dev, "Failed to set errors behavior\n");
+		return (error);
+	}
 
 	return (0);
 }

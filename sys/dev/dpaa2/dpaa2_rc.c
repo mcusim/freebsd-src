@@ -149,6 +149,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
 #define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
 #define CMDID_NI_SET_POOLS			CMD_NI(0x200)
+#define CMDID_NI_SET_ERR_BEHAVIOR		CMD_NI(0x20B)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1596,6 +1597,33 @@ dpaa2_rc_ni_set_pools(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_pools_cfg_t *cfg
 }
 
 static int
+dpaa2_rc_ni_set_err_behavior(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_err_cfg_t *cfg)
+{
+	struct __packed err_behavior_args {
+		uint32_t	err_mask;
+		uint8_t		flags;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cfg)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct err_behavior_args *) &cmd->params[0];
+	args->err_mask = cfg->err_mask;
+
+	args->flags |= cfg->set_err_fas ? 0x10u : 0u;
+	args->flags |= ((uint8_t) cfg->action) & 0x0Fu;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_ERR_BEHAVIOR));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2831,6 +2859,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_qos_table,	dpaa2_rc_ni_set_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_set_pools,	dpaa2_rc_ni_set_pools),
+	DEVMETHOD(dpaa2_cmd_ni_set_err_behavior,dpaa2_rc_ni_set_err_behavior),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
