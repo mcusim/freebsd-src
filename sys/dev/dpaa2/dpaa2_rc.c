@@ -1352,14 +1352,14 @@ dpaa2_rc_ni_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 		attr->options =	     resp->options;
 		attr->wriop_ver =    resp->wriop_ver;
 
-		attr->entries.fs =   resp->fs_entries + 64;
-		attr->entries.mac =  resp->mac_entries + 16;
+		attr->entries.fs =   resp->fs_entries;
+		attr->entries.mac =  resp->mac_entries;
 		attr->entries.vlan = resp->vlan_entries;
-		attr->entries.qos =  resp->qos_entries + 64;
+		attr->entries.qos =  resp->qos_entries;
 
 		attr->num.queues =   resp->num_queues;
-		attr->num.rx_tcs =   resp->num_rx_tcs + 1;
-		attr->num.tx_tcs =   resp->num_tx_tcs + 8;
+		attr->num.rx_tcs =   resp->num_rx_tcs;
+		attr->num.tx_tcs =   resp->num_tx_tcs;
 		attr->num.channels = resp->num_channels;
 		attr->num.cgs =      resp->num_cgs;
 
