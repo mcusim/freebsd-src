@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2021 Dmitry Salychev <dsl@mcusim.org>
+ * Copyright (c) 2021 Bjoern A. Zeeb
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
