@@ -1685,7 +1685,7 @@ dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 		if (bootverbose)
 			device_printf(rcdev, "Reading queue config: \n"
 			    "queue_type=%d tc=%d, idx=%d, fqid=%d\n"
-			    "dest_id=%d, priority=%d, flc=%d, user_ctx=%#jx\n"
+			    "dest_id=%d, priority=%d, flc=%#jx, user_ctx=%#jx\n"
 			    "cgid=%d, chan_id=%d, flags=%#x, qdbin=%d\n",
 			    args->queue_type, args->tc, args->idx, cfg->fqid,
 			    cfg->dest_id, cfg->priority, cfg->flc, cfg->user_ctx,
@@ -1744,7 +1744,7 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 	if (bootverbose)
 		device_printf(rcdev, "Writing queue config: \n"
 		    "queue_type=%d tc=%d, idx=%d, options=%#x\n"
-		    "dest_id=%d, priority=%d, flc=%d, user_ctx=%#jx\n"
+		    "dest_id=%d, priority=%d, flc=%#jx, user_ctx=%#jx\n"
 		    "cgid=%d, chan_id=%d, flags=%#x\n",
 		    args->queue_type, args->tc, args->idx, args->options,
 		    args->dest_id, args->priority, args->flc, args->user_ctx,
