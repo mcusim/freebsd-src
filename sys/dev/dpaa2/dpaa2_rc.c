@@ -1683,13 +1683,15 @@ dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 		cfg->hold_active = (resp->flags & 0x80u) > 0u ? true : false;
 
 		if (bootverbose)
-			device_printf(rcdev, "Reading queue config: \n"
-			    "queue_type=%d tc=%d, idx=%d, fqid=%d\n"
-			    "dest_id=%d, priority=%d, flc=%#jx, user_ctx=%#jx\n"
-			    "cgid=%d, chan_id=%d, flags=%#x, qdbin=%d\n",
-			    args->queue_type, args->tc, args->idx, cfg->fqid,
-			    cfg->dest_id, cfg->priority, cfg->flc, cfg->user_ctx,
-			    cfg->cgid, args->chan_id, resp->flags, cfg->qdbin
+			device_printf(rcdev, "Reading queue config "
+			    "(queue_type=%d, tc=%d, idx=%d, chan_id=%d): \n"
+			    "\tfqid=%d, dest_id=%d, priority=%d\n"
+			    "\tflc=%#jx, user_ctx=%#jx\n"
+			    "\tcgid=%d, flags=%#x, qdbin=%d\n",
+			    cfg->type, cfg->tc, cfg->idx, cfg->chan_id,
+			    cfg->fqid, cfg->dest_id, cfg->priority,
+			    cfg->flc, cfg->user_ctx,
+			    cfg->cgid, resp->flags, cfg->qdbin
 			);
 	}
 
@@ -1743,9 +1745,9 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 
 	if (bootverbose)
 		device_printf(rcdev, "Writing queue config: \n"
-		    "queue_type=%d tc=%d, idx=%d, options=%#x\n"
-		    "dest_id=%d, priority=%d, flc=%#jx, user_ctx=%#jx\n"
-		    "cgid=%d, chan_id=%d, flags=%#x\n",
+		    "\tqueue_type=%d tc=%d, idx=%d, options=%#x\n"
+		    "\tdest_id=%d, priority=%d, flc=%#jx, user_ctx=%#jx\n"
+		    "\tcgid=%d, chan_id=%d, flags=%#x\n",
 		    args->queue_type, args->tc, args->idx, args->options,
 		    args->dest_id, args->priority, args->flc, args->user_ctx,
 		    args->cgid, args->chan_id, args->flags
