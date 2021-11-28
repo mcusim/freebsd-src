@@ -150,6 +150,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
 #define CMDID_NI_SET_POOLS			CMD_NI(0x200)
 #define CMDID_NI_SET_ERR_BEHAVIOR		CMD_NI(0x20B)
+#define CMDID_NI_GET_QUEUE			CMD_NI(0x25F)
+#define CMDID_NI_SET_QUEUE			CMD_NI(0x260)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1624,6 +1626,73 @@ dpaa2_rc_ni_set_err_behavior(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg)
+{
+	struct __packed get_queue_args {
+		uint8_t		queue_type;
+		uint8_t		tc;
+		uint8_t		idx;
+		uint8_t		chan_id;
+	} *args;
+	struct __packed get_queue_resp {
+		uint64_t	_reserved1;
+		uint32_t	dest_id;
+		uint16_t	_reserved2;
+		uint8_t		priority;
+		uint8_t		flags;
+		uint64_t	flc;
+		uint64_t	user_ctx;
+		uint32_t	fqid;
+		uint16_t	qdbin;
+		uint16_t	_reserved3;
+		uint8_t		cgid;
+		uint8_t		_reserved[15];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cfg)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct get_queue_args *) &cmd->params[0];
+	args->queue_type = (uint8_t) cfg->type;
+	args->tc = cfg->tc;
+	args->idx = cfg->idx;
+	args->chan_id = cfg->chan_id;
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_QUEUE);
+	if (!error) {
+		resp = (struct get_queue_resp *) &cmd->params[0];
+
+		cfg->dest_id = resp->dest_id;
+		cfg->priority = resp->priority;
+		cfg->flc = resp->flc;
+		cfg->user_ctx = resp->user_ctx;
+		cfg->fqid = resp->fqid;
+		cfg->qdbin = resp->qdbin;
+		cfg->cgid = resp->cgid;
+
+		cfg->dest_type = (enum dpaa2_ni_dest_type) resp->flags & 0x0Fu;
+		cfg->cgid_valid = (resp->flags & 0x20u) > 0u ? true : false;
+		cfg->stash_control = (resp->flags & 0x40u) > 0u ? true : false;
+		cfg->hold_active = (resp->flags & 0x80u) > 0u ? true : false;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg)
+{
+	return (0);
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2860,6 +2929,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_set_pools,	dpaa2_rc_ni_set_pools),
 	DEVMETHOD(dpaa2_cmd_ni_set_err_behavior,dpaa2_rc_ni_set_err_behavior),
+	DEVMETHOD(dpaa2_cmd_ni_get_queue,	dpaa2_rc_ni_get_queue),
+	DEVMETHOD(dpaa2_cmd_ni_set_queue,	dpaa2_rc_ni_set_queue),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
