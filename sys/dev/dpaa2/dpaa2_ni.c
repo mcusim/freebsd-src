@@ -877,10 +877,10 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 			error = setup_rx_flow(dev, cmd, &sc->fq[i]);
 			break;
 		case DPAA2_NI_QUEUE_TX_CONF:
-			error = setup_tx_flow(dev, &sc->fq[i]);
+			error = setup_tx_flow(dev, cmd, &sc->fq[i]);
 			break;
 		case DPAA2_NI_QUEUE_RX_ERR:
-			error = setup_rx_err_flow(dev, &sc->fq[i]);
+			error = setup_rx_err_flow(dev, cmd, &sc->fq[i]);
 			break;
 		default:
 			device_printf(dev, "Invalid FQ type %d\n",
@@ -909,7 +909,7 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	queue_cfg.type = DPAA2_NI_QUEUE_RX;
 	queue_cfg.tc = fq->tc;
 	queue_cfg.idx = fq->flowid;
-	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, DPNI_QUEUE_RX, &queue_cfg);
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "Failed to obtain Rx queue configuration: "
 		    "tc=%d, flowid=%d\n", queue_cfg.tc, queue_cfg.idx);
