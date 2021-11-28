@@ -100,6 +100,14 @@
     DPAA2_NI_FAS_L4CE					\
 )
 
+/* Option bits to select specific queue configuration options to apply. */
+#define DPAA2_NI_QUEUE_OPT_USER_CTX	0x00000001
+#define DPAA2_NI_QUEUE_OPT_DEST		0x00000002
+#define DPAA2_NI_QUEUE_OPT_FLC		0x00000004
+#define DPAA2_NI_QUEUE_OPT_HOLD_ACTIVE	0x00000008
+#define DPAA2_NI_QUEUE_OPT_SET_CGID	0x00000040
+#define DPAA2_NI_QUEUE_OPT_CLEAR_CGID	0x00000080
+
 enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX,
 	DPAA2_NI_QUEUE_TX,
@@ -158,14 +166,14 @@ typedef struct {
  * It comprises a list of FDs, so it can be thought of as a queue of frames.
  *
  * NOTE: When the frames on a FQ are ready to be processed, the FQ is enqueued
- * onto a work queue (WQ).
+ *	 onto a work queue (WQ).
  */
 typedef struct dpaa2_ni_fq {
 	void (*consume)(device_t dev, dpaa2_ni_channel_t *channel,
 	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 
 	dpaa2_ni_channel_t	*channel;
-	uint32_t		 id;
+	uint32_t		 fqid;
 	uint16_t		 flowid;
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
@@ -213,6 +221,7 @@ typedef struct dpaa2_ni_fq {
  *		AIOP context. In that case the DPNI_SET_QUEUE can be used to
  *		override the default assigned priority of the FQ from the TC.
  * options:	Option bits selecting specific configuration options to apply.
+ *		See DPAA2_NI_QUEUE_OPT_* for details.
  * dest_type:	Type of destination for dequeued traffic.
  * cgid_valid:	(r) Congestion group ID is valid.
  * stash_control: (r/w) If true, lowest 6 bits of FLC are used for stash control.

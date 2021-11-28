@@ -210,9 +210,9 @@ static int	setup_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_channels(device_t, dpaa2_cmd_t, uint16_t);
 static int	setup_frame_queues(device_t);
 static int	setup_bind_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
-static int	setup_rx_flow(device_t, dpaa2_ni_fq_t *);
-static int	setup_tx_flow(device_t, dpaa2_ni_fq_t *);
-static int	setup_rx_err_flow(device_t, dpaa2_ni_fq_t *);
+static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
+static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
+static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -864,8 +864,7 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	err_cfg.err_mask = DPAA2_NI_FAS_RX_ERR_MASK;
 	err_cfg.set_err_fas = false;
 	err_cfg.action = DPAA2_NI_ERR_DISCARD;
-	error = DPAA2_CMD_NI_SET_ERR_BEHAVIOR(dev, dpaa2_mcp_tk(cmd, ni_token),
-	    &err_cfg);
+	error = DPAA2_CMD_NI_SET_ERR_BEHAVIOR(dev, cmd, &err_cfg);
 	if (error) {
 		device_printf(dev, "Failed to set errors behavior\n");
 		return (error);
@@ -875,7 +874,7 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	for (int i = 0; i < sc->num_fqs; i++) {
 		switch (sc->fq[i].type) {
 		case DPAA2_NI_QUEUE_RX:
-			error = setup_rx_flow(dev, &sc->fq[i]);
+			error = setup_rx_flow(dev, cmd, &sc->fq[i]);
 			break;
 		case DPAA2_NI_QUEUE_TX_CONF:
 			error = setup_tx_flow(dev, &sc->fq[i]);
@@ -896,19 +895,53 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 }
 
 static int
-setup_rx_flow(device_t dev, dpaa2_ni_fq_t *fq)
+setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
+{
+	device_t con_dev;
+	struct dpaa2_devinfo *con_info;
+	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	int error;
+
+	/* Obtain DPCON associated with the FQ's channel. */
+	con_dev = fq->channel->con_dev;
+	con_info = device_get_ivars(con_dev);
+
+	queue_cfg.type = DPAA2_NI_QUEUE_RX;
+	queue_cfg.tc = fq->tc;
+	queue_cfg.idx = fq->flowid;
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, DPNI_QUEUE_RX, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to obtain Rx queue configuration: "
+		    "tc=%d, flowid=%d\n", queue_cfg.tc, queue_cfg.idx);
+		return (error);
+	}
+
+	fq->fqid = queue_cfg.fqid;
+
+	queue_cfg.dest_id = con_info->id;
+	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
+	queue_cfg.priority = 1;
+	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
+	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
+	    DPAA2_NI_QUEUE_OPT_DEST;
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to update Rx queue configuration: "
+		    "tc=%d, flowid=%d\n", queue_cfg.tc, queue_cfg.idx);
+		return (error);
+	}
+
+	return (0);
+}
+
+static int
+setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
 	return (0);
 }
 
 static int
-setup_tx_flow(device_t dev, dpaa2_ni_fq_t *fq)
-{
-	return (0);
-}
-
-static int
-setup_rx_err_flow(device_t dev, dpaa2_ni_fq_t *fq)
+setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
 	return (0);
 }
