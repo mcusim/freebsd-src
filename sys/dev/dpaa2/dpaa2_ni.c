@@ -925,7 +925,7 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 1;
+	queue_cfg.priority = 0;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
