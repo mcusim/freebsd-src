@@ -1689,7 +1689,50 @@ dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 static int
 dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg)
 {
-	return (0);
+	struct __packed set_queue_args {
+		uint8_t		queue_type;
+		uint8_t		tc;
+		uint8_t		idx;
+		uint8_t		options;
+		uint32_t	_reserved1;
+		uint32_t	dest_id;
+		uint16_t	_reserved2;
+		uint8_t		priority;
+		uint8_t		flags;
+		uint64_t	flc;
+		uint64_t	user_ctx;
+		uint8_t		cgid;
+		uint8_t		chan_id;
+		uint8_t		_reserved[23];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cfg)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_queue_args *) &cmd->params[0];
+	args->queue_type = (uint8_t) cfg->type;
+	args->tc = cfg->tc;
+	args->idx = cfg->idx;
+	args->options = cfg->options;
+	args->dest_id = cfg->dest_id;
+	args->priority = cfg->priority;
+	args->flc = cfg->flc;
+	args->user_ctx = cfg->user_ctx;
+	args->cgid = cfg->cgid;
+	args->chan_id = cfg->chan_id;
+
+	args->flags |= (uint8_t)(cfg->dest_type & 0x0Fu);
+	args->flags |= cfg->stash_control ? 0x40u : 0u;
+	args->flags |= cfg->hold_active ? 0x80u : 0u;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_QUEUE));
 }
 
 static int
