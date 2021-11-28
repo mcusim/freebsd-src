@@ -107,6 +107,12 @@ enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX_ERR
 };
 
+enum dpaa2_ni_dest_type {
+	DPAA2_NI_DEST_NONE = 0,
+	DPAA2_NI_DEST_DPIO,
+	DPAA2_NI_DEST_DPCON
+};
+
 /**
  * @brief Attributes of the DPNI object.
  *
@@ -164,6 +170,78 @@ typedef struct dpaa2_ni_fq {
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 } dpaa2_ni_fq_t;
+
+/**
+ * @brief Configuration of the network interface queue.
+ *
+ * NOTE: This configuration is used to obtain information of a queue by
+ *	 DPNI_GET_QUEUE command and update it by DPNI_SET_QUEUE one.
+ *
+ * It includes binding of the queue to a DPIO or DPCON object to receive
+ * notifications and traffic on the CPU.
+ *
+ * user_ctx:	(r/w) User defined data, presented along with the frames
+ *		being dequeued from this queue.
+ * flc:		(r/w) Set default FLC value for traffic dequeued from this
+ *		queue. Please check description of FD structure for more
+ *		information. Note that FLC values set using DPNI_ADD_FS_ENTRY,
+ *		if any, take precedence over values per queue.
+ * dest_id:	(r/w) The ID of a DPIO or DPCON object, depending on
+ *		DEST_TYPE (in flags) value. This field is ignored for DEST_TYPE
+ *		set to 0 (DPNI_DEST_NONE).
+ * fqid:	(r) Frame queue ID, can be used to enqueue/dequeue or execute
+ *		other commands on the queue through DPIO. Note that Tx queues
+ *		are logical queues and not all management commands are available
+ *		on these queue types.
+ * qdbin:	(r) Queue destination bin. Can be used with the DPIO enqueue
+ *		operation based on QDID, QDBIN and QPRI.
+ * type:	Type of the queue to set configuration to.
+ * tc:		Traffic class. Ignored for QUEUE_TYPE 2 and 3 (Tx confirmation
+ *		and Rx error queues).
+ * idx:		Selects a specific queue out of the set of queues in a TC.
+ *		Accepted values are in range 0 to NUM_QUEUES–1. This field is
+ *		ignored for QUEUE_TYPE 3 (Rx error queue). For access to the
+ *		shared Tx confirmation queue (for Tx confirmation mode 1), this
+ *		field must be set to 0xff.
+ * cgid:	(r/w) Congestion group ID.
+ * chan_id:	(w) Channel index to be configured. Used only when QUEUE_TYPE is
+ *		set to DPNI_QUEUE_TX.
+ * priority:	(r/w) Sets the priority in the destination DPCON or DPIO for
+ *		dequeued traffic. Supported values are 0 to # of priorities in
+ *		destination DPCON or DPIO - 1. This field is ignored for
+ *		DEST_TYPE set to 0 (DPNI_DEST_NONE), except if this DPNI is in
+ *		AIOP context. In that case the DPNI_SET_QUEUE can be used to
+ *		override the default assigned priority of the FQ from the TC.
+ * options:	Option bits selecting specific configuration options to apply.
+ * dest_type:	Type of destination for dequeued traffic.
+ * cgid_valid:	(r) Congestion group ID is valid.
+ * stash_control: (r/w) If true, lowest 6 bits of FLC are used for stash control.
+ *		Please check description of FD structure for more information.
+ * hold_active:	(r/w) If true, this flag prevents the queue from being
+ *		rescheduled between DPIOs while it carries traffic and is active
+ *		on one DPIO. Can help reduce reordering if one queue is services
+ *		on multiple CPUs, but the queue is also more likely to be trapped
+ *		in one DPIO, especially when congested.
+ */
+typedef struct dpaa2_ni_queue_cfg {
+	uint64_t		 user_ctx;
+	uint64_t		 flc;
+	uint32_t		 dest_id;
+	uint32_t		 fqid;
+	uint16_t		 qdbin;
+	enum dpaa2_ni_queue_type type;
+	uint8_t			 tc;
+	uint8_t			 idx;
+	uint8_t			 cgid;
+	uint8_t			 chan_id;
+	uint8_t			 priority;
+	uint8_t			 options;
+
+	enum dpaa2_ni_dest_type	 dest_type;
+	bool			 cgid_valid;
+	bool			 stash_control;
+	bool			 hold_active;
+} dpaa2_ni_queue_cfg_t;
 
 /**
  * @brief Software context for the DPAA2 Network Interface driver.

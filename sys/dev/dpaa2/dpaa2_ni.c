@@ -210,6 +210,9 @@ static int	setup_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_channels(device_t, dpaa2_cmd_t, uint16_t);
 static int	setup_frame_queues(device_t);
 static int	setup_bind_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
+static int	setup_rx_flow(device_t, dpaa2_ni_fq_t *);
+static int	setup_tx_flow(device_t, dpaa2_ni_fq_t *);
+static int	setup_rx_err_flow(device_t, dpaa2_ni_fq_t *);
 
 static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
 static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
@@ -845,7 +848,7 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	 * Have the interface implicitly distribute traffic based on the default
 	 * hash key.
 	 */
-	/* err = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
+	/* error = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
 	/* if (err && err != -EOPNOTSUPP) */
 	/* 	dev_err(dev, "Failed to configure hashing\n"); */
 
@@ -857,7 +860,7 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	/* if (err && err != -EOPNOTSUPP) */
 	/* 	dev_err(dev, "Failed to configure Rx classification key\n"); */
 
-	/* Configure handling of error frames */
+	/* Configure handling of error frames. */
 	err_cfg.err_mask = DPAA2_NI_FAS_RX_ERR_MASK;
 	err_cfg.set_err_fas = false;
 	err_cfg.action = DPAA2_NI_ERR_DISCARD;
@@ -868,6 +871,45 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 		return (error);
 	}
 
+	/* Configure Rx and Tx-confirmation queues to generate CDANs. */
+	for (int i = 0; i < sc->num_fqs; i++) {
+		switch (sc->fq[i].type) {
+		case DPAA2_NI_QUEUE_RX:
+			error = setup_rx_flow(dev, &sc->fq[i]);
+			break;
+		case DPAA2_NI_QUEUE_TX_CONF:
+			error = setup_tx_flow(dev, &sc->fq[i]);
+			break;
+		case DPAA2_NI_QUEUE_RX_ERR:
+			error = setup_rx_err_flow(dev, &sc->fq[i]);
+			break;
+		default:
+			device_printf(dev, "Invalid FQ type %d\n",
+			    sc->fq[i].type);
+			return (EINVAL);
+		}
+		if (error)
+			return (error);
+	}
+
+	return (0);
+}
+
+static int
+setup_rx_flow(device_t dev, dpaa2_ni_fq_t *fq)
+{
+	return (0);
+}
+
+static int
+setup_tx_flow(device_t dev, dpaa2_ni_fq_t *fq)
+{
+	return (0);
+}
+
+static int
+setup_rx_err_flow(device_t dev, dpaa2_ni_fq_t *fq)
+{
 	return (0);
 }
 

@@ -781,6 +781,18 @@ METHOD int ni_set_err_behavior {
 	dpaa2_ni_err_cfg_t *cfg;
 } DEFAULT bypass_ni_set_err_behavior;
 
+METHOD int ni_get_queue {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_queue_cfg_t *cfg;
+} DEFAULT bypass_ni_get_queue;
+
+METHOD int ni_set_queue {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_queue_cfg_t *cfg;
+} DEFAULT bypass_ni_set_queue;
+
 /**
  * @brief Data Path I/O (DPIO) commands.
  */
