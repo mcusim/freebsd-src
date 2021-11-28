@@ -1681,6 +1681,16 @@ dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 		cfg->cgid_valid = (resp->flags & 0x20u) > 0u ? true : false;
 		cfg->stash_control = (resp->flags & 0x40u) > 0u ? true : false;
 		cfg->hold_active = (resp->flags & 0x80u) > 0u ? true : false;
+
+		if (bootverbose)
+			device_printf(rcdev, "Reading queue config: \n"
+			    "queue_type=%d tc=%d, idx=%d, fqid=%d\n"
+			    "dest_id=%d, priority=%d, flc=%d, user_ctx=%#jx\n"
+			    "cgid=%d, chan_id=%d, flags=%#x, qdbin=%d\n",
+			    args->queue_type, args->tc, args->idx, cfg->fqid,
+			    cfg->dest_id, cfg->priority, cfg->flc, cfg->user_ctx,
+			    cfg->cgid, args->chan_id, resp->flags, cfg->qdbin
+			);
 	}
 
 	return (error);
@@ -1730,6 +1740,16 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 	args->flags |= (uint8_t)(cfg->dest_type & 0x0Fu);
 	args->flags |= cfg->stash_control ? 0x40u : 0u;
 	args->flags |= cfg->hold_active ? 0x80u : 0u;
+
+	if (bootverbose)
+		device_printf(rcdev, "Writing queue config: \n"
+		    "queue_type=%d tc=%d, idx=%d, options=%#x\n"
+		    "dest_id=%d, priority=%d, flc=%d, user_ctx=%#jx\n"
+		    "cgid=%d, chan_id=%d, flags=%#x\n",
+		    args->queue_type, args->tc, args->idx, args->options,
+		    args->dest_id, args->priority, args->flc, args->user_ctx,
+		    args->cgid, args->chan_id, args->flags
+		);
 
 	return (exec_command(sc->portal, cmd, CMDID_NI_SET_QUEUE));
 }
