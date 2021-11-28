@@ -918,6 +918,11 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	fq->fqid = queue_cfg.fqid;
 
+	if (bootverbose)
+		device_printf(dev, "Rx queue: tc=%d, flowid=%d, fqid=%d, "
+		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx, queue_cfg.fqid,
+		    con_info->id);
+
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
 	queue_cfg.priority = 1;
