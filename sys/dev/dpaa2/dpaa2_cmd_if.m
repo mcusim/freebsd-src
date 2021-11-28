@@ -332,6 +332,26 @@ CODE {
 				device_get_parent(dev), cmd, cfg));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_queue(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_queue_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_QUEUE(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_set_queue(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_queue_cfg_t *cfg)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_QUEUE(
+				device_get_parent(dev), cmd, cfg));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
