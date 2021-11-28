@@ -1707,7 +1707,6 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
