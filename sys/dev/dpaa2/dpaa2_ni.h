@@ -49,8 +49,10 @@
 /* Maximum number of traffic classes per DPNI. */
 #define DPAA2_NI_MAX_TCS	8
 
-/* Queues. */
+/* Maximum number of Rx queues per traffic class. */
 #define DPAA2_NI_MAX_RXQ_PER_TC	16
+
+/* Queues. */
 #define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
 #define DPAA2_NI_MAX_RXEQ	1 /* Rx error queue */
 #define DPAA2_NI_MAX_TXQ	16
@@ -109,7 +111,7 @@
 #define DPAA2_NI_QUEUE_OPT_CLEAR_CGID	0x00000080
 
 enum dpaa2_ni_queue_type {
-	DPAA2_NI_QUEUE_RX,
+	DPAA2_NI_QUEUE_RX = 0,
 	DPAA2_NI_QUEUE_TX,
 	DPAA2_NI_QUEUE_TX_CONF,
 	DPAA2_NI_QUEUE_RX_ERR
@@ -190,10 +192,10 @@ typedef struct dpaa2_ni_fq {
  *
  * user_ctx:	(r/w) User defined data, presented along with the frames
  *		being dequeued from this queue.
- * flc:		(r/w) Set default FLC value for traffic dequeued from this
- *		queue. Please check description of FD structure for more
- *		information. Note that FLC values set using DPNI_ADD_FS_ENTRY,
- *		if any, take precedence over values per queue.
+ * flow_ctx:	(r/w) Set default FLC value for traffic dequeued from this queue.
+ *		Please check description of FD structure for more information.
+ *		Note that FLC values set using DPNI_ADD_FS_ENTRY, if any, take
+ *		precedence over values per queue.
  * dest_id:	(r/w) The ID of a DPIO or DPCON object, depending on
  *		DEST_TYPE (in flags) value. This field is ignored for DEST_TYPE
  *		set to 0 (DPNI_DEST_NONE).
@@ -234,7 +236,7 @@ typedef struct dpaa2_ni_fq {
  */
 typedef struct dpaa2_ni_queue_cfg {
 	uint64_t		 user_ctx;
-	uint64_t		 flc;
+	uint64_t		 flow_ctx;
 	uint32_t		 dest_id;
 	uint32_t		 fqid;
 	uint16_t		 qdbin;

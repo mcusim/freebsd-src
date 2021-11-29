@@ -160,7 +160,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* DPIO resources */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
-#define IO_RES_NUM		(4u)
+#define IO_RES_NUM		(1u)
 /* DPBP resources */
 #define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
@@ -168,7 +168,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
-#define CON_RES_NUM		(4u)
+#define CON_RES_NUM		(1u)
 
 struct resource_spec dpaa2_ni_spec[] = {
 	/*
@@ -179,9 +179,9 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 * interface that has produced ingress data to that core.
 	 */
 	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
-	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	/* { DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
 	/*
 	 * DPBP resources.
 	 *
@@ -197,9 +197,9 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 * the DPCONs must be private to the DPNIs.
 	 */
 	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
-	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
-	{ DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL },
+	/* { DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL }, */
+ 	/* { DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL }, */
 
 	RESOURCE_SPEC_END
 };
@@ -582,7 +582,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 
 	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
 	ep1_desc.obj_id = dinfo->id;
-	ep1_desc.if_id = 0; /* DPNI has an only endpoint */
+	ep1_desc.if_id = 0; /* DPNI has the only endpoint */
 	ep1_desc.type = dinfo->dtype;
 
 	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_tk(cmd, rc_token),
@@ -684,7 +684,7 @@ setup_channels(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token)
 
 	sc->num_chan = calc_channels_num(sc);
 
-	/* Allocate no more channels then DPNI queues. */
+	/* Allocate no more channels than DPNI queues. */
 	sc->num_chan = sc->num_chan > sc->attr.num.queues
 	    ? sc->attr.num.queues : sc->num_chan;
 
@@ -918,14 +918,16 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	fq->fqid = queue_cfg.fqid;
 
+#if 0
 	if (bootverbose)
 		device_printf(dev, "Rx queue: tc=%d, flowid=%d, fqid=%d, "
 		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx, queue_cfg.fqid,
 		    con_info->id);
+#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 1;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
