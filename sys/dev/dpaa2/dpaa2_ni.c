@@ -897,14 +897,12 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 static int
 setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
-	device_t con_dev;
 	struct dpaa2_devinfo *con_info;
 	dpaa2_ni_queue_cfg_t queue_cfg = {0};
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
-	con_dev = fq->channel->con_dev;
-	con_info = device_get_ivars(con_dev);
+	con_info = device_get_ivars(fq->channel->con_dev);
 
 	queue_cfg.type = DPAA2_NI_QUEUE_RX;
 	queue_cfg.tc = fq->tc;
@@ -944,6 +942,58 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 static int
 setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *con_info;
+	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	int error;
+
+	/* Obtain DPCON associated with the FQ's channel. */
+	con_info = device_get_ivars(fq->channel->con_dev);
+
+	for (int i = 0; i < sc->attr.num.tx_tcs; i++) {
+		queue_cfg.type = DPAA2_NI_QUEUE_TX;
+		queue_cfg.tc = i;
+		queue_cfg.idx = fq->flowid;
+		error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+		if (error) {
+			device_printf(dev, "Failed to obtain Tx queue "
+			    "configuration: tc=%d, flowid=%d\n", queue_cfg.tc,
+			    queue_cfg.idx);
+			return (error);
+		}
+		fq->tx_fqid[i] = queue_cfg.fqid;
+	}
+
+	/* All Tx queues which belong to the same flowid have the same qdbin. */
+	fq->tx_qdbin = queue_cfg.qdbin;
+
+	queue_cfg.type = DPAA2_NI_QUEUE_TX_CONF;
+	queue_cfg.tc = 0; /* ignored for TxConf queue */
+	queue_cfg.idx = fq->flowid;
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to obtain TxConf queue "
+		    "configuration: tc=%d, flowid=%d\n", queue_cfg.tc,
+		    queue_cfg.idx);
+		return (error);
+	}
+
+	fq->fqid = queue_cfg.fqid;
+
+	queue_cfg.dest_id = con_info->id;
+	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
+	queue_cfg.priority = 0;
+	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
+	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
+	    DPAA2_NI_QUEUE_OPT_DEST;
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to update TxConf queue "
+		    "configuration: tc=%d, flowid=%d\n", queue_cfg.tc,
+		    queue_cfg.idx);
+		return (error);
+	}
+
 	return (0);
 }
 

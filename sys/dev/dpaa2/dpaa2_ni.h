@@ -167,18 +167,29 @@ typedef struct {
  * @brief A frame queue is the basic queuing structure used by the QMan.
  * It comprises a list of FDs, so it can be thought of as a queue of frames.
  *
- * NOTE: When the frames on a FQ are ready to be processed, the FQ is enqueued
+ * NOTE: When frames on a FQ are ready to be processed, the FQ is enqueued
  *	 onto a work queue (WQ).
+ *
+ * fqid:	Frame queue ID, can be used to enqueue/dequeue or execute other
+ *		commands on the queue through DPIO.
+ * tx_fqid:	Frame queue IDs of the Tx queues which belong to the same flowid.
+ *		Note that Tx queues are logical queues and not all management
+ *		commands are available on these queue types.
+ * qdbin:	Queue destination bin. Can be used with the DPIO enqueue
+ *		operation based on QDID, QDBIN and QPRI. Note that all Tx queues
+ *		with the same flowid have the same destination bin.
  */
 typedef struct dpaa2_ni_fq {
-	void (*consume)(device_t dev, dpaa2_ni_channel_t *channel,
-	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
-
 	dpaa2_ni_channel_t	*channel;
 	uint32_t		 fqid;
+	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
+	uint32_t		 tx_qdbin;
 	uint16_t		 flowid;
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
+
+	void (*consume)(device_t dev, dpaa2_ni_channel_t *channel,
+	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 } dpaa2_ni_fq_t;
 
 /**
