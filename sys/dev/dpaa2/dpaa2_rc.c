@@ -1671,7 +1671,7 @@ dpaa2_rc_ni_get_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 
 		cfg->dest_id = resp->dest_id;
 		cfg->priority = resp->priority;
-		cfg->flc = resp->flc;
+		cfg->flow_ctx = resp->flc;
 		cfg->user_ctx = resp->user_ctx;
 		cfg->fqid = resp->fqid;
 		cfg->qdbin = resp->qdbin;
@@ -1736,7 +1736,7 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 	args->options = cfg->options;
 	args->dest_id = cfg->dest_id;
 	args->priority = cfg->priority;
-	args->flc = cfg->flc;
+	args->flc = cfg->flow_ctx;
 	args->user_ctx = cfg->user_ctx;
 	args->cgid = cfg->cgid;
 	args->chan_id = cfg->chan_id;
