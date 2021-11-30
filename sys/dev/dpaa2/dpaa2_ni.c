@@ -882,6 +882,16 @@ setup_dpni_binding(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 			return (error);
 	}
 
+	/*
+	 * Get the Queuing Destination ID (QDID) that should be used for frame
+	 * enqueue operations.
+	 */
+	error = DPAA2_CMD_NI_GET_QDID(dev, cmd, DPAA2_NI_QUEUE_TX, &sc->tx_qdid);
+	if (error) {
+		device_printf(dev, "Failed to get Tx queuing destination ID\n");
+		return (error);
+	}
+
 	return (0);
 }
 
