@@ -209,7 +209,8 @@ struct resource_spec dpaa2_ni_spec[] = {
 static int	setup_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_channels(device_t, dpaa2_cmd_t, uint16_t);
 static int	setup_frame_queues(device_t);
-static int	setup_bind_dpni(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
+static int	setup_dpni_binding(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
+static int	setup_rx_distribution(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
@@ -351,7 +352,7 @@ dpaa2_ni_attach(device_t dev)
 		    error);
 		goto err_close_ni;
 	}
-	error = setup_bind_dpni(dev, cmd, rc_token, ni_token);
+	error = setup_dpni_binding(dev, cmd, rc_token, ni_token);
 	if (error) {
 		device_printf(dev, "Failed to bind DPNI: error=%d\n", error);
 		goto err_close_ni;
@@ -819,7 +820,7 @@ setup_frame_queues(device_t dev)
  * @brief Bind DPNI to DPBPs, DPIOs, frame queues and channels.
  */
 static int
-setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
+setup_dpni_binding(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
     uint16_t ni_token)
 {
 	device_t bp_dev;
@@ -832,11 +833,11 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bp_info = device_get_ivars(bp_dev);
 
+	/* Configure buffers pool. */
 	pools_cfg.pools_num = 1;
 	pools_cfg.pools[0].bp_obj_id = bp_info->id;
 	pools_cfg.pools[0].backup_flag = 0;
 	pools_cfg.pools[0].buf_sz = sc->rx_bufsz;
-
 	error = DPAA2_CMD_NI_SET_POOLS(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    &pools_cfg);
 	if (error) {
@@ -844,21 +845,13 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 		return (error);
 	}
 
-	/*
-	 * Have the interface implicitly distribute traffic based on the default
-	 * hash key.
-	 */
-	/* error = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
-	/* if (err && err != -EOPNOTSUPP) */
-	/* 	dev_err(dev, "Failed to configure hashing\n"); */
-
-	/*
-	 * Configure the flow classification key; it includes all supported
-	 * header fields and cannot be modified at runtime.
-	 */
-	/* err = dpaa2_eth_set_default_cls(priv); */
-	/* if (err && err != -EOPNOTSUPP) */
-	/* 	dev_err(dev, "Failed to configure Rx classification key\n"); */
+	/* Setup ingress traffic distribution. */
+	error = setup_rx_distribution(dev, cmd, rc_token, ni_token);
+	if (error) {
+		device_printf(dev, "Failed to setup ingress traffic "
+		    "distribution\n");
+		return (error);
+	}
 
 	/* Configure handling of error frames. */
 	err_cfg.err_mask = DPAA2_NI_FAS_RX_ERR_MASK;
@@ -890,6 +883,31 @@ setup_bind_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 		if (error)
 			return (error);
 	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Setup ingress traffic distribution.
+ *
+ * NOTE: Distribution functionality is valid only when DPNI_OPT_NO_FS option
+ *	 hasn't been specified for DPNI and a number of DPNI queues > 1.
+ */
+static int
+setup_rx_distribution(device_t, dpaa2_cmd_t, uint16_t, uint16_t)
+{
+	/* error = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
+	/* if (err && err != -EOPNOTSUPP) */
+	/* 	dev_err(dev, "Failed to configure hashing\n"); */
+
+	/*
+	 * Configure the flow classification key; it includes all supported
+	 * header fields and cannot be modified at runtime.
+	 */
+	/* err = dpaa2_eth_set_default_cls(priv); */
+	/* if (err && err != -EOPNOTSUPP) */
+	/* 	dev_err(dev, "Failed to configure Rx classification key\n"); */
 
 	return (0);
 }
