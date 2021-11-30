@@ -895,7 +895,8 @@ setup_dpni_binding(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
  *	 hasn't been specified for DPNI and a number of DPNI queues > 1.
  */
 static int
-setup_rx_distribution(device_t, dpaa2_cmd_t, uint16_t, uint16_t)
+setup_rx_distribution(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
+    uint16_t ni_token)
 {
 	/* error = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
 	/* if (err && err != -EOPNOTSUPP) */
