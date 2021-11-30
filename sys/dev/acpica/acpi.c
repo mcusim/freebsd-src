@@ -1986,10 +1986,6 @@ acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
 	default:
 		return (0);
 	}
-
-	default:
-		return (0);
-	}
 }
 
 int
