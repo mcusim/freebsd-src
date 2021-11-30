@@ -773,10 +773,6 @@ setup_frame_queues(device_t dev)
 
 	sc->num_fqs = 0;
 
-	/*
-	 * There is one Tx confirmation FQ per Tx flow. Number of Tx and Rx
-	 * queues is the same. Tx conf. queues come first in the FQ array.
-	 */
 	for (i = 0; i < sc->num_chan; i++) {
 		sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_TX_CONF;
 		sc->fq[sc->num_fqs].flowid = (uint16_t) i;
@@ -798,6 +794,8 @@ setup_frame_queues(device_t dev)
 
 	/* There is exactly one Rx error queue per DPNI. */
 	sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX_ERR;
+	sc->fq[sc->num_fqs].tc = 0; /* ignored */
+	sc->fq[sc->num_fqs].flowid = 0; /* ignored */
 	sc->fq[sc->num_fqs].consume = dpni_consume_rx_err;
 	sc->num_fqs++;
 	rx_err_fqs = 1;
@@ -913,6 +911,9 @@ setup_rx_distribution(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	return (0);
 }
 
+/**
+ * @internal
+ */
 static int
 setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
@@ -958,6 +959,9 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	return (0);
 }
 
+/**
+ * @internal
+ */
 static int
 setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
@@ -1016,9 +1020,44 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	return (0);
 }
 
+/**
+ * @internal
+ */
 static int
 setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 {
+	struct dpaa2_devinfo *con_info;
+	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	int error;
+
+	/* Obtain DPCON associated with the FQ's channel. */
+	con_info = device_get_ivars(fq->channel->con_dev);
+
+	queue_cfg.type = DPAA2_NI_QUEUE_RX_ERR;
+	queue_cfg.tc = fq->tc; /* ignored */
+	queue_cfg.idx = fq->flowid; /* ignored */
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to obtain RxErr queue "
+		    "configuration\n");
+		return (error);
+	}
+
+	fq->fqid = queue_cfg.fqid;
+
+	queue_cfg.dest_id = con_info->id;
+	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
+	queue_cfg.priority = 1;
+	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
+	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
+	    DPAA2_NI_QUEUE_OPT_DEST;
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	if (error) {
+		device_printf(dev, "Failed to update RxErr queue "
+		    "configuration\n");
+		return (error);
+	}
+
 	return (0);
 }
 
