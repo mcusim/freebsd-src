@@ -352,6 +352,16 @@ CODE {
 				device_get_parent(dev), cmd, cfg));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_qdid(device_t dev, dpaa2_cmd_t cmd,
+		enum dpaa2_ni_queue_type type, uint16_t *qdid)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_QDID(
+				device_get_parent(dev), cmd, type, qdid));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -812,6 +822,13 @@ METHOD int ni_set_queue {
 	dpaa2_cmd_t	 cmd;
 	dpaa2_ni_queue_cfg_t *cfg;
 } DEFAULT bypass_ni_set_queue;
+
+METHOD int ni_get_qdid {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	enum dpaa2_ni_queue_type type;
+	uint16_t	*qdid;
+} DEFAULT bypass_ni_get_qdid;
 
 /**
  * @brief Data Path I/O (DPIO) commands.

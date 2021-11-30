@@ -152,6 +152,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_ERR_BEHAVIOR		CMD_NI(0x20B)
 #define CMDID_NI_GET_QUEUE			CMD_NI(0x25F)
 #define CMDID_NI_SET_QUEUE			CMD_NI(0x260)
+#define CMDID_NI_GET_QDID			CMD_NI(0x210)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1760,6 +1761,39 @@ dpaa2_rc_ni_set_queue(device_t rcdev, dpaa2_cmd_t cmd, dpaa2_ni_queue_cfg_t *cfg
 }
 
 static int
+dpaa2_rc_ni_get_qdid(device_t rcdev, dpaa2_cmd_t cmd,
+    enum dpaa2_ni_queue_type type, uint16_t *qdid)
+{
+	struct __packed get_qdid_args {
+		uint8_t		queue_type;
+	} *args;
+	struct __packed get_qdid_resp {
+		uint16_t	qdid;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct get_qdid_args *) &cmd->params[0];
+	args->queue_type = (uint8_t) type;
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_QDID);
+	if (!error) {
+		resp = (struct get_qdid_resp *) &cmd->params[0];
+		*qdid = resp->qdid;
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -2998,6 +3032,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_err_behavior,dpaa2_rc_ni_set_err_behavior),
 	DEVMETHOD(dpaa2_cmd_ni_get_queue,	dpaa2_rc_ni_get_queue),
 	DEVMETHOD(dpaa2_cmd_ni_set_queue,	dpaa2_rc_ni_set_queue),
+	DEVMETHOD(dpaa2_cmd_ni_get_qdid,	dpaa2_rc_ni_get_qdid),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
