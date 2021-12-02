@@ -669,7 +669,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 	}
 
 	/* Setup checksums validation and generation. */
-	if (ifp->if_capenable & IFCAP_RXCSUM) {
+	if (sc->ifp->if_capenable & IFCAP_RXCSUM) {
 		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
 		    DPAA2_NI_OFL_RX_L3_CSUM, true);
 		if (error) {
@@ -685,7 +685,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 			return (error);
 		}
 	}
-	if (ifp->if_capenable & IFCAP_TXCSUM) {
+	if (sc->ifp->if_capenable & IFCAP_TXCSUM) {
 		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
 		    DPAA2_NI_OFL_TX_L3_CSUM, true);
 		if (error) {

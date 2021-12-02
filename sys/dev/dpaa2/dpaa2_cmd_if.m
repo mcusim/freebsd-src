@@ -380,7 +380,7 @@ CODE {
 	}
 	static int
 	bypass_ni_set_offload(device_t dev, dpaa2_cmd_t cmd,
-		enum dpaa2_ni_ofl_type ofl_type, boolean en)
+		enum dpaa2_ni_ofl_type ofl_type, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -872,7 +872,7 @@ METHOD int ni_set_offload {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 	enum dpaa2_ni_ofl_type ofl_type;
-	boolean		 en;
+	bool		 en;
 } DEFAULT bypass_ni_set_offload;
 
 /**

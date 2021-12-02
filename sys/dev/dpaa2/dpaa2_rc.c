@@ -1847,7 +1847,7 @@ dpaa2_rc_ni_set_mfl(device_t rcdev, dpaa2_cmd_t cmd, uint16_t length)
 
 static int
 dpaa2_rc_ni_set_offload(device_t rcdev, dpaa2_cmd_t cmd,
-    enum dpaa2_ni_ofl_type ofl_type, boolean en)
+    enum dpaa2_ni_ofl_type ofl_type, bool en)
 {
 	struct __packed set_ofl_args {
 		uint8_t		_reserved[3];
