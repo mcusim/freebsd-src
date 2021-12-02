@@ -388,6 +388,26 @@ CODE {
 				device_get_parent(dev), cmd, ofl_type, en));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_irq_mask(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint32_t mask)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_IRQ_MASK(
+				device_get_parent(dev), cmd, irq_idx, mask));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		bool en)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_IRQ_ENABLE(
+				device_get_parent(dev), cmd, irq_idx, en));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -874,6 +894,20 @@ METHOD int ni_set_offload {
 	enum dpaa2_ni_ofl_type ofl_type;
 	bool		 en;
 } DEFAULT bypass_ni_set_offload;
+
+METHOD int ni_set_irq_mask {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	uint32_t	 mask;
+} DEFAULT bypass_ni_set_irq_mask;
+
+METHOD int ni_set_irq_enable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	bool		 en;
+} DEFAULT bypass_ni_set_irq_enable;
 
 /**
  * @brief Data Path I/O (DPIO) commands.

@@ -156,6 +156,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_ADD_MAC_ADDR			CMD_NI(0x226)
 #define CMDID_NI_SET_MFL			CMD_NI(0x216)
 #define CMDID_NI_SET_OFFLOAD			CMD_NI(0x26C)
+#define CMDID_NI_SET_IRQ_MASK			CMD_NI(0x014)
+#define CMDID_NI_SET_IRQ_ENABLE			CMD_NI(0x012)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1872,6 +1874,56 @@ dpaa2_rc_ni_set_offload(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_ni_set_irq_mask(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint32_t mask)
+{
+	struct __packed set_irq_mask_args {
+		uint32_t	mask;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_mask_args *) &cmd->params[0];
+	args->mask = mask;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_IRQ_MASK));
+}
+
+static int
+dpaa2_rc_ni_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    bool en)
+{
+	struct __packed set_irq_enable_args {
+		uint32_t	en;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_enable_args *) &cmd->params[0];
+	args->en = en ? 1u : 0u;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_IRQ_ENABLE));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -3114,6 +3166,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_add_mac_addr,	dpaa2_rc_ni_add_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_mfl,		dpaa2_rc_ni_set_mfl),
 	DEVMETHOD(dpaa2_cmd_ni_set_offload,	dpaa2_rc_ni_set_offload),
+	DEVMETHOD(dpaa2_cmd_ni_set_irq_mask,	dpaa2_rc_ni_set_irq_mask),
+	DEVMETHOD(dpaa2_cmd_ni_set_irq_enable,	dpaa2_rc_ni_set_irq_enable),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

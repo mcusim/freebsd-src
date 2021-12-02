@@ -294,6 +294,7 @@ dpaa2_ni_attach(device_t dev)
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
 	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM | IFCAP_JUMBO_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
+
 	ifp->if_init =	dpni_if_init;
 	ifp->if_start = dpni_if_start;
 	ifp->if_ioctl = dpni_if_ioctl;
