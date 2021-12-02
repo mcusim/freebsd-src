@@ -153,6 +153,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_QUEUE			CMD_NI(0x25F)
 #define CMDID_NI_SET_QUEUE			CMD_NI(0x260)
 #define CMDID_NI_GET_QDID			CMD_NI(0x210)
+#define CMDID_NI_ADD_MAC_ADDR			CMD_NI(0x226)
+#define CMDID_NI_SET_MFL			CMD_NI(0x216)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1794,6 +1796,57 @@ dpaa2_rc_ni_get_qdid(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_ni_add_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
+{
+	struct __packed add_mac_args {
+		uint8_t		flags;
+		uint8_t		_reserved;
+		uint8_t		mac[ETHER_ADDR_LEN];
+		uint8_t		tc_id;
+		uint8_t		fq_id;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !mac)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct add_mac_args *) &cmd->params[0];
+	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
+		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_ADD_MAC_ADDR));
+}
+
+static int
+dpaa2_rc_ni_set_mfl(device_t rcdev, dpaa2_cmd_t cmd, uint16_t length)
+{
+	struct __packed set_mfl_args {
+		uint16_t length;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_mfl_args *) &cmd->params[0];
+	args->length = length;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_MFL));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -3033,6 +3086,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_queue,	dpaa2_rc_ni_get_queue),
 	DEVMETHOD(dpaa2_cmd_ni_set_queue,	dpaa2_rc_ni_set_queue),
 	DEVMETHOD(dpaa2_cmd_ni_get_qdid,	dpaa2_rc_ni_get_qdid),
+	DEVMETHOD(dpaa2_cmd_ni_add_mac_addr,	dpaa2_rc_ni_add_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_set_mfl,		dpaa2_rc_ni_set_mfl),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

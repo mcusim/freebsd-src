@@ -98,47 +98,37 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-/*
- * Minimally supported version of the DPNI API.
- */
+/* Name of the DPAA2 network interface. */
+#define DPAA2_IF_NAME		"dpaa2ni"
+
+/* Maximum acceptable MTU value. */
+#define DPAA2_ETH_MFL	(10 * 1024)
+#define DPAA2_ETH_HCV	(ETHER_HDR_LEN+ETHER_CRC_LEN+ETHER_VLAN_ENCAP_LEN)
+#define DPAA2_ETH_MTU	(DPAA2_ETH_MFL-DPAA2_ETH_HCV)
+
+/* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
 
-#define DPNI_ENQ_FQID_VER_MAJOR	7U
-#define DPNI_ENQ_FQID_VER_MINOR	9U
-
-/*
- * Due to a limitation in WRIOP 1.0.0, the RX buffer data must be aligned
- * to 256 bytes. For newer revisions, the requirement is only for 64B alignment.
- */
-#define ETH_RX_BUF_ALIGN_REV1	256
+/* RX buffer data alignment. */
+#define ETH_RX_BUF_ALIGN_REV1	256 /* limitation of WRIOP 1.0.0 */
 #define ETH_RX_BUF_ALIGN	64
 
-/*
- * Frame's software annotation. The hardware options are either 0 or 64.
- */
+/* Frame's software annotation. The hardware options are either 0 or 64. */
 #define ETH_SWA_SIZE		64
 
-/*
- * Hardware annotation area in RX/TX buffers.
- */
+/* Hardware annotation area in RX/TX buffers. */
 #define ETH_RX_HWA_SIZE		64
 
-/*
- * Rx buffer configuration.
- */
+/* Rx buffer configuration. */
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
 #define ETH_RX_BUF_TAILROOM	CACHE_LINE_ALIGN(sizeof(struct mbuf))
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
 
-/*
- * Size of a buffer to keep a QoS table key configuration.
- */
+/* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
 
-/*
- * DPNI buffer layout options.
- */
+/* Buffers layout options. */
 #define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
 #define DPNI_BUF_LAYOUT_OPT_PARSER_RESULT	0x00000002
 #define DPNI_BUF_LAYOUT_OPT_FRAME_STATUS	0x00000004
@@ -147,9 +137,7 @@ __FBSDID("$FreeBSD$");
 #define DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM	0x00000020
 #define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
 
-/*
- * Enables TCAM for Flow Steering and QoS look-ups.
- */
+/* Enables TCAM for Flow Steering and QoS look-ups. */
 #define DPNI_OPT_HAS_KEY_MASKING		0x000010
 
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
@@ -236,6 +224,7 @@ static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
+
 static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 static void	dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
@@ -278,6 +267,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->mii = NULL;
 	sc->media_status = 0;
 	sc->mac.dpmac_id = 0;
+
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
@@ -298,12 +288,12 @@ dpaa2_ni_attach(device_t dev)
 
 	sc->ifp = ifp;
 
-	if_initname(ifp, "dpaa2ni", device_get_unit(sc->dev));
+	if_initname(ifp, DPAA2_IF_NAME, device_get_unit(sc->dev));
 	ifp->if_softc = sc;
+	ifp->if_mtu = DPAA2_ETH_MTU;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
 	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM;
 	ifp->if_capenable = ifp->if_capabilities;
-
 	ifp->if_init =	dpni_if_init;
 	ifp->if_start = dpni_if_start;
 	ifp->if_ioctl = dpni_if_ioctl;
@@ -525,6 +515,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
+	uint8_t eth_bca[ETHER_ADDR_LEN];
 	uint32_t link;
 	int error;
 
@@ -621,7 +612,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 				device_printf(dev, "MAC PHY device is '%s'\n",
 				    device_get_nameunit(sc->mac.phy_dev));
 #endif
-
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
@@ -660,6 +650,23 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 	if (error)
 		device_printf(dev, "Failed to configure QoS table: error=%d\n",
 		    error);
+
+	/* Add broadcast physical address to the MAC filtering table. */
+	memset(eth_bca, 0xff, ETHER_ADDR_LEN);
+	error = DPAA2_CMD_NI_ADD_MAC_ADDR(dev, cmd, eth_bca);
+	if (error) {
+		device_printf(dev, "Failed to add broadcast physical address to "
+		    "the MAC filtering table\n");
+		return (error);
+	}
+
+	/* Set the maximum allowed length for received frames. */
+	error = DPAA2_CMD_NI_SET_MAX_FRAME_LENGTH(dev, cmd, DPAA2_ETH_MFL);
+	if (error) {
+		device_printf(dev, "Failed to set maximum length for received "
+		    "frames\n");
+		return (error);
+	}
 
 	return (0);
 }
