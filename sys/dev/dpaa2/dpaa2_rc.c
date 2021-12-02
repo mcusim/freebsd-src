@@ -155,6 +155,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_QDID			CMD_NI(0x210)
 #define CMDID_NI_ADD_MAC_ADDR			CMD_NI(0x226)
 #define CMDID_NI_SET_MFL			CMD_NI(0x216)
+#define CMDID_NI_SET_OFFLOAD			CMD_NI(0x26C)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -1845,6 +1846,32 @@ dpaa2_rc_ni_set_mfl(device_t rcdev, dpaa2_cmd_t cmd, uint16_t length)
 }
 
 static int
+dpaa2_rc_ni_set_offload(device_t rcdev, dpaa2_cmd_t cmd,
+    enum dpaa2_ni_ofl_type ofl_type, boolean en)
+{
+	struct __packed set_ofl_args {
+		uint8_t		_reserved[3];
+		uint8_t		ofl_type;
+		uint32_t	config;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_ofl_args *) &cmd->params[0];
+	args->ofl_type = (uint8_t) ofl_type;
+	args->config = en ? 1u : 0u;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_OFFLOAD));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -3086,6 +3113,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_qdid,	dpaa2_rc_ni_get_qdid),
 	DEVMETHOD(dpaa2_cmd_ni_add_mac_addr,	dpaa2_rc_ni_add_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_mfl,		dpaa2_rc_ni_set_mfl),
+	DEVMETHOD(dpaa2_cmd_ni_set_offload,	dpaa2_rc_ni_set_offload),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

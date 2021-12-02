@@ -123,6 +123,14 @@ enum dpaa2_ni_dest_type {
 	DPAA2_NI_DEST_DPCON
 };
 
+enum dpaa2_ni_ofl_type {
+	DPAA2_NI_OFL_RX_L3_CSUM = 0,
+	DPAA2_NI_OFL_RX_L4_CSUM,
+	DPAA2_NI_OFL_TX_L3_CSUM,
+	DPAA2_NI_OFL_TX_L4_CSUM,
+	DPAA2_NI_OFL_FLCTYPE_HASH /* FD flow context for AIOP/CTLU */
+};
+
 /**
  * @brief Attributes of the DPNI object.
  *

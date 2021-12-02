@@ -378,6 +378,16 @@ CODE {
 				device_get_parent(dev), cmd, length));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_offload(device_t dev, dpaa2_cmd_t cmd,
+		enum dpaa2_ni_ofl_type ofl_type, boolean en)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_OFFLOAD(
+				device_get_parent(dev), cmd, ofl_type, en));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -857,6 +867,13 @@ METHOD int ni_set_mfl {
 	dpaa2_cmd_t	 cmd;
 	uint16_t	 length;
 } DEFAULT bypass_ni_set_mfl;
+
+METHOD int ni_set_offload {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	enum dpaa2_ni_ofl_type ofl_type;
+	boolean		 en;
+} DEFAULT bypass_ni_set_offload;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
