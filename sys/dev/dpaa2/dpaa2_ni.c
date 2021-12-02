@@ -661,7 +661,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 	}
 
 	/* Set the maximum allowed length for received frames. */
-	error = DPAA2_CMD_NI_SET_MAX_FRAME_LENGTH(dev, cmd, DPAA2_ETH_MFL);
+	error = DPAA2_CMD_NI_SET_MFL(dev, cmd, DPAA2_ETH_MFL);
 	if (error) {
 		device_printf(dev, "Failed to set maximum length for received "
 		    "frames\n");
