@@ -1807,7 +1807,6 @@ dpaa2_rc_ni_add_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
 	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
@@ -1831,7 +1830,6 @@ dpaa2_rc_ni_set_mfl(device_t rcdev, dpaa2_cmd_t cmd, uint16_t length)
 	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
-	int error;
 
 	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
