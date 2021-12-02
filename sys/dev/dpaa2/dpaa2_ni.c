@@ -292,7 +292,7 @@ dpaa2_ni_attach(device_t dev)
 	ifp->if_softc = sc;
 	ifp->if_mtu = DPAA2_ETH_MTU;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
-	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM;
+	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM | IFCAP_JUMBO_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
 	ifp->if_init =	dpni_if_init;
 	ifp->if_start = dpni_if_start;
@@ -666,6 +666,40 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 		device_printf(dev, "Failed to set maximum length for received "
 		    "frames\n");
 		return (error);
+	}
+
+	/* Setup checksums validation and generation. */
+	if (ifp->if_capenable & IFCAP_RXCSUM) {
+		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
+		    DPAA2_NI_OFL_RX_L3_CSUM, true);
+		if (error) {
+			device_printf(dev, "Failed to setup Rx L3 checksum "
+			    "validation\n");
+			return (error);
+		}
+		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
+		    DPAA2_NI_OFL_RX_L4_CSUM, true);
+		if (error) {
+			device_printf(dev, "Failed to setup Rx L4 checksum "
+			    "validation\n");
+			return (error);
+		}
+	}
+	if (ifp->if_capenable & IFCAP_TXCSUM) {
+		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
+		    DPAA2_NI_OFL_TX_L3_CSUM, true);
+		if (error) {
+			device_printf(dev, "Failed to setup Tx L3 checksum "
+			    "generation\n");
+			return (error);
+		}
+		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
+		    DPAA2_NI_OFL_TX_L4_CSUM, true);
+		if (error) {
+			device_printf(dev, "Failed to setup Tx L4 checksum "
+			    "generation\n");
+			return (error);
+		}
 	}
 
 	return (0);
