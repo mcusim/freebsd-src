@@ -1899,7 +1899,7 @@ dpaa2_rc_ni_set_irq_mask(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 }
 
 static int
-dpaa2_rc_ni_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+dpaa2_rc_ni_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
     bool en)
 {
 	struct __packed set_irq_enable_args {
