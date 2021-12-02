@@ -362,6 +362,22 @@ CODE {
 				device_get_parent(dev), cmd, type, qdid));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_add_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac) {
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_ADD_MAC_ADDR(
+				device_get_parent(dev), cmd, mac));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_set_mfl(device_t dev, dpaa2_cmd_t cmd, uint16_t length) {
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_MFL(
+				device_get_parent(dev), cmd, length));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -829,6 +845,18 @@ METHOD int ni_get_qdid {
 	enum dpaa2_ni_queue_type type;
 	uint16_t	*qdid;
 } DEFAULT bypass_ni_get_qdid;
+
+METHOD int ni_add_mac_addr {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		*mac;
+} DEFAULT bypass_ni_add_mac_addr;
+
+METHOD int ni_set_mfl {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint16_t	 length;
+} DEFAULT bypass_ni_set_mfl;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
