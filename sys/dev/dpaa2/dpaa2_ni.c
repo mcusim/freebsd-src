@@ -272,6 +272,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->mii = NULL;
 	sc->media_status = 0;
 	sc->mac.dpmac_id = 0;
+	sc->if_flags = 0;
 
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
@@ -1578,16 +1579,17 @@ dpni_if_start(struct ifnet *ifp)
  * @internal
  */
 static int
-dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
+dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *) data;
 	uint32_t changed = 0;
-	int error = 0;
+	int rc = 0;
 
-	printf("%s: invoked: command=%lu, data=%s\n", __func__, command, data);
+	printf("%s: invoked: cmd=%lu, ifr_name=%s\n", __func__, cmd,
+	    ifr->ifr_name);
 
-	switch (command) {
+	switch (cmd) {
 	case SIOCSIFCAP:
 		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (changed & IFCAP_HWCSUM) {
@@ -1598,7 +1600,28 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 	case SIOCSIFFLAGS:
-		/* TBD */
+		DPNI_LOCK(sc);
+		if (ifp->if_flags & IFF_UP) {
+			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+				changed = ifp->if_flags ^ sc->if_flags;
+				if (changed & IFF_PROMISC) {
+					/* dpni_set_promisc(sc, */
+					/*     ifp->if_flags & IFF_PROMISC); */
+				}
+				if (changed & IFF_ALLMULTI) {
+					/* dpni_set_allmulti(sc, */
+					/*     ifp->if_flags & IFF_ALLMULTI); */
+				}
+			} else {
+				DPNI_UNLOCK(sc);
+				dpni_if_init(sc);
+				DPNI_LOCK(sc);
+			}
+		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING)
+			/* dpni_if_stop(sc); */
+
+		sc->if_flags = ifp->if_flags;
+		DPNI_UNLOCK(sc);
 		break;
 	case SIOCADDMULTI:
 		/* TBD */
@@ -1609,14 +1632,13 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:
 		if (sc->mii)
-			error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media,
-			    command);
+			rc= ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, cmd);
 		break;
 	default:
-		error = ether_ioctl(ifp, command, data);
+		rc = ether_ioctl(ifp, cmd, data);
 	}
 
-	return (error);
+	return (rc);
 }
 
 /**

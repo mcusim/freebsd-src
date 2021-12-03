@@ -285,6 +285,7 @@ struct dpaa2_ni_softc {
 	uint16_t		 rx_bufsz;
 	uint16_t		 tx_data_off;
 	uint16_t		 tx_qdid;
+	uint32_t		 if_flags;
 	dpaa2_ni_attr_t		 attr;
 
 	/* For network interface and miibus. */
