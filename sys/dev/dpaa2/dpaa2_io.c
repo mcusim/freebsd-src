@@ -330,7 +330,8 @@ setup_msi(struct dpaa2_io_softc *sc)
 
 	val = pci_msi_count(sc->dev);
 	if (val < DPAA2_IO_MSI_COUNT)
-		device_printf(sc->dev, "Have %d MSI messages\n", val);
+		device_printf(sc->dev, "MSI: actual=%d, expected=%d\n", val,
+		    DPAA2_IO_MSI_COUNT);
 	val = MIN(val, DPAA2_IO_MSI_COUNT);
 
 	if (pci_alloc_msi(sc->dev, &val) != 0)
