@@ -1476,23 +1476,77 @@ dpni_ifmedia_tick(void *arg)
 static void
 dpni_if_init(void *arg)
 {
+	device_t pdev, dev;
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	struct ifnet *ifp = sc->ifp;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	uint16_t rc_token, ni_token;
+	int error;
+
+	dev = sc->dev;
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+	dinfo = device_get_ivars(dev);
 
 	DPNI_LOCK(sc);
-
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 		DPNI_UNLOCK(sc);
 		return;
 	}
+	DPNI_UNLOCK(sc);
 
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		    error);
+		return;
+	}
+
+	/* Open resource container and network interface object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token), dinfo->id,
+	    &ni_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_close_rc;
+	}
+
+	error = DPAA2_CMD_NI_ENABLE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	if (error) {
+		device_printf(dev, "Failed to enable DPNI: error=%d\n", error);
+		goto err_close_ni;
+	}
+
+	DPNI_LOCK(sc);
 	if (sc->mii)
 		mii_mediachg(sc->mii);
 	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
+
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
-
 	DPNI_UNLOCK(sc);
+
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	dpaa2_mcp_free_command(cmd);
+	return;
+
+err_close_ni:
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+	return;
 }
 
 /**
@@ -1568,6 +1622,7 @@ static void
 dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
 {
 	/* TBD */
+	printf("%s: invoked\n", __func__);
 }
 
 /**
@@ -1595,6 +1650,7 @@ dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
     struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
 {
 	/* TBD */
+	printf("%s: invoked\n", __func__);
 }
 
 /**
@@ -1605,6 +1661,7 @@ dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
     struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
 {
 	/* TBD */
+	printf("%s: invoked\n", __func__);
 }
 
 /**
@@ -1637,13 +1694,13 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 {
 	uint8_t i, num_chan;
 
-	/* # of allocated DPIOs */
+	/* Number of the allocated DPIOs. */
 	for (i = 0; i < IO_RES_NUM; i++)
 		if (!sc->res[IO_RID(i)])
 			break;
 	num_chan = i;
 
-	/* # of allocated DPCONs */
+	/* Number of the allocated DPCONs. */
 	for (i = 0; i < CON_RES_NUM; i++)
 		if (!sc->res[CON_RID(i)])
 			break;
