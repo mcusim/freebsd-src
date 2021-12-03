@@ -202,10 +202,11 @@ static int	setup_rx_distribution(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
+static int	setup_msi(struct dpaa2_ni_softc *);
 
-static int	set_buf_layout(device_t dev, dpaa2_cmd_t cmd);
-static int	set_pause_frame(device_t dev, dpaa2_cmd_t cmd);
-static int	set_qos_table(device_t dev, dpaa2_cmd_t cmd);
+static int	set_buf_layout(device_t, dpaa2_cmd_t);
+static int	set_pause_frame(device_t, dpaa2_cmd_t);
+static int	set_qos_table(device_t, dpaa2_cmd_t);
 
 static int	dpni_ifmedia_change(struct ifnet *ifp);
 static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
@@ -214,6 +215,8 @@ static void	dpni_ifmedia_tick(void *arg);
 static void	dpni_if_init(void *arg);
 static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+
+static void	dpni_msi_intr(void *arg);
 
 static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
@@ -349,6 +352,23 @@ dpaa2_ni_attach(device_t dev)
 		goto err_close_ni;
 	}
 
+	/* Configure IRQs. */
+	error = setup_msi(sc);
+	if (error) {
+		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
+		goto err_close_ni;
+	}
+	if ((sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
+		device_printf(dev, "Failed to allocate IRQ resource\n");
+		goto err_close_ni;
+	}
+	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, dpni_msi_intr, sc, &sc->intr)) {
+		device_printf(dev, "Failed to setup IRQ resource\n");
+		goto err_close_ni;
+	}
+
 	/* Close the network interface object and the resource container. */
 	error = DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
@@ -367,6 +387,7 @@ dpaa2_ni_attach(device_t dev)
 	callout_init(&sc->mii_callout, 0);
 
 	return (0);
+
 err_close_ni:
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 err_close_rc:
@@ -1115,6 +1136,29 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 /**
  * @internal
+ * @brief Allocate MSI interrupts for this DPAA2 network interface object.
+ */
+static int
+setup_msi(struct dpaa2_ni_softc *sc)
+{
+	int val;
+
+	val = pci_msi_count(sc->dev);
+	if (val < DPAA2_NI_MSI_COUNT)
+		device_printf(sc->dev, "Have %d MSI messages\n", val);
+	val = MIN(val, DPAA2_NI_MSI_COUNT);
+
+	if (pci_alloc_msi(sc->dev, &val) != 0)
+		return (EINVAL);
+
+	for (int i = 0; i < val; i++)
+		sc->irq_rid[i] = i + 1;
+
+	return (0);
+}
+
+/**
+ * @internal
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
@@ -1469,6 +1513,16 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	return (error);
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_msi_intr(void *arg)
+{
+	/* NOTE: Useless interrupt handler. */
+	printf("%s: invoked\n", __func__);
 }
 
 /**

@@ -43,6 +43,9 @@
 /* Maximum number of resources per DPNI. */
 #define DPAA2_NI_MAX_RESOURCES	9
 
+/* Maximum number of MSIs supported by the DPNI objects. */
+#define DPAA2_NI_MSI_COUNT	1
+
 /* Maximum number of channels to distribute Rx and Tx conf traffic to GPPs. */
 #define DPAA2_NI_MAX_CHANNELS	16
 
@@ -309,6 +312,10 @@ struct dpaa2_ni_softc {
  	/* Frame queues. */
 	uint32_t		 num_fqs;
 	dpaa2_ni_fq_t		 fq[DPAA2_NI_MAX_QUEUES];
+
+	int			 irq_rid[DPAA2_NI_MSI_COUNT];
+	struct resource		*irq_res;
+	void			*intr; /* interrupt handle */
 
 	struct {
 		bus_dma_tag_t	 dtag;
