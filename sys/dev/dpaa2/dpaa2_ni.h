@@ -40,32 +40,21 @@
 #include "dpaa2_swp.h"
 #include "dpaa2_io.h"
 
-/* Maximum number of resources per DPNI. */
-#define DPAA2_NI_MAX_RESOURCES	9
+/* Name of the DPAA2 network interface. */
+#define DPAA2_NI_IFNAME		"dpaa2ni"
 
-/* Maximum number of MSIs supported by the DPNI objects. */
-#define DPAA2_NI_MSI_COUNT	1
+#define DPAA2_NI_MAX_RESOURCES	9  /* max. # of resources per DPNI */
+#define DPAA2_NI_MSI_COUNT	1  /* MSIs supported by the DPNI objects */
+#define DPAA2_NI_MAX_CHANNELS	16 /* to distribute ingress traffic to cores */
+#define DPAA2_NI_MAX_TCS	8  /* max. # of traffic classes per DPNI */
+#define DPAA2_NI_MAX_POOLS	8  /* max. # of buffer pools per DPNI */
 
-/* Maximum number of channels to distribute Rx and Tx conf traffic to GPPs. */
-#define DPAA2_NI_MAX_CHANNELS	16
-
-/* Maximum number of traffic classes per DPNI. */
-#define DPAA2_NI_MAX_TCS	8
-
-/* Maximum number of Rx queues per traffic class. */
-#define DPAA2_NI_MAX_RXQ_PER_TC	16
-
-/* Queues. */
+#define DPAA2_NI_MAX_RXQ_PER_TC	16 /* Rx queues per traffic class */
 #define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
 #define DPAA2_NI_MAX_RXEQ	1 /* Rx error queue */
 #define DPAA2_NI_MAX_TXQ	16
-
-/* Maximum number of queues associated with a DPNI. */
 #define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
     DPAA2_NI_MAX_RXEQ)
-
-/* Maximum number of buffer pools per DPNI. */
-#define DPAA2_NI_MAX_POOLS	8
 
 /* Error and status bits in the frame annotation status word. */
 #define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */

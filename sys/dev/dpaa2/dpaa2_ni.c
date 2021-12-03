@@ -98,9 +98,6 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-/* Name of the DPAA2 network interface. */
-#define DPAA2_IF_NAME		"dpaa2ni"
-
 /* Maximum acceptable MTU value. */
 #define DPAA2_ETH_MFL	(10 * 1024)
 #define DPAA2_ETH_HCV	(ETHER_HDR_LEN+ETHER_CRC_LEN+ETHER_VLAN_ENCAP_LEN)
@@ -291,7 +288,7 @@ dpaa2_ni_attach(device_t dev)
 
 	sc->ifp = ifp;
 
-	if_initname(ifp, DPAA2_IF_NAME, device_get_unit(sc->dev));
+	if_initname(ifp, DPAA2_NI_IFNAME, device_get_unit(sc->dev));
 	ifp->if_softc = sc;
 	ifp->if_mtu = DPAA2_ETH_MTU;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
