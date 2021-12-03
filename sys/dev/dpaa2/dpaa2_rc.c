@@ -138,6 +138,8 @@ __FBSDID("$FreeBSD$");
 
 #define CMDID_NI_OPEN				CMD_NI(0x801)
 #define CMDID_NI_CLOSE				CMD_NI(0x800)
+#define CMDID_NI_ENABLE				CMD_NI(0x002)
+#define CMDID_NI_DISABLE			CMD_NI(0x003)
 #define CMDID_NI_GET_API_VER			CMD_NI(0xA01)
 #define CMDID_NI_RESET				CMD_NI(0x005)
 #define CMDID_NI_GET_ATTR			CMD_NI(0x004)
@@ -1282,6 +1284,34 @@ dpaa2_rc_ni_close(device_t rcdev, dpaa2_cmd_t cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (exec_command(sc->portal, cmd, CMDID_NI_CLOSE));
+}
+
+static int
+dpaa2_rc_ni_enable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_ENABLE));
+}
+
+static int
+dpaa2_rc_ni_disable(device_t rcdev, dpaa2_cmd_t cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_DISABLE));
 }
 
 static int
@@ -3148,6 +3178,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	/*	DPNI commands */
 	DEVMETHOD(dpaa2_cmd_ni_open,		dpaa2_rc_ni_open),
 	DEVMETHOD(dpaa2_cmd_ni_close,		dpaa2_rc_ni_close),
+	DEVMETHOD(dpaa2_cmd_ni_enable,		dpaa2_rc_ni_enable),
+	DEVMETHOD(dpaa2_cmd_ni_disable,		dpaa2_rc_ni_disable),
 	DEVMETHOD(dpaa2_cmd_ni_get_api_version,	dpaa2_rc_ni_get_api_version),
 	DEVMETHOD(dpaa2_cmd_ni_reset,		dpaa2_rc_ni_reset),
 	DEVMETHOD(dpaa2_cmd_ni_get_attributes,	dpaa2_rc_ni_get_attributes),
