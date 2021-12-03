@@ -1153,13 +1153,13 @@ setup_dpni_irqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 	}
 
 	/* Configure DPNI to generate interrupts. */
-	error = DPAA2_NI_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, ni_token),
+	error = DPAA2_CMD_NI_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    DPNI_IRQ_INDEX, DPNI_IRQ_LINK_CHANGED | DPNI_IRQ_EP_CHANGED);
 	if (error) {
 		device_printf(dev, "Failed to set DPNI IRQ mask\n");
 		return (error);
 	}
-	error = DPAA2_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
+	error = DPAA2_CMD_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
 	if (error) {
 		device_printf(dev, "Failed to enable DPNI IRQ\n");
 		return (error);
