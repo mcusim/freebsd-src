@@ -103,6 +103,10 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_ETH_HCV	(ETHER_HDR_LEN+ETHER_CRC_LEN+ETHER_VLAN_ENCAP_LEN)
 #define DPAA2_ETH_MTU	(DPAA2_ETH_MFL-DPAA2_ETH_HCV)
 
+#define DPNI_IRQ_INDEX		0          /* of the only DPNI IRQ */
+#define DPNI_IRQ_LINK_CHANGED	0x00000001 /* link state changed */
+#define DPNI_IRQ_EP_CHANGED	0x00000002 /* DPAA2 endpoint dis/connected */
+
 /* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
@@ -199,6 +203,7 @@ static int	setup_rx_distribution(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
+static int	setup_dpni_irqs(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_msi(struct dpaa2_ni_softc *);
 
 static int	set_buf_layout(device_t, dpaa2_cmd_t);
@@ -348,21 +353,9 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to bind DPNI: error=%d\n", error);
 		goto err_close_ni;
 	}
-
-	/* Configure IRQs. */
-	error = setup_msi(sc);
+	error = setup_dpni_irqs(dev, cmd, rc_token, ni_token);
 	if (error) {
-		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
-		goto err_close_ni;
-	}
-	if ((sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
-	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
-		device_printf(dev, "Failed to allocate IRQ resource\n");
-		goto err_close_ni;
-	}
-	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, dpni_msi_intr, sc, &sc->intr)) {
-		device_printf(dev, "Failed to setup IRQ resource\n");
+		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_close_ni;
 	}
 
@@ -1125,6 +1118,50 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	if (error) {
 		device_printf(dev, "Failed to update RxErr queue "
 		    "configuration\n");
+		return (error);
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Configure DPNI object to generate interrupts.
+ */
+static int
+setup_dpni_irqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
+    uint16_t ni_token)
+{
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	int error;
+
+	/* Configure IRQs. */
+	error = setup_msi(sc);
+	if (error) {
+		device_printf(dev, "Failed to allocate MSI\n");
+		return (error);
+	}
+	if ((sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
+		device_printf(dev, "Failed to allocate IRQ resource\n");
+		return (ENXIO);
+	}
+	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, dpni_msi_intr, sc, &sc->intr)) {
+		device_printf(dev, "Failed to setup IRQ resource\n");
+		return (ENXIO);
+	}
+
+	/* Configure DPNI to generate interrupts. */
+	error = DPAA2_NI_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, ni_token),
+	    DPNI_IRQ_INDEX, DPNI_IRQ_LINK_CHANGED | DPNI_IRQ_EP_CHANGED);
+	if (error) {
+		device_printf(dev, "Failed to set DPNI IRQ mask\n");
+		return (error);
+	}
+	error = DPAA2_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
+	if (error) {
+		device_printf(dev, "Failed to enable DPNI IRQ\n");
 		return (error);
 	}
 
