@@ -36,6 +36,25 @@
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 
+/* Maximum number of MSIs supported by the DPIO objects. */
+#define DPAA2_IO_MSI_COUNT	1
+
+/**
+ * @brief Software context for the DPAA2 I/O driver.
+ */
+struct dpaa2_io_softc {
+	device_t		 dev;
+	dpaa2_swp_desc_t	 swp_desc;
+	dpaa2_swp_t		 swp;
+
+	struct resource 	*res[3];
+	struct resource_map	 map[3];
+
+	int			 irq_rid[DPAA2_IO_MSI_COUNT];
+	struct resource		*irq_resource;
+	void			*intr; /* interrupt handle */
+};
+
 /**
  * @brief Context used by DPIO to configure data availability notifications
  * (CDAN) on a particular WQ channel.

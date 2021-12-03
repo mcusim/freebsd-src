@@ -43,11 +43,9 @@
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 #include "dpaa2_ni.h"
+#include "dpaa2_io.h"
 
 #define DPAA2_MCP_MEM_WIDTH	0x40 /* Minimal size of the MC portal. */
-
-/* Maximum number of MSIs supported by DPIO objects. */
-#define DPAA2_IO_MSI_COUNT	1
 
 /*
  * Flags for DPAA2 devices as resources.
@@ -104,22 +102,6 @@ struct dpaa2_rc_softc {
 	dpaa2_mcp_t		 portal;
 	int			 unit;
 	uint32_t		 cont_id;
-};
-
-/**
- * @brief Software context for the DPAA2 I/O driver.
- */
-struct dpaa2_io_softc {
-	device_t		 dev;
-	dpaa2_swp_desc_t	 swp_desc;
-	dpaa2_swp_t		 swp;
-
-	struct resource 	*res[3];
-	struct resource_map	 map[3];
-
-	int			 irq_rid[DPAA2_IO_MSI_COUNT];
-	struct resource		*irq_resource;
-	void			*intr; /* interrupt handle */
 };
 
 /**
