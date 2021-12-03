@@ -216,6 +216,24 @@ CODE {
 		return (ENXIO);
 	}
 	static int
+	bypass_ni_enable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_ENABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_disable(device_t dev, dpaa2_cmd_t cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_DISABLE(
+				device_get_parent(dev), cmd));
+		return (ENXIO);
+	}
+	static int
 	bypass_ni_get_api_version(device_t dev, dpaa2_cmd_t cmd,
 		uint16_t *major, uint16_t *minor)
 	{
@@ -785,6 +803,16 @@ METHOD int ni_close {
 	device_t	 dev;
 	dpaa2_cmd_t	 cmd;
 } DEFAULT bypass_ni_close;
+
+METHOD int ni_enable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_ni_enable;
+
+METHOD int ni_disable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+} DEFAULT bypass_ni_disable;
 
 METHOD int ni_get_api_version {
 	device_t	 dev;
