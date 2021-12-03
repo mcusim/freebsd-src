@@ -1481,9 +1481,13 @@ dpni_if_init(void *arg)
 	struct ifnet *ifp = sc->ifp;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
+	dpaa2_ep_desc_t ep1_desc, ep2_desc;
 	dpaa2_cmd_t cmd;
 	uint16_t rc_token, ni_token;
+	uint32_t link;
 	int error;
+
+	printf("%s: invoked\n", __func__);
 
 	dev = sc->dev;
 	pdev = device_get_parent(dev);
@@ -1535,6 +1539,14 @@ dpni_if_init(void *arg)
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 	DPNI_UNLOCK(sc);
 
+	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_tk(cmd, rc_token),
+	    &ep1_desc, &ep2_desc, &link);
+	if (!error) {
+		device_printf(dev, "connected to %s (id=%d), DPAA2 link %s\n",
+		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
+		    link ? "up" : "down");
+	}
+
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
 	dpaa2_mcp_free_command(cmd);
@@ -1559,6 +1571,7 @@ dpni_if_start(struct ifnet *ifp)
 		return;
 
 	/* ... enqueue frames here ... */
+	printf("%s: invoked\n", __func__);
 }
 
 /**
