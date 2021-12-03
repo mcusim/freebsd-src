@@ -1585,7 +1585,7 @@ dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	uint32_t changed = 0;
 	int error = 0;
 
-	printf("%s: invoked\n", __func__);
+	printf("%s: invoked: command=%lu, data=%s\n", __func__, command, data);
 
 	switch (command) {
 	case SIOCSIFCAP:
