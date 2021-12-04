@@ -1585,8 +1585,10 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	uint32_t changed = 0;
 	int rc = 0;
 
+#if 0
 	printf("%s: invoked: cmd=0x%lx, ifr_name=%s\n", __func__, cmd,
 	    ifr->ifr_name);
+#endif
 
 	switch (cmd) {
 	case SIOCSIFCAP:
