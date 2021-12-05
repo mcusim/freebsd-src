@@ -179,9 +179,11 @@ __FBSDID("$FreeBSD$");
 
 /* ------------------------- DPMAC command IDs ------------------------------ */
 #define CMD_MAC_BASE_VERSION	1
+#define CMD_MAC_2ND_VERSION	2
 #define CMD_MAC_ID_OFFSET	4
 
-#define CMD_MAC(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+#define CMD_MAC(id)	(((id) << CMD_MAC_ID_OFFSET) | CMD_MAC_BASE_VERSION)
+#define CMD_MAC_V2(id)	(((id) << CMD_MAC_ID_OFFSET) | CMD_MAC_2ND_VERSION)
 
 #define CMDID_MAC_OPEN				CMD_MAC(0x80C)
 #define CMDID_MAC_CLOSE				CMD_MAC(0x800)
@@ -190,6 +192,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_MAC_MDIO_WRITE			CMD_MAC(0x0C1)
 #define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
 #define CMDID_MAC_GET_ATTR			CMD_MAC(0x004)
+#define CMDID_MAC_SET_LINK_STATE		CMD_MAC_V2(0x0C3)
 
 /* ------------------------- DPCON command IDs ------------------------------ */
 #define CMD_CON_BASE_VERSION	1
@@ -2445,6 +2448,41 @@ dpaa2_rc_mac_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_mac_set_link_state(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_mac_link_state_t *state)
+{
+	struct __packed mac_set_link_args {
+		uint64_t	options;
+		uint32_t	rate;
+		uint32_t	_reserved1;
+		uint32_t	flags;
+		uint32_t	_reserved2;
+		uint64_t	supported;
+		uint64_t	advert;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !state)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct mac_set_link_args *) &cmd->params[0];
+	args->options = state->options;
+	args->rate = state->rate;
+	args->supported = state->supported;
+	args->advert = state->advert;
+
+	args->flags |= state->up ? 0x1u : 0u;
+	args->flags |= state->state_valid ? 0x2u : 0u;
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_SET_LINK_STATE));
+}
+
+static int
 dpaa2_rc_con_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
     uint16_t *token)
 {
@@ -3300,6 +3338,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mac_mdio_write,	dpaa2_rc_mac_mdio_write),
 	DEVMETHOD(dpaa2_cmd_mac_get_addr,	dpaa2_rc_mac_get_addr),
 	DEVMETHOD(dpaa2_cmd_mac_get_attributes, dpaa2_rc_mac_get_attributes),
+	DEVMETHOD(dpaa2_cmd_mac_set_link_state,	dpaa2_rc_mac_set_link_state),
 	/*	DPCON commands */
 	DEVMETHOD(dpaa2_cmd_con_open,		dpaa2_rc_con_open),
 	DEVMETHOD(dpaa2_cmd_con_close,		dpaa2_rc_con_close),
