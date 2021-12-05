@@ -35,12 +35,14 @@
 
 #include "dpaa2_types.h"
 #include "dpaa2_ni.h"
+#include "dpaa2_mac.h"
 
 /*
  * DPAA2 MC command interface helper routines.
  */
 
 #define DPAA2_PORTAL_TIMEOUT		100000	/* us */
+#define DPAA2_MCP_MEM_WIDTH		0x40 /* Minimal size of the MC portal. */
 
 /*
  * Portal flags.
@@ -85,13 +87,6 @@
 #define DPAA2_CMD_PARAMS_N		7u
 #define DPAA2_LABEL_SZ			16
 
-/* DPNI link configuration options. */
-#define DPAA2_NI_LINK_OPT_AUTONEG	((uint64_t) 0x01u)
-#define DPAA2_NI_LINK_OPT_HALF_DUPLEX	((uint64_t) 0x02u)
-#define DPAA2_NI_LINK_OPT_PAUSE		((uint64_t) 0x04u)
-#define DPAA2_NI_LINK_OPT_ASYM_PAUSE	((uint64_t) 0x08u)
-#define DPAA2_NI_LINK_OPT_PFC_PAUSE	((uint64_t) 0x10u)
-
 /*
  * Public types.
  */
@@ -104,37 +99,6 @@ enum dpaa2_rc_region_type {
 enum dpaa2_io_chan_mode {
 	DPAA2_IO_NO_CHANNEL,
 	DPAA2_IO_LOCAL_CHANNEL
-};
-
-enum dpaa2_mac_eth_if {
-	DPAA2_MAC_ETH_IF_MII,
-	DPAA2_MAC_ETH_IF_RMII,
-	DPAA2_MAC_ETH_IF_SMII,
-	DPAA2_MAC_ETH_IF_GMII,
-	DPAA2_MAC_ETH_IF_RGMII,
-	DPAA2_MAC_ETH_IF_SGMII,
-	DPAA2_MAC_ETH_IF_QSGMII,
-	DPAA2_MAC_ETH_IF_XAUI,
-	DPAA2_MAC_ETH_IF_XFI,
-	DPAA2_MAC_ETH_IF_CAUI,
-	DPAA2_MAC_ETH_IF_1000BASEX,
-	DPAA2_MAC_ETH_IF_USXGMII
-};
-
-enum dpaa2_mac_link_type {
-	DPAA2_MAC_LINK_TYPE_NONE,
-	DPAA2_MAC_LINK_TYPE_FIXED,
-	DPAA2_MAC_LINK_TYPE_PHY,
-	DPAA2_MAC_LINK_TYPE_BACKPLANE
-};
-
-/**
- * @brief DPNI behavior in case of errors.
- */
-enum dpaa2_ni_err_action {
-	DPAA2_NI_ERR_DISCARD = 0,
-	DPAA2_NI_ERR_CONTINUE = 1,
-	DPAA2_NI_ERR_SEND_TO_ERROR_QUEUE = 2
 };
 
 /**
@@ -388,21 +352,6 @@ typedef struct {
 	uint32_t	if_id;
 	enum dpaa2_dev_type type;
 } dpaa2_ep_desc_t;
-
-/**
- * @brief Attributes of the DPMAC object.
- *
- * id:		DPMAC object ID.
- * max_rate:	Maximum supported rate (in Mbps).
- * eth_if:	Type of the Ethernet interface.
- * link_type:	Type of the link.
- */
-typedef struct {
-	uint32_t	id;
-	uint32_t	max_rate;
-	enum dpaa2_mac_eth_if eth_if;
-	enum dpaa2_mac_link_type link_type;
-} dpaa2_mac_attr_t;
 
 /**
  * @brief Attributes of the DPCON object.

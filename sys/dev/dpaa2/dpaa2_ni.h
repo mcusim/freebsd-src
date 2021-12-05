@@ -102,6 +102,13 @@
 #define DPAA2_NI_QUEUE_OPT_SET_CGID	0x00000040
 #define DPAA2_NI_QUEUE_OPT_CLEAR_CGID	0x00000080
 
+/* DPNI link configuration options. */
+#define DPAA2_NI_LINK_OPT_AUTONEG	((uint64_t) 0x01u)
+#define DPAA2_NI_LINK_OPT_HALF_DUPLEX	((uint64_t) 0x02u)
+#define DPAA2_NI_LINK_OPT_PAUSE		((uint64_t) 0x04u)
+#define DPAA2_NI_LINK_OPT_ASYM_PAUSE	((uint64_t) 0x08u)
+#define DPAA2_NI_LINK_OPT_PFC_PAUSE	((uint64_t) 0x10u)
+
 enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX = 0,
 	DPAA2_NI_QUEUE_TX,
@@ -121,6 +128,15 @@ enum dpaa2_ni_ofl_type {
 	DPAA2_NI_OFL_TX_L3_CSUM,
 	DPAA2_NI_OFL_TX_L4_CSUM,
 	DPAA2_NI_OFL_FLCTYPE_HASH /* FD flow context for AIOP/CTLU */
+};
+
+/**
+ * @brief DPNI behavior in case of errors.
+ */
+enum dpaa2_ni_err_action {
+	DPAA2_NI_ERR_DISCARD = 0,
+	DPAA2_NI_ERR_CONTINUE,
+	DPAA2_NI_ERR_SEND_TO_ERROR_QUEUE
 };
 
 /**

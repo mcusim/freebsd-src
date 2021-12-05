@@ -636,6 +636,16 @@ CODE {
 				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
+	static int
+	bypass_mac_set_link_state(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_mac_link_state_t *state)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_SET_LINK_STATE(
+				device_get_parent(dev), cmd, state));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_con_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
@@ -1106,6 +1116,12 @@ METHOD int mac_get_attributes {
 	dpaa2_cmd_t	  cmd;
 	dpaa2_mac_attr_t *attr;
 } DEFAULT bypass_mac_get_attributes;
+
+METHOD int mac_set_link_state {
+	device_t	  dev;
+	dpaa2_cmd_t	  cmd;
+	dpaa2_mac_link_state_t *state;
+} DEFAULT bypass_mac_set_link_state;
 
 /**
  * @brief Data Path Concentrator (DPCON) commands.

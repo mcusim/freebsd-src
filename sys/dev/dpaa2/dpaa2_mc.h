@@ -44,8 +44,7 @@
 #include "dpaa2_swp.h"
 #include "dpaa2_ni.h"
 #include "dpaa2_io.h"
-
-#define DPAA2_MCP_MEM_WIDTH	0x40 /* Minimal size of the MC portal. */
+#include "dpaa2_mac.h"
 
 /*
  * Flags for DPAA2 devices as resources.
@@ -118,19 +117,6 @@ struct dpaa2_bp_softc {
 struct dpaa2_con_softc {
 	device_t		 dev;
 	dpaa2_con_attr_t	 attr;
-};
-
-/**
- * @brief Software context for the DPAA2 MAC driver.
- *
- * dev:		Device associated with this software context.
- * addr:	Physical address assigned to the DPMAC object.
- * attr:	Attributes of the DPMAC object.
- */
-struct dpaa2_mac_softc {
-	device_t		 dev;
-	uint8_t			 addr[ETHER_ADDR_LEN];
-	dpaa2_mac_attr_t	 attr;
 };
 
 /**
