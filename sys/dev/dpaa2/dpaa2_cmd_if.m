@@ -389,6 +389,16 @@ CODE {
 		return (ENXIO);
 	}
 	static int
+	bypass_ni_clear_mac_filters(device_t dev, dpaa2_cmd_t cmd, bool rm_uni,
+		bool rm_multi)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_CLEAR_MAC_FILTERS(
+				device_get_parent(dev), cmd, rm_uni, rm_multi));
+		return (ENXIO);
+	}
+	static int
 	bypass_ni_set_mfl(device_t dev, dpaa2_cmd_t cmd, uint16_t length) {
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -909,6 +919,13 @@ METHOD int ni_add_mac_addr {
 	dpaa2_cmd_t	 cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_add_mac_addr;
+
+METHOD int ni_clear_mac_filters {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	bool		 rm_uni;
+	bool		 rm_multi;
+} DEFAULT bypass_ni_clear_mac_filters;
 
 METHOD int ni_set_mfl {
 	device_t	 dev;
