@@ -212,10 +212,6 @@ static int	set_pause_frame(device_t, dpaa2_cmd_t);
 static int	set_qos_table(device_t, dpaa2_cmd_t);
 static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 
-static int	dpni_ifmedia_change(struct ifnet *ifp);
-static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
-static void	dpni_ifmedia_tick(void *arg);
-
 static void	dpni_if_init(void *arg);
 static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
@@ -226,9 +222,14 @@ static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 
 /* Callbacks. */
 
+static int	dpni_ifmedia_change(struct ifnet *ifp);
+static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
+static void	dpni_ifmedia_tick(void *arg);
+
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
+
 static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 static void	dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
@@ -1535,13 +1536,13 @@ dpni_ifmedia_change(struct ifnet *ifp)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
-	DPNI_LOCK(sc);
+	printf("%s: invoked\n", __func__);
 
+	DPNI_LOCK(sc);
 	if (sc->mii) {
 		mii_mediachg(sc->mii);
 		sc->media_status = sc->mii->mii_media.ifm_media;
 	}
-
 	DPNI_UNLOCK(sc);
 
 	return (0);
@@ -1556,14 +1557,14 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
-	DPNI_LOCK(sc);
+	printf("%s: invoked\n", __func__);
 
+	DPNI_LOCK(sc);
 	if (sc->mii) {
 		mii_pollstat(sc->mii);
 		ifmr->ifm_active = sc->mii->mii_media_active;
 		ifmr->ifm_status = sc->mii->mii_media_status;
 	}
-
 	DPNI_UNLOCK(sc);
 }
 
@@ -1893,8 +1894,8 @@ static device_method_t dpaa2_ni_methods[] = {
 	DEVMETHOD(device_detach,	dpaa2_ni_detach),
 
 	/* MII bus interface */
-	DEVMETHOD(miibus_readreg,	dpaa2_ni_miibus_readreg),
-	DEVMETHOD(miibus_writereg,	dpaa2_ni_miibus_writereg),
+	/* DEVMETHOD(miibus_readreg,	dpaa2_ni_miibus_readreg), */
+	/* DEVMETHOD(miibus_writereg,	dpaa2_ni_miibus_writereg), */
 	/* DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg), */
 
 	DEVMETHOD_END
