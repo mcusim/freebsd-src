@@ -1536,7 +1536,9 @@ dpni_ifmedia_change(struct ifnet *ifp)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
+#if 0
 	printf("%s: invoked\n", __func__);
+#endif
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
@@ -1557,7 +1559,9 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
+#if 0
 	printf("%s: invoked\n", __func__);
+#endif
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
