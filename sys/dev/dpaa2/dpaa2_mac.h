@@ -34,7 +34,6 @@
 #include <sys/queue.h>
 
 #include "dpaa2_types.h"
-#include "dpaa2_mcp.h"
 
 /* DPMAC link configuration options. */
 #define DPAA2_MAC_LINK_OPT_AUTONEG	((uint64_t) 0x01u)
