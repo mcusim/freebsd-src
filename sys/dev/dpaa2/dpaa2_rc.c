@@ -146,6 +146,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_BUF_LAYOUT			CMD_NI(0x265)
 #define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
 #define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
+#define CMDID_NI_SET_PRIM_MAC_ADDR		CMD_NI(0x224)
+#define CMDID_NI_GET_PRIM_MAC_ADDR		CMD_NI(0x225)
 #define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
 #define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
 #define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
@@ -1533,7 +1535,7 @@ dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
 	if (!sc->portal || !cmd || !mac)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	error = exec_command(sc->portal, cmd, CMDID_NI_SET_PRIM_MAC_ADDR);
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_PRIM_MAC_ADDR);
 	if (!error) {
 		resp = (struct get_prim_mac_resp *) &cmd->params[0];
 		for (int i = 1; i <= ETHER_ADDR_LEN; i++)
