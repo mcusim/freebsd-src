@@ -1496,6 +1496,54 @@ dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
 }
 
 static int
+dpaa2_rc_ni_set_prim_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
+{
+	struct __packed set_prim_mac_args {
+		uint8_t		_reserved[2];
+		uint8_t		mac[ETHER_ADDR_LEN];
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !mac)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	args = (struct set_prim_mac_args *) &cmd->params[0];
+	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
+		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_PRIM_MAC_ADDR));
+}
+
+static int
+dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, dpaa2_cmd_t cmd, uint8_t *mac)
+{
+	struct __packed get_prim_mac_resp {
+		uint8_t		_reserved[2];
+		uint8_t		mac[ETHER_ADDR_LEN];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !mac)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_SET_PRIM_MAC_ADDR);
+	if (!error) {
+		resp = (struct get_prim_mac_resp *) &cmd->params[0];
+		for (int i = 1; i <= ETHER_ADDR_LEN; i++)
+			mac[ETHER_ADDR_LEN - i] = resp->mac[i - 1];
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_ni_set_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
     dpaa2_ni_link_cfg_t *cfg)
 {
@@ -3211,6 +3259,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_buf_layout,	dpaa2_rc_ni_set_buf_layout),
 	DEVMETHOD(dpaa2_cmd_ni_get_tx_data_off, dpaa2_rc_ni_get_tx_data_offset),
 	DEVMETHOD(dpaa2_cmd_ni_get_port_mac_addr, dpaa2_rc_ni_get_port_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_set_prim_mac_addr, dpaa2_rc_ni_set_prim_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_get_prim_mac_addr, dpaa2_rc_ni_get_prim_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_link_cfg,	dpaa2_rc_ni_set_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_set_qos_table,	dpaa2_rc_ni_set_qos_table),
