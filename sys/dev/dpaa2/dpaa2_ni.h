@@ -334,6 +334,7 @@ struct dpaa2_ni_softc {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
 		device_t	 phy_dev;
+		dpaa2_mac_link_state_t link_state;
 	} mac; /* Info about connected DPMAC (if exists) */
 
 	struct {
