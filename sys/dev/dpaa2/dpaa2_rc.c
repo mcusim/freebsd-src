@@ -1874,8 +1874,8 @@ dpaa2_rc_ni_clear_mac_filters(device_t rcdev, dpaa2_cmd_t cmd, bool rm_uni,
 	reset_cmd_params(cmd);
 
 	args = (struct clear_mac_filters_args *) &cmd->params[0];
-	flags |= rm_uni ? 0x1 : 0x0;
-	flags |= rm_multi ? 0x2 : 0x0;
+	args->flags |= rm_uni ? 0x1 : 0x0;
+	args->flags |= rm_multi ? 0x2 : 0x0;
 
 	return (exec_command(sc->portal, cmd, CMDID_NI_CLEAR_MAC_FILTERS));
 }
