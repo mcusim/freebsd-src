@@ -1634,7 +1634,6 @@ dpni_if_start(struct ifnet *ifp)
 		return;
 
 	/* ... enqueue frames here ... */
-	printf("%s: invoked\n", __func__);
 }
 
 /**
