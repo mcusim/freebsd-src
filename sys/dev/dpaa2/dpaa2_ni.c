@@ -1645,19 +1645,15 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *) data;
 	uint32_t changed = 0;
-	int rc = 0, mtu;
+	int rc = 0;
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		DPNI_LOCK(sc);
-		mtu = ifr->ifr_mtu;
-
-		if (mtu < ETHERMIN || mtu > DPAA2_ETH_MTU)
+		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > DPAA2_ETH_MTU)
 			return (EINVAL);
 
 		/* TODO: Update max. frame length according to the new MTU. */
 		ifp->if_mtu = mtu;
-		DPNI_UNLOCK(sc);
 		break;
 	case SIOCSIFCAP:
 		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
