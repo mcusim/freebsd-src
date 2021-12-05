@@ -1653,7 +1653,7 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			return (EINVAL);
 
 		/* TODO: Update max. frame length according to the new MTU. */
-		ifp->if_mtu = mtu;
+		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 	case SIOCSIFCAP:
 		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
