@@ -98,10 +98,10 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-/* Maximum acceptable MTU value. */
-#define DPAA2_ETH_MFL	(10 * 1024)
-#define DPAA2_ETH_HCV	(ETHER_HDR_LEN+ETHER_CRC_LEN+ETHER_VLAN_ENCAP_LEN)
-#define DPAA2_ETH_MTU	(DPAA2_ETH_MFL-DPAA2_ETH_HCV)
+/* Maximum acceptable frame length and MTU. */
+#define DPAA2_ETH_MFL		(10 * 1024)
+#define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
+#define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
 
 #define DPNI_IRQ_INDEX		0          /* of the only DPNI IRQ */
 #define DPNI_IRQ_LINK_CHANGED	0x00000001 /* link state changed */
@@ -205,6 +205,7 @@ static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_dpni_irqs(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_msi(struct dpaa2_ni_softc *);
+static int	setup_if_caps(struct dpaa2_ni_softc *);
 
 static int	set_buf_layout(device_t, dpaa2_cmd_t);
 static int	set_pause_frame(device_t, dpaa2_cmd_t);
@@ -218,8 +219,6 @@ static void	dpni_if_init(void *arg);
 static void	dpni_if_start(struct ifnet *ifp);
 static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
 
-static void	dpni_msi_intr(void *arg);
-
 static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
@@ -229,13 +228,16 @@ static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
-
 static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 static void	dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
 static void	dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
+
+/* ISRs */
+
+static void	dpni_msi_intr(void *arg);
 
 /*
  * Device interface.
@@ -678,40 +680,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 		device_printf(dev, "Failed to set maximum length for received "
 		    "frames\n");
 		return (error);
-	}
-
-	/* Setup checksums validation and generation. */
-	if (sc->ifp->if_capenable & IFCAP_RXCSUM) {
-		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
-		    DPAA2_NI_OFL_RX_L3_CSUM, true);
-		if (error) {
-			device_printf(dev, "Failed to setup Rx L3 checksum "
-			    "validation\n");
-			return (error);
-		}
-		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
-		    DPAA2_NI_OFL_RX_L4_CSUM, true);
-		if (error) {
-			device_printf(dev, "Failed to setup Rx L4 checksum "
-			    "validation\n");
-			return (error);
-		}
-	}
-	if (sc->ifp->if_capenable & IFCAP_TXCSUM) {
-		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
-		    DPAA2_NI_OFL_TX_L3_CSUM, true);
-		if (error) {
-			device_printf(dev, "Failed to setup Tx L3 checksum "
-			    "generation\n");
-			return (error);
-		}
-		error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd,
-		    DPAA2_NI_OFL_TX_L4_CSUM, true);
-		if (error) {
-			device_printf(dev, "Failed to setup Tx L4 checksum "
-			    "generation\n");
-			return (error);
-		}
 	}
 
 	return (0);
@@ -1194,6 +1162,97 @@ setup_msi(struct dpaa2_ni_softc *sc)
 
 /**
  * @internal
+ * @brief Update DPNI according to the update interface capabilities.
+ */
+static int
+setup_if_caps(struct dpaa2_ni_softc *sc)
+{
+	const bool en_rxcsum = sc->ifp->if_capenable & IFCAP_RXCSUM;
+	const bool en_txcsum = sc->ifp->if_capenable & IFCAP_TXCSUM;
+
+	device_t dev, pdev;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	uint16_t rc_token, ni_token;
+	int error;
+
+	dev = sc->dev;
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+	dinfo = device_get_ivars(dev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd\n");
+		goto err_exit;
+	}
+
+	/* Open resource container and network interface object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token), dinfo->id,
+	    &ni_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_close_rc;
+	}
+
+	/* Setup checksums validation. */
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd, DPAA2_NI_OFL_RX_L3_CSUM,
+	    en_rxcsum);
+	if (error) {
+		device_printf(dev, "Failed to %s L3 checksum validation\n",
+		    en_rxcsum ? "enable" : "disable");
+		goto err_close_ni;
+	}
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd, DPAA2_NI_OFL_RX_L4_CSUM,
+	    en_rxcsum);
+	if (error) {
+		device_printf(dev, "Failed to %s L4 checksum validation\n",
+		    en_rxcsum ? "enable" : "disable");
+		goto err_close_ni;
+	}
+
+	/* Setup checksums generation. */
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd, DPAA2_NI_OFL_TX_L3_CSUM,
+	    en_txcsum);
+	if (error) {
+		device_printf(dev, "Failed to %s L3 checksum generation\n",
+		    en_txcsum ? "enable" : "disable");
+		goto err_close_ni;
+	}
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, cmd, DPAA2_NI_OFL_TX_L4_CSUM,
+	    en_txcsum);
+	if (error) {
+		device_printf(dev, "Failed to %s L4 checksum generation\n",
+		    en_txcsum ? "enable" : "disable");
+		goto err_close_ni;
+	}
+
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	dpaa2_mcp_free_command(cmd);
+	return (0);
+
+err_close_ni:
+	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+err_exit:
+	return (error);
+}
+
+/**
+ * @internal
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
@@ -1487,8 +1546,6 @@ dpni_if_init(void *arg)
 	uint32_t link;
 	int error;
 
-	printf("%s: invoked\n", __func__);
-
 	dev = sc->dev;
 	pdev = device_get_parent(dev);
 	rcinfo = device_get_ivars(pdev);
@@ -1504,7 +1561,7 @@ dpni_if_init(void *arg)
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
-		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
+		printf("%s: failed to allocate dpaa2_cmd: error=%d\n", __func__,
 		    error);
 		return;
 	}
@@ -1512,21 +1569,21 @@ dpni_if_init(void *arg)
 	/* Open resource container and network interface object. */
 	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
 	if (error) {
-		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		printf("%s: failed to open DPRC: id=%d, error=%d\n", __func__,
 		    rcinfo->id, error);
 		goto err_free_cmd;
 	}
 	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(cmd, rc_token), dinfo->id,
 	    &ni_token);
 	if (error) {
-		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
+		printf("%s: failed to open DPNI: id=%d, error=%d\n", __func__,
 		    dinfo->id, error);
 		goto err_close_rc;
 	}
 
 	error = DPAA2_CMD_NI_ENABLE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
-		device_printf(dev, "Failed to enable DPNI: error=%d\n", error);
+		printf("%s: failed to enable DPNI: error=%d\n", __func__, error);
 		goto err_close_ni;
 	}
 
@@ -1539,13 +1596,19 @@ dpni_if_init(void *arg)
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 	DPNI_UNLOCK(sc);
 
+	/* Link between DPNI and another DPAA2 endpoint should be established. */
+	ep1_desc.obj_id = dinfo->id;
+	ep1_desc.if_id = 0; /* DPNI has the only endpoint */
+	ep1_desc.type = dinfo->dtype;
 	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_tk(cmd, rc_token),
 	    &ep1_desc, &ep2_desc, &link);
-	if (!error) {
-		device_printf(dev, "connected to %s (id=%d), DPAA2 link %s\n",
+	if (error)
+		printf("%s: failed to get DPAA2 link: error=%d\n", __func__,
+		    error);
+	else
+		printf("%s: connected to %s (id=%d), DPAA2 link %s\n", __func__,
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
 		    link ? "up" : "down");
-	}
 
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
@@ -1583,14 +1646,20 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *) data;
 	uint32_t changed = 0;
-	int rc = 0;
-
-#if 0
-	printf("%s: invoked: cmd=0x%lx, ifr_name=%s\n", __func__, cmd,
-	    ifr->ifr_name);
-#endif
+	int rc = 0, mtu;
 
 	switch (cmd) {
+	case SIOCSIFMTU:
+		DPNI_LOCK(sc);
+		mtu = ifr->ifr_mtu;
+
+		if (mtu < ETHERMIN || mtu > DPAA2_ETH_MTU)
+			return (EINVAL);
+
+		/* TODO: Update max. frame length according to the new MTU. */
+		ifp->if_mtu = mtu;
+		DPNI_UNLOCK(sc);
+		break;
 	case SIOCSIFCAP:
 		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
 		if (changed & IFCAP_HWCSUM) {
@@ -1598,6 +1667,12 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifp->if_capenable |= IFCAP_HWCSUM;
 			else
 				ifp->if_capenable &= ~IFCAP_HWCSUM;
+		}
+		rc = setup_if_caps(sc);
+		if (rc) {
+			printf("%s: Failed to update iface capabilities: "
+			    "error=%d\n", rc);
+			rc = ENXIO;
 		}
 		break;
 	case SIOCSIFFLAGS:
