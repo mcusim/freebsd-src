@@ -1670,7 +1670,7 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = setup_if_caps(sc);
 		if (rc) {
 			printf("%s: Failed to update iface capabilities: "
-			    "error=%d\n", rc);
+			    "error=%d\n", __func__, rc);
 			rc = ENXIO;
 		}
 		break;
