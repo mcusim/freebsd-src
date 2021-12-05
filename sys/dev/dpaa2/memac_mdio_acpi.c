@@ -119,6 +119,7 @@ static void
 memacphy_miibus_statchg(device_t dev)
 {
 	device_printf(dev, "statchg\n");
+	MIIBUS_STATCHG(device_get_parent(dev));
 }
 
 static device_method_t memacphy_acpi_methods[] = {
