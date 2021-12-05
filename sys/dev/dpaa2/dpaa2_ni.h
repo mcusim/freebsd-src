@@ -39,6 +39,7 @@
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
 #include "dpaa2_io.h"
+#include "dpaa2_mac.h"
 
 /* Name of the DPAA2 network interface. */
 #define DPAA2_NI_IFNAME		"dpaa2ni"
