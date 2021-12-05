@@ -210,6 +210,7 @@ static int	setup_if_caps(struct dpaa2_ni_softc *);
 static int	set_buf_layout(device_t, dpaa2_cmd_t);
 static int	set_pause_frame(device_t, dpaa2_cmd_t);
 static int	set_qos_table(device_t, dpaa2_cmd_t);
+static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 
 static int	dpni_ifmedia_change(struct ifnet *ifp);
 static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
@@ -612,12 +613,10 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 			 */
 			sc->mac.dpmac_id = ep2_desc.obj_id;
 
-			error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev,
-			    dpaa2_mcp_tk(cmd, ni_token), sc->mac.addr);
+			error = set_mac_addr(dev, cmd, rc_token, ni_token);
 			if (error)
-				device_printf(dev, "Failed to obtain a MAC "
-				    "address of the connected DPMAC: error=%d\n",
-				    error);
+				device_printf(dev, "Failed to set MAC address: "
+				    "error=%d\n", error);
 
 			error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev,
 			    sc->mac.dpmac_id);
@@ -1460,6 +1459,68 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	if (error) {
 		device_printf(dev, "Failed to clear QoS table\n");
 		return (error);
+	}
+
+	return (0);
+}
+
+static int
+set_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
+{
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct ifnet *ifp = sc->ifp;
+	struct ether_addr rnd_mac_addr;
+	uint8_t mac_addr[ETHER_ADDR_LEN];
+	uint8_t dpni_mac_addr[ETHER_ADDR_LEN];
+	int error;
+
+	/*
+	 * Get the MAC address associated with the physical port, if the DPNI is
+	 * connected to a DPMAC directly associated with one of the physical
+	 * ports.
+	 */
+	error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, dpaa2_mcp_tk(cmd, ni_token),
+	    mac_addr);
+	if (error) {
+		device_printf(dev, "Failed to obtain the MAC address "
+		    "associated with the physical port\n");
+		return (error);
+	}
+
+	/* Get primary MAC address from the DPNI attributes. */
+	error = DPAA2_CMD_NI_GET_PRIM_MAC_ADDR(dev, cmd, dpni_mac_addr);
+	if (error) {
+		device_printf(dev, "Failed to obtain primary MAC address\n");
+		return (error);
+	}
+
+	if (!ETHER_IS_ZERO(mac_addr)) {
+		/* Set MAC address of the physical port as DPNI's primary one. */
+		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
+		if (error) {
+			device_printf(dev, "Failed to set primary MAC "
+			    "address\n");
+			return (error);
+		}
+		for (int i = 0; i < ETHER_ADDR_LEN; i++)
+			sc->mac.addr[i] = mac_addr[i];
+	} else if (ETHER_IS_ZERO(dpni_mac_addr)) {
+		/* Generate random MAC address as DPNI's primary one. */
+		ether_gen_addr(ifp, &rnd_mac_addr);
+		for (int i = 0; i < ETHER_ADDR_LEN; i++)
+			mac_addr[i] = rnd_mac_addr.octet[i];
+
+		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
+		if (error) {
+			device_printf(dev, "Failed to set random primary MAC "
+			    "address\n");
+			return (error);
+		}
+		for (int i = 0; i < ETHER_ADDR_LEN; i++)
+			sc->mac.addr[i] = mac_addr[i];
+	} else {
+		for (int i = 0; i < ETHER_ADDR_LEN; i++)
+			sc->mac.addr[i] = dpni_mac_addr[i];
 	}
 
 	return (0);
