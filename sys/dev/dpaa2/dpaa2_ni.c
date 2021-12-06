@@ -530,6 +530,7 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 {
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *dinfo;
+	struct memacphy_softc *physc;
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
 	uint8_t eth_bca[ETHER_ADDR_LEN];
 	uint32_t link;
@@ -624,6 +625,10 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 			if (error == 0) {
 				device_printf(dev, "MAC PHY device is '%s'\n",
 				    device_get_nameunit(sc->mac.phy_dev));
+
+				/* Share DPNI software context with PHY. */
+				physc = device_get_softc(sc->mac.phy_dev);
+				physc->nisc = sc;
 
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
@@ -1661,34 +1666,6 @@ dpni_if_init(void *arg)
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 	DPNI_UNLOCK(sc);
-
-	/* Link between DPNI and another DPAA2 endpoint should be established. */
-	ep1_desc.obj_id = dinfo->id;
-	ep1_desc.if_id = 0; /* DPNI has the only endpoint */
-	ep1_desc.type = dinfo->dtype;
-	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_tk(cmd, rc_token),
-	    &ep1_desc, &ep2_desc, &link);
-	if (error)
-		printf("%s: failed to get DPAA2 link: error=%d\n", __func__,
-		    error);
-	else
-		printf("%s: connected to %s (id=%d), DPAA2 link %s\n", __func__,
-		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
-		    link ? "up" : "down");
-
-	/* Print DPNI link state. */
-	error = DPAA2_CMD_NI_GET_LINK_STATE(dev, dpaa2_mcp_tk(cmd, ni_token),
-	    &link_state);
-	if (error)
-		printf("%s: failed to get DPNI link state: error=%d\n", __func__,
-		    error);
-	else
-		printf("%s: DPNI link %s (%s): rate=%d, options=0x%lx, "
-		    "supported=0x%lx, advert=0x%lx\n", __func__,
-		    link_state.link_up ? "up" : "down",
-		    link_state.state_valid ? "valid" : "ignore",
-		    link_state.rate, link_state.options,
-		    link_state.sup_speeds, link_state.adv_speeds);
 
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));

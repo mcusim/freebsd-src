@@ -53,12 +53,21 @@ __FBSDID("$FreeBSD$");
 #include "acpi_bus_if.h"
 #include "miibus_if.h"
 
+#include "dpaa2_mc.h"
+#include "dpaa2_ni.h"
+#include "dpaa2_mcp.h"
+#include "dpaa2_swp.h"
+#include "dpaa2_mc_if.h"
+#include "dpaa2_swp_if.h"
+#include "dpaa2_cmd_if.h"
+
 /* -------------------------------------------------------------------------- */
 
 struct memacphy_softc {
-	int			uid;
-	uint64_t		phy_channel;
-	char			compatible[64];
+	int			 uid;
+	uint64_t		 phy_channel;
+	char			 compatible[64];
+	struct dpaa2_ni_softc	*nisc;
 };
 
 static int
@@ -116,10 +125,74 @@ memacphy_miibus_writereg(device_t dev, int phy, int reg, int data)
 }
 
 static void
-memacphy_miibus_statchg(device_t dev)
+memacphy_miibus_statchg(device_t phy_dev)
 {
-	device_printf(dev, "statchg\n");
-	MIIBUS_STATCHG(device_get_parent(dev));
+	device_t dev, pdev;
+	struct memacphy_softc *phy_sc = device_get_softc(phy_dev);
+	struct dpaa2_ni_softc *sc = sc->nisc;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_cmd_t cmd;
+	dpaa2_mac_link_state_t link_state = {0};
+	uint16_t rc_token, mac_token;
+	int error;
+
+	if (!sc)
+		goto err_exit;
+
+	dev = sc->dev;
+	pdev = device_get_parent(dev);
+	rcinfo = device_get_ivars(pdev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "Failed to allocate dpaa2_cmd\n");
+		goto err_exit;
+	}
+
+	/* Open resource container and DPMAC object. */
+	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
+		    rcinfo->id, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id, &mac_token);
+	if (error) {
+		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
+		    sc->mac.dpmac_id, error);
+		goto err_close_rc;
+	}
+
+	link_state.supported = sc->mii->mii_media_active;
+	link_state.advert = sc->mii->mii_media_active;
+	link_state.rate = 1000;
+	link_state.options =
+	    DPAA2_MAC_LINK_OPT_AUTONEG |
+	    DPAA2_MAC_LINK_OPT_PAUSE;
+	link_state.up = true;
+	link_state.state_valid = true;
+	error = DPAA2_CMD_MAC_SET_LINK_STATE(dev, cmd, &link_state);
+	if (error) {
+		device_printf(dev, "Failed to set DPMAC link state: id=%d, "
+		    "error=%d\n", sc->mac.dpmac_id, error);
+		goto err_close_mac;
+	}
+
+	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	dpaa2_mcp_free_command(cmd);
+	return (0);
+
+err_close_mac:
+	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+err_exit:
+	return;
 }
 
 static device_method_t memacphy_acpi_methods[] = {
