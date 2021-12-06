@@ -150,6 +150,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_PRIM_MAC_ADDR		CMD_NI(0x225)
 #define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
 #define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
+#define CMDID_NI_GET_LINK_STATE			CMD_NI(0x215)
 #define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
 #define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
 #define CMDID_NI_SET_POOLS			CMD_NI(0x200)
@@ -1603,6 +1604,45 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, dpaa2_cmd_t cmd,
 		cfg->rate = resp->rate;
 		cfg->options = resp->options;
 		cfg->adv_speeds = resp->adv_speeds;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_ni_get_link_state(device_t rcdev, dpaa2_cmd_t cmd,
+    dpaa2_ni_link_state_t *state)
+{
+	struct __packed link_state_resp {
+		uint32_t	_reserved1;
+		uint32_t	flags;
+		uint32_t	rate;
+		uint32_t	_reserved2;
+		uint64_t	options;
+		uint64_t	supported;
+		uint64_t	advert;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !state)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_LINK_STATE);
+	if (!error) {
+		resp = (struct link_state_resp *) &cmd->params[0];
+		state->options = resp->options;
+		state->adv_speeds = resp->advert;
+		state->sup_speeds = resp->supported;
+		state->rate = resp->rate;
+
+		state->link_up = resp->flags & 0x1u ? true : false;
+		state->state_valid = resp->flags & 0x2u ? true : false;
 	}
 
 	return (error);
@@ -3303,6 +3343,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_prim_mac_addr, dpaa2_rc_ni_get_prim_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_set_link_cfg,	dpaa2_rc_ni_set_link_cfg),
 	DEVMETHOD(dpaa2_cmd_ni_get_link_cfg,	dpaa2_rc_ni_get_link_cfg),
+	DEVMETHOD(dpaa2_cmd_ni_get_link_state,	dpaa2_rc_ni_get_link_state),
 	DEVMETHOD(dpaa2_cmd_ni_set_qos_table,	dpaa2_rc_ni_set_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_clear_qos_table, dpaa2_rc_ni_clear_qos_table),
 	DEVMETHOD(dpaa2_cmd_ni_set_pools,	dpaa2_rc_ni_set_pools),

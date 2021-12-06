@@ -303,6 +303,16 @@ CODE {
 		return (ENXIO);
 	}
 	static int
+	bypass_ni_get_link_state(device_t dev, dpaa2_cmd_t cmd,
+		dpaa2_ni_link_state_t *state)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_LINK_STATE(
+				device_get_parent(dev), cmd, state));
+		return (ENXIO);
+	}
+	static int
 	bypass_ni_get_port_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
 	{
 		panic_on_mc(dev);
@@ -893,6 +903,12 @@ METHOD int ni_get_link_cfg {
 	dpaa2_cmd_t	 cmd;
 	dpaa2_ni_link_cfg_t *cfg;
 } DEFAULT bypass_ni_get_link_cfg;
+
+METHOD int ni_get_link_state {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	dpaa2_ni_link_state_t *state;
+} DEFAULT bypass_ni_get_link_state;
 
 METHOD int ni_get_port_mac_addr {
 	device_t	 dev;
