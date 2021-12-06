@@ -1683,8 +1683,8 @@ dpni_if_init(void *arg)
 		printf("%s: failed to get DPNI link state: error=%d\n", __func__,
 		    error);
 	else
-		printf("%s: DPNI link %s (%s): rate=%d, options=0x%x, "
-		    "supported=0x%x, advert=0x%x\n", __func__,
+		printf("%s: DPNI link %s (%s): rate=%d, options=0x%lx, "
+		    "supported=0x%lx, advert=0x%lx\n", __func__,
 		    link_state.link_up ? "up" : "down",
 		    link_state.state_valid ? "valid" : "ignore",
 		    link_state.rate, link_state.options,
