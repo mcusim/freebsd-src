@@ -283,6 +283,111 @@ typedef struct dpaa2_ni_queue_cfg {
 } dpaa2_ni_queue_cfg_t;
 
 /**
+ * @brief Buffer layout attributes.
+ *
+ * pd_size:		Size kept for private data (in bytes, max. 64)
+ * fd_align:		Frame data alignment.
+ * head_size:		Data head room.
+ * tail_size:		Data tail room.
+ * options:		...
+ * pass_timestamp:	Timestamp is included in the buffer layout.
+ * pass_parser_result:	Parsing results are included in the buffer layout.
+ * pass_frame_status:	Frame status is included in the buffer layout.
+ * pass_sw_opaque:	SW annotation is activated.
+ * queue_type:		Type of a queue this configuration applies to.
+ */
+typedef struct {
+	uint16_t	pd_size;
+	uint16_t	fd_align;
+	uint16_t	head_size;
+	uint16_t	tail_size;
+	uint16_t	options;
+	bool		pass_timestamp;
+	bool		pass_parser_result;
+	bool		pass_frame_status;
+	bool		pass_sw_opaque;
+	enum dpaa2_ni_queue_type queue_type;
+} dpaa2_ni_buf_layout_t;
+
+/**
+ * @brief Buffer pools configuration for a network interface.
+ */
+typedef struct {
+	uint8_t		pools_num;
+	struct {
+		uint32_t bp_obj_id;
+		uint16_t buf_sz;
+		int	 backup_flag; /* 0 - regular pool, 1 - backup pool */
+	} pools[DPAA2_NI_MAX_POOLS];
+} dpaa2_ni_pools_cfg_t;
+
+/**
+ * @brief Errors behavior configuration for a network interface.
+ *
+ * err_mask:		The errors mask to configure.
+ * action:		Desired action for the errors selected in the mask.
+ * set_err_fas:		Set to true to mark the errors in frame annotation
+ * 			status (FAS); relevant for non-discard actions only.
+ */
+typedef struct {
+	uint32_t	err_mask;
+	enum dpaa2_ni_err_action action;
+	bool		set_err_fas;
+} dpaa2_ni_err_cfg_t;
+
+/**
+ * @brief Link configuration.
+ *
+ * options:	Mask of available options.
+ * adv_speeds:	Speeds that are advertised for autoneg.
+ * rate:	Rate in Mbps.
+ */
+typedef struct {
+	uint64_t	options;
+	uint64_t	adv_speeds;
+	uint32_t	rate;
+} dpaa2_ni_link_cfg_t;
+
+/**
+ * @brief Link state.
+ *
+ * options:	Mask of available options.
+ * adv_speeds:	Speeds that are advertised for autoneg.
+ * sup_speeds:	Speeds capability of the PHY.
+ * rate:	Rate in Mbps.
+ * link_up:	Link state (true if link is up, false otherwise).
+ * state_valid:	Ignore/Update the state of the link.
+ */
+typedef struct {
+	uint64_t	options;
+	uint64_t	adv_speeds;
+	uint64_t	sup_speeds;
+	uint32_t	rate;
+	bool		link_up;
+	bool		state_valid;
+} dpaa2_ni_link_state_t;
+
+/**
+ * @brief QoS table configuration.
+ *
+ * kcfg_busaddr:	Address of the buffer in I/O virtual address space which
+ *			holds the QoS table key configuration.
+ * default_tc:		Default traffic class to use in case of a lookup miss in
+ *			the QoS table.
+ * discard_on_miss:	Set to true to discard frames in case of no match.
+ *			Default traffic class will be used otherwise.
+ * keep_entries:	Set to true to keep existing QoS table entries. This
+ *			option will work properly only for DPNI objects created
+ *			with DPNI_OPT_HAS_KEY_MASKING option.
+ */
+typedef struct {
+	uint64_t	kcfg_busaddr;
+	uint8_t		default_tc;
+	bool		discard_on_miss;
+	bool		keep_entries;
+} dpaa2_ni_qos_table_t;
+
+/**
  * @brief Software context for the DPAA2 Network Interface driver.
  *
  * dev:		Device associated with this software context.

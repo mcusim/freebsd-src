@@ -1606,6 +1606,7 @@ dpni_if_init(void *arg)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
+	dpaa2_ni_link_state_t link_state;
 	dpaa2_cmd_t cmd;
 	uint16_t rc_token, ni_token;
 	uint32_t link;
@@ -1674,6 +1675,20 @@ dpni_if_init(void *arg)
 		printf("%s: connected to %s (id=%d), DPAA2 link %s\n", __func__,
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
 		    link ? "up" : "down");
+
+	/* Print DPNI link state. */
+	error = DPAA2_CMD_NI_GET_LINK_STATE(dev, dpaa2_mcp_tk(cmd, ni_token),
+	    &link_state);
+	if (error)
+		printf("%s: failed to get DPNI link state: error=%d\n", __func__,
+		    error);
+	else
+		printf("%s: DPNI link %s (%s): rate=%d, options=0x%x, "
+		    "supported=0x%x, advert=0x%x\n", __func__,
+		    link_state.link_up ? "up" : "down",
+		    link_state.state_valid ? "valid" : "ignore",
+		    link_state.rate, link_state.options,
+		    link_state.sup_speeds, link_state.adv_speeds);
 
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(cmd, ni_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
