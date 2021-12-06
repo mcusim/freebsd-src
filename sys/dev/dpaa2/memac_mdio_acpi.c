@@ -124,7 +124,6 @@ memacphy_miibus_statchg(device_t phy_dev)
 	struct memacphy_softc *phy_sc = device_get_softc(phy_dev);
 	struct dpaa2_ni_softc *sc = phy_sc->nisc;
 	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
 	dpaa2_mac_link_state_t link_state = {0};
 	uint16_t rc_token, mac_token;
