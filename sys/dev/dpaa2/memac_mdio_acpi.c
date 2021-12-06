@@ -63,13 +63,6 @@ __FBSDID("$FreeBSD$");
 
 /* -------------------------------------------------------------------------- */
 
-struct memacphy_softc {
-	int			 uid;
-	uint64_t		 phy_channel;
-	char			 compatible[64];
-	struct dpaa2_ni_softc	*nisc;
-};
-
 static int
 memacphy_acpi_probe(device_t dev)
 {
@@ -129,7 +122,7 @@ memacphy_miibus_statchg(device_t phy_dev)
 {
 	device_t dev, pdev;
 	struct memacphy_softc *phy_sc = device_get_softc(phy_dev);
-	struct dpaa2_ni_softc *sc = sc->nisc;
+	struct dpaa2_ni_softc *sc = phy_sc->nisc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	dpaa2_cmd_t cmd;
@@ -183,7 +176,7 @@ memacphy_miibus_statchg(device_t phy_dev)
 	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
 	dpaa2_mcp_free_command(cmd);
-	return (0);
+	return;
 
 err_close_mac:
 	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
