@@ -1610,11 +1610,8 @@ dpni_if_init(void *arg)
 	struct ifnet *ifp = sc->ifp;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
-	dpaa2_ep_desc_t ep1_desc, ep2_desc;
-	dpaa2_ni_link_state_t link_state;
 	dpaa2_cmd_t cmd;
 	uint16_t rc_token, ni_token;
-	uint32_t link;
 	int error;
 
 	dev = sc->dev;
