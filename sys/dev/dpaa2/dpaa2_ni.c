@@ -530,7 +530,6 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 {
 	struct dpaa2_ni_softc *sc;
 	struct dpaa2_devinfo *dinfo;
-	struct memacphy_softc *physc;
 	dpaa2_ep_desc_t ep1_desc, ep2_desc;
 	uint8_t eth_bca[ETHER_ADDR_LEN];
 	uint32_t link;
@@ -623,13 +622,10 @@ setup_dpni(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
 			error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev,
 			    sc->mac.dpmac_id);
 			if (error == 0) {
+#if 0
 				device_printf(dev, "MAC PHY device is '%s'\n",
 				    device_get_nameunit(sc->mac.phy_dev));
-
-				/* Share DPNI software context with PHY. */
-				physc = device_get_softc(sc->mac.phy_dev);
-				physc->nisc = sc;
-
+#endif
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
@@ -1562,18 +1558,17 @@ static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-
-#if 0
-	printf("%s: invoked\n", __func__);
-#endif
+	int active, status;
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
 		mii_pollstat(sc->mii);
-		ifmr->ifm_active = sc->mii->mii_media_active;
-		ifmr->ifm_status = sc->mii->mii_media_status;
+		ifmr->ifm_active = active = sc->mii->mii_media_active;
+		ifmr->ifm_status = status = sc->mii->mii_media_status;
 	}
 	DPNI_UNLOCK(sc);
+
+	printf("%s: active=0x%x, status=0x%x\n", __func__, active, status);
 }
 
 /**
