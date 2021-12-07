@@ -408,6 +408,7 @@ struct dpaa2_ni_softc {
 	uint16_t		 tx_data_off;
 	uint16_t		 tx_qdid;
 	uint32_t		 if_flags;
+	uint32_t		 link_options;
 	int			 link_state;
 
 	dpaa2_ni_attr_t		 attr;
@@ -444,12 +445,6 @@ struct dpaa2_ni_softc {
 		device_t	 phy_dev;
 		dpaa2_mac_link_state_t link_state;
 	} mac; /* Info about connected DPMAC (if exists) */
-
-	struct {
-		uint32_t	 rate;
-		uint64_t	 options;
-		bool		 up;
-	} link_state;
 };
 
 extern struct resource_spec dpaa2_ni_spec[];
