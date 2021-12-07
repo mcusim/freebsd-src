@@ -277,6 +277,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->media_status = 0;
 	sc->mac.dpmac_id = 0;
 	sc->if_flags = 0;
+	sc->link_state = LINK_STATE_UNKNOWN;
 
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
@@ -1536,10 +1537,6 @@ dpni_ifmedia_change(struct ifnet *ifp)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
-#if 0
-	printf("%s: invoked\n", __func__);
-#endif
-
 	DPNI_LOCK(sc);
 	if (sc->mii) {
 		mii_mediachg(sc->mii);
@@ -1557,19 +1554,92 @@ dpni_ifmedia_change(struct ifnet *ifp)
 static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
+	device_t pdev, dev;
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	int active = 0;
-	int status = 0;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	dpaa2_mac_link_state_t mac_link = {0};
+	dpaa2_cmd_t cmd;
+	uint16_t rc_token, mac_token;
+	int link_state = ifp->if_link_state;
+	int error;
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
 		mii_pollstat(sc->mii);
-		ifmr->ifm_active = active = sc->mii->mii_media_active;
-		ifmr->ifm_status = status = sc->mii->mii_media_status;
+		ifmr->ifm_active = sc->mii->mii_media_active;
+		ifmr->ifm_status = sc->mii->mii_media_status;
 	}
 	DPNI_UNLOCK(sc);
 
-	printf("%s: active=0x%x, status=0x%x\n", __func__, active, status);
+	if (link_state != sc->link_state) {
+		sc->link_state = link_state;
+
+		dev = sc->dev;
+		pdev = device_get_parent(dev);
+		rcinfo = device_get_ivars(pdev);
+
+		/* Allocate a command to send to MC hardware. */
+		error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+		if (error) {
+			device_printf(dev, "Failed to allocate dpaa2_cmd: "
+			    "error=%d\n", error);
+			goto err_exit;
+		}
+
+		/* Open resource container and DPMAC object. */
+		error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+		if (error) {
+			device_printf(dev, "Failed to open DPRC: id=%d, "
+			    "error=%d\n", rcinfo->id, error);
+			goto err_free_cmd;
+		}
+		error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id,
+		    &mac_token);
+		if (error) {
+			device_printf(dev, "Failed to open DPMAC: id=%d, "
+			    "error=%d\n", sc->mac.dpmac_id, error);
+			goto err_close_rc;
+		}
+
+		if (link_state == LINK_STATE_UP ||
+		    link_state == LINK_STATE_DOWN) {
+			/* Update DPMAC link state. */
+			link_state.supported = sc->mii->mii_media.ifm_media;
+			link_state.advert = sc->mii->mii_media.ifm_media;
+			link_state.rate = 1000;
+			link_state.options =
+			    DPAA2_MAC_LINK_OPT_AUTONEG |
+			    DPAA2_MAC_LINK_OPT_PAUSE;
+			link_state.up = link_state == LINK_STATE_UP
+			    ? true : false;
+			link_state.state_valid = true;
+
+			/* Inform DPMAC about link state. */
+			error = DPAA2_CMD_MAC_SET_LINK_STATE(dev, cmd,
+			    &link_state);
+			if (error) {
+				device_printf(dev, "Failed to set DPMAC link "
+				    "state: id=%d, error=%d\n", sc->mac.dpmac_id,
+				    error);
+				goto err_close_mac;
+			}
+		}
+		DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
+		DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+		dpaa2_mcp_free_command(cmd);
+	}
+
+	return;
+
+ err_close_mac:
+	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(cmd, mac_token));
+ err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+ err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+ err_exit:
+	return;
 }
 
 /**
