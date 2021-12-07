@@ -661,13 +661,10 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 	if (dinfo->msi.msi_alloc != 0)
 		return (ENXIO);
 
-	/*
-	 * TODO: Enable debug output via sysctl.
-	 */
-	/* if (bootverbose) */
-	/* 	device_printf(rcdev, */
-	/* 	    "Attempting to allocate %d MSI vector%s (%d supported)\n", */
-	/* 	    *count, *count > 1 ? "s" : "", dinfo->msi.msi_msgnum); */
+	if (bootverbose)
+		device_printf(rcdev,
+		    "Allocating %d MSI vector%s (%d supported)\n",
+		    *count, *count > 1 ? "s" : "", dinfo->msi.msi_msgnum);
 
 	/* Don't ask for more than the device supports. */
 	actual = min(*count, dinfo->msi.msi_msgnum);
