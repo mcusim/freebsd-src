@@ -662,7 +662,7 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 		return (ENXIO);
 
 	if (bootverbose)
-		device_printf(rcdev,
+		device_printf(child,
 		    "Allocating %d MSI vector%s (%d supported)\n",
 		    *count, *count > 1 ? "s" : "", dinfo->msi.msi_msgnum);
 
