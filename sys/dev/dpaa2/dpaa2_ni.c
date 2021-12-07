@@ -1605,19 +1605,18 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 		if (link_state == LINK_STATE_UP ||
 		    link_state == LINK_STATE_DOWN) {
 			/* Update DPMAC link state. */
-			link_state.supported = sc->mii->mii_media.ifm_media;
-			link_state.advert = sc->mii->mii_media.ifm_media;
-			link_state.rate = 1000;
-			link_state.options =
+			mac_link.supported = sc->mii->mii_media.ifm_media;
+			mac_link.advert = sc->mii->mii_media.ifm_media;
+			mac_link.rate = 1000;
+			mac_link.options =
 			    DPAA2_MAC_LINK_OPT_AUTONEG |
 			    DPAA2_MAC_LINK_OPT_PAUSE;
-			link_state.up = link_state == LINK_STATE_UP
-			    ? true : false;
-			link_state.state_valid = true;
+			mac_link.up = link_state == LINK_STATE_UP ? true : false;
+			mac_link.state_valid = true;
 
 			/* Inform DPMAC about link state. */
 			error = DPAA2_CMD_MAC_SET_LINK_STATE(dev, cmd,
-			    &link_state);
+			    &mac_link);
 			if (error) {
 				device_printf(dev, "Failed to set DPMAC link "
 				    "state: id=%d, error=%d\n", sc->mac.dpmac_id,
