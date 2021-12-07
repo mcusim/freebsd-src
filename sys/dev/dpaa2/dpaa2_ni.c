@@ -1557,7 +1557,6 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 	device_t pdev, dev;
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
 	dpaa2_mac_link_state_t mac_link = {0};
 	dpaa2_cmd_t cmd;
 	uint16_t rc_token, mac_token;
