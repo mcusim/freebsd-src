@@ -84,8 +84,10 @@ static struct resource_spec dpaa2_io_spec[] = {
 /* Forward declarations. */
 
 static int	setup_msi(struct dpaa2_io_softc *sc);
-static void	msi_intr(void *arg);
-static int	dpaa2_io_detach(device_t dev);
+
+/* ISRs */
+
+static void	dpio_msi_intr(void *arg);
 
 /*
  * Device interface.
@@ -97,6 +99,12 @@ dpaa2_io_probe(device_t dev)
 	/* DPIO device will be added by a parent resource container itself. */
 	device_set_desc(dev, "DPAA2 I/O");
 	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+dpaa2_io_detach(device_t dev)
+{
+	return (0);
 }
 
 static int
@@ -251,7 +259,7 @@ dpaa2_io_attach(device_t dev)
 		goto err_free_swp;
 	}
 	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, msi_intr, sc, &sc->intr)) {
+	    NULL, dpio_msi_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		goto err_free_swp;
 	}
@@ -265,12 +273,6 @@ dpaa2_io_attach(device_t dev)
  err_exit:
 	dpaa2_io_detach(dev);
 	return (ENXIO);
-}
-
-static int
-dpaa2_io_detach(device_t dev)
-{
-	return (0);
 }
 
 /*
@@ -348,7 +350,7 @@ setup_msi(struct dpaa2_io_softc *sc)
  * @brief DPAA2 I/O interrupt handler.
  */
 static void
-msi_intr(void *arg)
+dpio_msi_intr(void *arg)
 {
 	/* NOTE: Useless interrupt handler. */
 	printf("%s: invoked\n", __func__);
