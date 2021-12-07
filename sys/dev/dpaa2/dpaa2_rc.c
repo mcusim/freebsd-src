@@ -623,7 +623,8 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += print_dpaa2_type(rl, DPAA2_DEV_BP);
 	retval += print_dpaa2_type(rl, DPAA2_DEV_CON);
 
-	retval += printf(" at %s (id=%u)", dpaa2_ttos(dinfo->dtype), dinfo->id);
+	retval += printf(" at %s (id=%u, irqs=%u)", dpaa2_ttos(dinfo->dtype),
+	    dinfo->id, dinfo->msi.msi_msgnum);
 
 	retval += bus_print_child_domain(rcdev, child);
 	retval += bus_print_child_footer(rcdev, child);
@@ -662,9 +663,8 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 		return (ENXIO);
 
 	if (bootverbose)
-		device_printf(child,
-		    "Allocating %d MSI vector%s (%d supported)\n",
-		    *count, *count > 1 ? "s" : "", dinfo->msi.msi_msgnum);
+		device_printf(child, "Allocating %d of %d MSI%s\n",
+		    *count, dinfo->msi.msi_msgnum, *count > 1 ? "s" : "");
 
 	/* Don't ask for more than the device supports. */
 	actual = min(*count, dinfo->msi.msi_msgnum);
