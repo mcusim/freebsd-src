@@ -1384,7 +1384,7 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
 		return (error);
 	}
 
-	sc->link_state.options = link_cfg.options;
+	sc->link_options = link_cfg.options;
 
 	return (0);
 }
