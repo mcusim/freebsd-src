@@ -1558,7 +1558,8 @@ static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	int active, status;
+	int active = 0;
+	int status = 0;
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
