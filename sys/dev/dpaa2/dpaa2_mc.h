@@ -56,13 +56,6 @@
 /* An element in the queue of the managed DPAA2 devices. */
 struct dpaa2_mc_devinfo;
 
-struct memacphy_softc {
-	int			 uid;
-	uint64_t		 phy_channel;
-	char			 compatible[64];
-	struct dpaa2_ni_softc	*nisc;
-};
-
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.
  *
