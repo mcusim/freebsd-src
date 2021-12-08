@@ -973,7 +973,6 @@ setup_dpni_irqs(device_t dev)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	dpaa2_cmd_t cmd = sc->cmd;
-	uint16_t rc_token = sc->rc_token;
 	uint16_t ni_token = sc->ni_token;
 	int error;
 
