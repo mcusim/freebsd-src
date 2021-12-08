@@ -199,11 +199,11 @@ static int	setup_dpni(device_t dev);
 static int	setup_channels(device_t dev);
 static int	setup_frame_queues(device_t dev);
 static int	setup_dpni_binding(device_t dev);
+static int	setup_dpni_irqs(device_t dev);
 static int	setup_rx_distribution(device_t dev);
 static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
-static int	setup_dpni_irqs(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static int	setup_msi(struct dpaa2_ni_softc *);
 static int	setup_if_caps(struct dpaa2_ni_softc *);
 
@@ -717,7 +717,6 @@ setup_dpni_binding(device_t dev)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *bp_info;
 	dpaa2_cmd_t cmd = sc->cmd;
-	uint16_t rc_token = sc->rc_token;
 	uint16_t ni_token = sc->ni_token;
 	dpaa2_ni_pools_cfg_t pools_cfg;
 	dpaa2_ni_err_cfg_t err_cfg;
