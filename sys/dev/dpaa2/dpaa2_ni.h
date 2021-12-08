@@ -413,6 +413,11 @@ struct dpaa2_ni_softc {
 
 	dpaa2_ni_attr_t		 attr;
 
+	/* Help to send commands to MC. */
+	dpaa2_cmd_t		 cmd;
+	uint16_t		 rc_token;
+	uint16_t		 ni_token;
+
 	/* For network interface and miibus. */
 	struct ifnet		*ifp;
 	struct mtx		 lock;
