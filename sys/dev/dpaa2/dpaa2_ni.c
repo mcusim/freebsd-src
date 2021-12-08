@@ -79,12 +79,12 @@ __FBSDID("$FreeBSD$");
 #include "mdio_if.h"
 
 #include "dpaa2_mc.h"
-#include "dpaa2_ni.h"
+#include "dpaa2_mc_if.h"
 #include "dpaa2_mcp.h"
 #include "dpaa2_swp.h"
-#include "dpaa2_mc_if.h"
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
+#include "dpaa2_ni.h"
 
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
 
@@ -212,15 +212,15 @@ static int	set_pause_frame(device_t, dpaa2_cmd_t);
 static int	set_qos_table(device_t, dpaa2_cmd_t);
 static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 
-static void	dpni_if_init(void *arg);
-static void	dpni_if_start(struct ifnet *ifp);
-static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
-
 static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 
 /* Callbacks. */
+
+static void	dpni_if_init(void *arg);
+static void	dpni_if_start(struct ifnet *ifp);
+static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
 
 static int	dpni_ifmedia_change(struct ifnet *ifp);
 static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
@@ -396,125 +396,6 @@ err_exit:
 static int
 dpaa2_ni_detach(device_t dev)
 {
-	return (0);
-}
-
-/*
- * MII interface.
- */
-
-static int
-dpaa2_ni_miibus_readreg(device_t dev, int phy, int reg)
-{
-	device_t pdev;
-	struct dpaa2_ni_softc *sc;
-	struct dpaa2_devinfo *rcinfo;
-	dpaa2_cmd_t cmd;
-	uint16_t rc_token, mac_token;
-	uint16_t val = 0;
-	int error;
-
-	sc = device_get_softc(dev);
-	pdev = device_get_parent(dev);
-	rcinfo = device_get_ivars(pdev);
-
-	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-	if (error) {
-		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
-		    error);
-		return (0);
-	}
-
-	/* Open resource container and DPMAC object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
-	if (error) {
-		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
-		    rcinfo->id, error);
-		goto free_cmd;
-	}
-	error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id, &mac_token);
-	if (error) {
-		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
-		    sc->mac.dpmac_id, error);
-		goto close_rc;
-	}
-
-	/* Read PHY register. */
-	error = DPAA2_CMD_MAC_MDIO_READ(dev, cmd, phy, reg, &val);
-	if (error) {
-		device_printf(dev, "Failed to read PHY register: dpmac_id=%d, "
-		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
-		    phy, reg, error);
-		val = 0;
-	}
-
-	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
-	if (error)
-		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
-		    sc->mac.dpmac_id, error);
- close_rc:
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
-	if (error)
-		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
- free_cmd:
-	dpaa2_mcp_free_command(cmd);
-	return (val);
-}
-
-static int
-dpaa2_ni_miibus_writereg(device_t dev, int phy, int reg, int val)
-{
-	device_t pdev;
-	struct dpaa2_ni_softc *sc;
-	struct dpaa2_devinfo *rcinfo;
-	dpaa2_cmd_t cmd;
-	uint16_t rc_token, mac_token;
-	int error;
-
-	sc = device_get_softc(dev);
-	pdev = device_get_parent(dev);
-	rcinfo = device_get_ivars(pdev);
-
-	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-	if (error) {
-		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
-		    error);
-		return (0);
-	}
-
-	/* Open resource container and DPMAC object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
-	if (error) {
-		device_printf(dev, "Failed to open DPRC: id=%d, error=%d\n",
-		    rcinfo->id, error);
-		goto free_cmd;
-	}
-	error = DPAA2_CMD_MAC_OPEN(dev, cmd, sc->mac.dpmac_id, &mac_token);
-	if (error) {
-		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
-		    sc->mac.dpmac_id, error);
-		goto close_rc;
-	}
-
-	/* Write PHY register. */
-	error = DPAA2_CMD_MAC_MDIO_WRITE(dev, cmd, phy, reg, val);
-	if (error)
-		device_printf(dev, "Failed to write PHY register: dpmac_id=%d, "
-		    "phy=0x%x, reg=0x%x, error=%d\n", sc->mac.dpmac_id,
-		    phy, reg, error);
-
-	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
-	if (error)
-		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
-		    sc->mac.dpmac_id, error);
- close_rc:
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
-	if (error)
-		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
- free_cmd:
-	dpaa2_mcp_free_command(cmd);
 	return (0);
 }
 
@@ -1128,6 +1009,8 @@ setup_dpni_irqs(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token,
 		device_printf(dev, "Failed to set DPNI IRQ mask\n");
 		return (error);
 	}
+
+	/* Enable IRQ. */
 	error = DPAA2_CMD_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
 	if (error) {
 		device_printf(dev, "Failed to enable DPNI IRQ\n");
@@ -1948,11 +1831,6 @@ static device_method_t dpaa2_ni_methods[] = {
 	DEVMETHOD(device_probe,		dpaa2_ni_probe),
 	DEVMETHOD(device_attach,	dpaa2_ni_attach),
 	DEVMETHOD(device_detach,	dpaa2_ni_detach),
-
-	/* MII bus interface */
-	/* DEVMETHOD(miibus_readreg,	dpaa2_ni_miibus_readreg), */
-	/* DEVMETHOD(miibus_writereg,	dpaa2_ni_miibus_writereg), */
-	/* DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg), */
 
 	DEVMETHOD_END
 };
