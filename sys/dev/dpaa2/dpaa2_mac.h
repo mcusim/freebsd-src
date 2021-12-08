@@ -33,6 +33,8 @@
 #include <sys/bus.h>
 #include <sys/queue.h>
 
+#include <net/ethernet.h>
+
 #include "dpaa2_types.h"
 
 /* DPMAC link configuration options. */
