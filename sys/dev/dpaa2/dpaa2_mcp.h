@@ -34,7 +34,6 @@
 #include <sys/mutex.h>
 
 #include "dpaa2_types.h"
-#include "dpaa2_ni.h"
 #include "dpaa2_mac.h"
 
 /*
