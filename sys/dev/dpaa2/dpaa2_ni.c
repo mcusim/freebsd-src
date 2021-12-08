@@ -1403,8 +1403,8 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 		sc->link_state = link_state;
 		dev = sc->dev;
 
-		error = DPAA2_CMD_MAC_OPEN(dev, sc->cmd, sc->mac.dpmac_id,
-		    &mac_token);
+		error = DPAA2_CMD_MAC_OPEN(dev, dpaa2_mcp_tk(sc->cmd,
+		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
 		if (error) {
 			device_printf(dev, "Failed to open DPMAC: id=%d, "
 			    "error=%d\n", sc->mac.dpmac_id, error);
