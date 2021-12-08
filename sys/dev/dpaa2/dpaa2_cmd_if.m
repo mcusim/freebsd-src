@@ -464,6 +464,16 @@ CODE {
 				device_get_parent(dev), cmd, irq_idx, en));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint32_t *status)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_IRQ_STATUS(
+				device_get_parent(dev), cmd, irq_idx, status));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -1009,6 +1019,13 @@ METHOD int ni_set_irq_enable {
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_ni_set_irq_enable;
+
+METHOD int ni_get_irq_status {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	uint32_t	*status;
+} DEFAULT bypass_ni_get_irq_status;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
