@@ -662,10 +662,6 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 	if (dinfo->msi.msi_alloc != 0)
 		return (ENXIO);
 
-	if (bootverbose)
-		device_printf(child, "Allocating %d of %d MSI%s\n",
-		    *count, dinfo->msi.msi_msgnum, *count > 1 ? "s" : "");
-
 	/* Don't ask for more than the device supports. */
 	actual = min(*count, dinfo->msi.msi_msgnum);
 
@@ -699,16 +695,14 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 
 	if (bootverbose) {
 		if (actual == 1) {
-			/* TODO: Enable debug output via sysctl. */
-			/* device_printf(child, "Using IRQ %d for MSI\n", irqs[0]); */
+			device_printf(child, "Using IRQ %d for MSI\n", irqs[0]);
 		} else {
 			/*
 			 * Be fancy and try to print contiguous runs
 			 * of IRQ values as ranges.  'run' is true if
 			 * we are in a range.
 			 */
-			/* TODO: Enable debug output via sysctl. */
-			/* device_printf(child, "Using IRQs %d", irqs[0]); */
+			device_printf(child, "Using IRQs %d", irqs[0]);
 			run = 0;
 			for (i = 1; i < actual; i++) {
 				/* Still in a run? */
