@@ -218,18 +218,18 @@ MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc", "DPAA2 Resource Container");
  * response.
  */
 struct __packed dpaa2_obj {
-	uint32_t		 _reserved1;
-	uint32_t		 id;
-	uint16_t		 vendor;
-	uint8_t			 irq_count;
-	uint8_t			 reg_count;
-	uint32_t		 state;
-	uint16_t		 ver_major;
-	uint16_t		 ver_minor;
-	uint16_t		 flags;
-	uint16_t		 _reserved2;
-	uint8_t			 type[16];
-	uint8_t			 label[16];
+	uint32_t	_reserved1;
+	uint32_t	id;
+	uint16_t	vendor;
+	uint8_t		irq_count;
+	uint8_t		reg_count;
+	uint32_t	state;
+	uint16_t	ver_major;
+	uint16_t	ver_minor;
+	uint16_t	flags;
+	uint16_t	_reserved2;
+	uint8_t		type[16];
+	uint8_t		label[16];
 };
 
 /* Forward declarations. */
@@ -240,11 +240,6 @@ static int	add_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 static int	add_managed_child(struct dpaa2_rc_softc *sc, dpaa2_cmd_t cmd,
 		    const dpaa2_obj_t *obj);
 
-static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
-		    const uint16_t cmdid);
-static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
-
 static int	set_irq_enable(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
 		    const uint8_t irq_idx, const uint8_t enable,
 		    const uint16_t cmdid);
@@ -254,6 +249,13 @@ static int	add_dpaa2_res(device_t rcdev, device_t child,
 		    enum dpaa2_dev_type devtype, int *rid, int flags);
 static int	print_dpaa2_type(struct resource_list *rl,
 		    enum dpaa2_dev_type type);
+
+/* Utility routines to send commands to MC. */
+
+static int	exec_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd,
+		    const uint16_t cmdid);
+static void	send_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
+static int	wait_for_command(dpaa2_mcp_t portal, dpaa2_cmd_t cmd);
 static void	reset_cmd_params(dpaa2_cmd_t cmd);
 
 /*

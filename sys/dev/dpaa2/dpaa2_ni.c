@@ -66,15 +66,12 @@ __FBSDID("$FreeBSD$");
 #include <net/if_types.h>
 
 #include <dev/pci/pcivar.h>
-
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-
 #include <dev/mdio/mdio.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"
-
 #include "miibus_if.h"
 #include "mdio_if.h"
 
@@ -143,21 +140,22 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
-/*
- * Macros to calculate DPAA2 resource IDs.
- */
-/* DPIO resources */
+/* for DPIO resources */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
 #define IO_RES_NUM		(1u)
-/* DPBP resources */
+/* for DPBP resources */
 #define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
 #define BP_RES_NUM		(1u)
-/* DPCON resources */
+/* for DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
 #define CON_RES_NUM		(1u)
+/* for DPMCP resources */
+#define MCP_RID_OFF		(CON_RID_OFF + CON_RES_NUM)
+#define MCP_RID(rid)		((rid) + MCP_RID_OFF)
+#define MCP_RES_NUM		(1u)
 
 struct resource_spec dpaa2_ni_spec[] = {
 	/*
@@ -189,6 +187,13 @@ struct resource_spec dpaa2_ni_spec[] = {
 	/* { DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL }, */
 	/* { DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL }, */
  	/* { DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL }, */
+	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: One per DPNI. MC command portals (MCPs) are used to send
+	 * commands to, and receive responses from, the MC firmware.
+	 */
+	/* { DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE }, */
 
 	RESOURCE_SPEC_END
 };
