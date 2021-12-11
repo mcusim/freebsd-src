@@ -34,7 +34,7 @@ enum dpaa2_dev_type {
 	DPAA2_DEV_RC,		/* Resource Container (firmware bus) */
 	DPAA2_DEV_IO,		/* I/O object (to work with QBMan portal) */
 	DPAA2_DEV_NI,		/* Network Interface */
-	DPAA2_DEV_MCP,		/* MC portal configuration */
+	DPAA2_DEV_MCP,		/* MC portal */
 	DPAA2_DEV_BP,		/* Buffer Pool */
 	DPAA2_DEV_CON,		/* Concentrator */
 	DPAA2_DEV_MAC,		/* MAC object */
