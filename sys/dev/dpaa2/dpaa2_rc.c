@@ -63,8 +63,8 @@ __FBSDID("$FreeBSD$");
 
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
 #define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
-#define CMD_SPIN_TIMEOUT	10u	/* us */
-#define CMD_SPIN_ATTEMPTS	15u	/* max. 150 us */
+#define CMD_SPIN_TIMEOUT	1000u	/* us */
+#define CMD_SPIN_ATTEMPTS	150u	/* max. 150 ms */
 
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
@@ -332,7 +332,7 @@ dpaa2_rc_attach(device_t dev)
 		dinfo->dtype = DPAA2_DEV_RC;
 
 		/* Prepare helper portal object to send commands to MC. */
-		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
+		error = dpaa2_mcp_init_atomic(&sc->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF);
 		if (error) {
 			device_printf(dev, "Failed to initialize dpaa2_mcp: "

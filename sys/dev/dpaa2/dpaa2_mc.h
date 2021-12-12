@@ -158,11 +158,13 @@ struct dpaa2_devinfo {
 
 DECLARE_CLASS(dpaa2_mc_driver);
 
-/* For device interface */
+/* For device interface. */
+
 int dpaa2_mc_attach(device_t dev);
 int dpaa2_mc_detach(device_t dev);
 
-/* For bus interface */
+/* For bus interface. */
+
 struct resource * dpaa2_mc_alloc_resource(device_t mcdev, device_t child,
     int type, int *rid, rman_res_t start, rman_res_t end, rman_res_t count,
     u_int flags);
@@ -175,7 +177,8 @@ int dpaa2_mc_activate_resource(device_t mcdev, device_t child, int type,
 int dpaa2_mc_deactivate_resource(device_t mcdev, device_t child, int type,
     int rid, struct resource *r);
 
-/* For pseudo-pcib interface */
+/* For pseudo-pcib interface. */
+
 int dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs);
 int dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs);
@@ -184,7 +187,8 @@ int dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 int dpaa2_mc_get_id(device_t mcdev, device_t child, enum pci_id_type type,
     uintptr_t *id);
 
-/* For DPAA2 Management Complex bus driver interface */
+/* For DPAA2 MC bus interface. */
+
 int dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags);
 int dpaa2_mc_get_free_dev(device_t mcdev, device_t *dpaa2_dev,
     enum dpaa2_dev_type devtype);
