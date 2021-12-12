@@ -63,8 +63,8 @@ __FBSDID("$FreeBSD$");
 
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
 #define CMD_SLEEP_ATTEMPTS	150u	/* max. 150 ms */
-#define CMD_SPIN_TIMEOUT	1000u	/* us */
-#define CMD_SPIN_ATTEMPTS	150u	/* max. 150 ms */
+#define CMD_SPIN_TIMEOUT	100u	/* us */
+#define CMD_SPIN_ATTEMPTS	1500u	/* max. 150 ms */
 
 #define TYPE_LEN_MAX		16u
 #define LABEL_LEN_MAX		16u
