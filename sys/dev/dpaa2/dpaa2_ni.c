@@ -1606,8 +1606,6 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 static void
 dpni_msi_intr(void *arg)
 {
-	/* printf("%s: invoked\n", __func__); */
-
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	device_t dev = sc->dev;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
