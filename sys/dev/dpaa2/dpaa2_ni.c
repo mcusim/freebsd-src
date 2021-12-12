@@ -1389,7 +1389,6 @@ dpni_ifmedia_change(struct ifnet *ifp)
 static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
-	device_t dev;
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	dpaa2_mac_link_state_t mac_link = {0};
 	uint16_t mac_token;
@@ -1406,12 +1405,11 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 
 	if (link_state != sc->link_state) {
 		sc->link_state = link_state;
-		dev = sc->dev;
 
-		error = DPAA2_CMD_MAC_OPEN(dev, dpaa2_mcp_tk(sc->cmd,
+		error = DPAA2_CMD_MAC_OPEN(sc->dev, dpaa2_mcp_tk(sc->cmd,
 		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
 		if (error) {
-			device_printf(dev, "Failed to open DPMAC: id=%d, "
+			device_printf(sc->dev, "Failed to open DPMAC: id=%d, "
 			    "error=%d\n", sc->mac.dpmac_id, error);
 			goto err_exit;
 		}
@@ -1429,21 +1427,21 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 			mac_link.state_valid = true;
 
 			/* Inform DPMAC about link state. */
-			error = DPAA2_CMD_MAC_SET_LINK_STATE(dev, sc->cmd,
+			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, sc->cmd,
 			    &mac_link);
 			if (error) {
-				device_printf(dev, "Failed to set DPMAC link "
-				    "state: id=%d, error=%d\n", sc->mac.dpmac_id,
-				    error);
+				device_printf(sc->dev, "Failed to set DPMAC "
+				    "link state: id=%d, error=%d\n",
+				    sc->mac.dpmac_id, error);
 				goto err_close_mac;
 			}
 		}
-		DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, mac_token));
+		DPAA2_CMD_MAC_CLOSE(sc->dev, dpaa2_mcp_tk(sc->cmd, mac_token));
 	}
 	return;
 
  err_close_mac:
-	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, mac_token));
+	DPAA2_CMD_MAC_CLOSE(sc->dev, dpaa2_mcp_tk(sc->cmd, mac_token));
  err_exit:
 	return;
 }
