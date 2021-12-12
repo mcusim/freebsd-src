@@ -1606,26 +1606,26 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 static void
 dpni_msi_intr(void *arg)
 {
-	printf("%s: invoked\n", __func__);
+	/* printf("%s: invoked\n", __func__); */
 
-	/* struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg; */
-	/* device_t dev = sc->dev; */
-	/* uint32_t status = ~0u; /\* clear all IRQ status bits *\/ */
-	/* int error; */
+	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+	device_t dev = sc->dev;
+	uint32_t status = ~0u; /* clear all IRQ status bits */
+	int error;
 
-	/* error = DPAA2_CMD_NI_GET_IRQ_STATUS(dev, dpaa2_mcp_tk(sc->cmd, */
-	/*     sc->ni_token), DPNI_IRQ_INDEX, &status); */
-	/* if (error) { */
-	/* 	device_printf(dev, "Failed to obtain IRQ status: error=%d\n", */
-	/* 	    error); */
-	/* 	return; */
-	/* } */
+	error = DPAA2_CMD_NI_GET_IRQ_STATUS(dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->ni_token), DPNI_IRQ_INDEX, &status);
+	if (error) {
+		device_printf(dev, "Failed to obtain IRQ status: error=%d\n",
+		    error);
+		return;
+	}
 
-	/* if (status & DPNI_IRQ_LINK_CHANGED) */
-	/* 	printf("%s: link state changed\n", __func__); */
+	if (status & DPNI_IRQ_LINK_CHANGED)
+		printf("%s: link state changed\n", __func__);
 
-	/* if (status & DPNI_IRQ_EP_CHANGED) */
-	/* 	printf("%s: endpoint changed\n", __func__); */
+	if (status & DPNI_IRQ_EP_CHANGED)
+		printf("%s: endpoint changed\n", __func__);
 }
 
 /**
