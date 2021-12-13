@@ -36,6 +36,7 @@
 #include <net/ethernet.h>
 
 #include "dpaa2_types.h"
+#include "dpaa2_mcp.h"
 
 #define DPAA2_MAC_MSI_COUNT	1  /* MSIs per DPMAC */
 
