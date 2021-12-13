@@ -1110,7 +1110,7 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 		    en_allmulti ? "TRUE" : "FALSE");
 
 	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->ni_token), en_allmulti);
+	    sc->ni_token), en_promisc ? true : en_allmulti);
 	if (error) {
 		device_printf(dev, "Failed to %s multicast promiscuous mode\n",
 		    en_allmulti ? "enable" : "disable");
