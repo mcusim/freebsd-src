@@ -37,6 +37,8 @@
 
 #include "dpaa2_types.h"
 
+#define DPAA2_MAC_MSI_COUNT	1  /* MSIs per DPMAC */
+
 /* DPMAC link configuration options. */
 #define DPAA2_MAC_LINK_OPT_AUTONEG	((uint64_t) 0x01u)
 #define DPAA2_MAC_LINK_OPT_HALF_DUPLEX	((uint64_t) 0x02u)
@@ -103,6 +105,16 @@ struct dpaa2_mac_softc {
 	device_t		 dev;
 	uint8_t			 addr[ETHER_ADDR_LEN];
 	dpaa2_mac_attr_t	 attr;
+
+	/* Help to send commands to MC. */
+	dpaa2_cmd_t		 cmd;
+	uint16_t		 rc_token;
+	uint16_t		 mac_token;
+
+	/* Interrupts. */
+	int			 irq_rid[DPAA2_MAC_MSI_COUNT];
+	struct resource		*irq_res;
+	void			*intr; /* interrupt handle */
 };
 
 #endif /* _DPAA2_MAC_H */

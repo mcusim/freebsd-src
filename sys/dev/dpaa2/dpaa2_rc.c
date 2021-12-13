@@ -194,6 +194,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
 #define CMDID_MAC_GET_ATTR			CMD_MAC(0x004)
 #define CMDID_MAC_SET_LINK_STATE		CMD_MAC_V2(0x0C3)
+#define CMDID_MAC_SET_IRQ_MASK			CMD_MAC(0x014)
+#define CMDID_MAC_SET_IRQ_ENABLE		CMD_MAC(0x012)
 
 /* ------------------------- DPCON command IDs ------------------------------ */
 #define CMD_CON_BASE_VERSION	1
@@ -2551,6 +2553,62 @@ dpaa2_rc_mac_set_link_state(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_mac_set_irq_mask(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint32_t mask)
+{
+	/*
+	 * TODO: Implementation is the same as for ni_set_irq_mask().
+	 */
+	struct __packed set_irq_mask_args {
+		uint32_t	mask;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_mask_args *) &cmd->params[0];
+	args->mask = mask;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_SET_IRQ_MASK));
+}
+
+static int
+dpaa2_rc_mac_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    bool en)
+{
+	/*
+	 * TODO: Implementation is the same as for ni_set_irq_enable().
+	 */
+	struct __packed set_irq_enable_args {
+		uint32_t	en;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_enable_args *) &cmd->params[0];
+	args->en = en ? 1u : 0u;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_MAC_SET_IRQ_ENABLE));
+}
+
+static int
 dpaa2_rc_con_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
     uint16_t *token)
 {
@@ -3409,6 +3467,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mac_get_addr,	dpaa2_rc_mac_get_addr),
 	DEVMETHOD(dpaa2_cmd_mac_get_attributes, dpaa2_rc_mac_get_attributes),
 	DEVMETHOD(dpaa2_cmd_mac_set_link_state,	dpaa2_rc_mac_set_link_state),
+	DEVMETHOD(dpaa2_cmd_mac_set_irq_mask,	dpaa2_rc_mac_set_irq_mask),
+	DEVMETHOD(dpaa2_cmd_mac_set_irq_enable,	dpaa2_rc_mac_set_irq_enable),
 	/*	DPCON commands */
 	DEVMETHOD(dpaa2_cmd_con_open,		dpaa2_rc_con_open),
 	DEVMETHOD(dpaa2_cmd_con_close,		dpaa2_rc_con_close),
