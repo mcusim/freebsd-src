@@ -165,6 +165,8 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_IRQ_MASK			CMD_NI(0x014)
 #define CMDID_NI_SET_IRQ_ENABLE			CMD_NI(0x012)
 #define CMDID_NI_GET_IRQ_STATUS			CMD_NI(0x016)
+#define CMDID_NI_SET_UNI_PROMISC		CMD_NI(0x222)
+#define CMDID_NI_SET_MULTI_PROMISC		CMD_NI(0x220)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
