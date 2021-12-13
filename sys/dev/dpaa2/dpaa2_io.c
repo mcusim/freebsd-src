@@ -342,6 +342,7 @@ setup_dpio_irqs(device_t dev)
 		return (ENXIO);
 	}
 
+#if 0
 	/* Unmask all DPIO interrupts. */
 	error = DPAA2_CMD_IO_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, io_token),
 	    DPIO_IRQ_INDEX, 0xFFFFFFFFu);
@@ -356,6 +357,7 @@ setup_dpio_irqs(device_t dev)
 		device_printf(dev, "Failed to enable IRQ\n");
 		return (error);
 	}
+#endif
 
 	return (0);
 }
@@ -391,6 +393,7 @@ setup_msi(struct dpaa2_io_softc *sc)
 static void
 dpio_msi_intr(void *arg)
 {
+#if 0
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
 	int error;
@@ -402,8 +405,8 @@ dpio_msi_intr(void *arg)
 		    error);
 		return;
 	}
-
-	printf("%s: status=0x%x\n", __func__, status);
+#endif
+	printf("%s: invoked\n", __func__);
 }
 
 static device_method_t dpaa2_io_methods[] = {
