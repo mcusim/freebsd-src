@@ -94,11 +94,6 @@ enum dpaa2_rc_region_type {
 	DPAA2_RC_REG_QBMAN_PORTAL
 };
 
-enum dpaa2_io_chan_mode {
-	DPAA2_IO_NO_CHANNEL,
-	DPAA2_IO_LOCAL_CHANNEL
-};
-
 /**
  * @brief Helper object to interact with the MC portal.
  *
@@ -216,28 +211,6 @@ typedef struct {
 	uint32_t	flags;
 	enum dpaa2_rc_region_type type;
 } dpaa2_rc_obj_region_t;
-
-/**
- * @brief Attributes of the DPIO object.
- *
- * swp_ce_paddr: Physical address of the software portal cache-enabled area.
- * swp_ci_paddr: Physical address of the software portal cache-inhibited area.
- * swp_version:	 Hardware IP version of the software portal.
- * id:		 DPIO object ID.
- * swp_id:	 Software portal ID.
- * priors_num:	 Number of priorities for the notification channel (1-8);
- *		 relevant only if channel mode is "local channel".
- * chan_mode:	 Notification channel mode.
- */
-typedef struct {
-	uint64_t	swp_ce_paddr;
-	uint64_t	swp_ci_paddr;
-	uint32_t	swp_version;
-	uint32_t	id;
-	uint16_t	swp_id;
-	uint8_t		priors_num;
-	enum dpaa2_io_chan_mode chan_mode;
-} dpaa2_io_attr_t;
 
 /**
  * @brief Attributes of the DPBP object.
