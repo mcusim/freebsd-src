@@ -214,6 +214,7 @@ static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
 static int	setup_msi(struct dpaa2_ni_softc *);
 static int	setup_if_caps(struct dpaa2_ni_softc *);
+static int	setup_if_flags(struct dpaa2_ni_softc *);
 
 static int	set_buf_layout(device_t, dpaa2_cmd_t);
 static int	set_pause_frame(device_t, dpaa2_cmd_t);
@@ -1093,6 +1094,36 @@ setup_if_caps(struct dpaa2_ni_softc *sc)
 
 /**
  * @internal
+ * @brief Update DPNI according to the updated interface flags.
+ */
+static int
+setup_if_flags(struct dpaa2_ni_softc *sc)
+{
+	const bool en_promisc = sc->ifp->if_flags & IFF_PROMISC;
+	const bool en_allmulti = sc->ifp->if_flags & IFF_ALLMULTI;
+	device_t dev = sc->dev;
+	int error;
+
+	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->ni_token), en_allmulti);
+	if (error) {
+		device_printf(dev, "Failed to %s multicast promiscuous mode\n",
+		    en_allmulti ? "enable" : "disable");
+		return (error);
+	}
+
+	error = DPAA2_CMD_NI_SET_UNI_PROMISC(dev, sc->cmd, en_promisc);
+	if (error) {
+		device_printf(dev, "Failed to %s unicast promiscuous mode\n",
+		    en_promisc ? "enable" : "disable");
+		return (error);
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
@@ -1558,26 +1589,29 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				changed = ifp->if_flags ^ sc->if_flags;
-				printf("%s: SIOCSIFFLAGS: up and running"
-				    "(changed=0x%x)\n", __func__, changed);
 
-				if (changed & IFF_PROMISC) {
-					/* dpni_set_promisc(sc, */
-					/*     ifp->if_flags & IFF_PROMISC); */
-				}
-				if (changed & IFF_ALLMULTI) {
-					/* dpni_set_allmulti(sc, */
-					/*     ifp->if_flags & IFF_ALLMULTI); */
+				if (bootverbose)
+					printf("%s: SIOCSIFFLAGS: up and "
+					    "running (changed=0x%x)\n",
+					    __func__, changed);
+
+				if (changed & IFF_PROMISC ||
+				    changed & IFF_ALLMULTI) {
+					rc = setup_if_flags(sc);
 				}
 			} else {
 				DPNI_UNLOCK(sc);
-				printf("%s: SIOCSIFFLAGS: starting up\n",
-				    __func__);
+				if (bootverbose) {
+					printf("%s: SIOCSIFFLAGS: starting up\n",
+					    __func__);
+				}
 				dpni_if_init(sc);
 				DPNI_LOCK(sc);
 			}
 		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			printf("%s: SIOCSIFFLAGS: shutting down\n", __func__);
+			if (bootverbose)
+				printf("%s: SIOCSIFFLAGS: shutting down\n",
+				    __func__);
 			/* dpni_if_stop(sc); */
 		}
 
