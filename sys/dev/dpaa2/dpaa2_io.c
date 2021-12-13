@@ -320,6 +320,11 @@ dpaa2_io_conf_wq_channel(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
 static int
 setup_dpio_irqs(device_t dev)
 {
+	struct dpaa2_io_softc *sc = device_get_softc(dev);
+	dpaa2_cmd_t cmd = sc->cmd;
+	uint16_t io_token = sc->io_token;
+	int error;
+
 	/* Configure IRQs. */
 	error = setup_msi(sc);
 	if (error) {
