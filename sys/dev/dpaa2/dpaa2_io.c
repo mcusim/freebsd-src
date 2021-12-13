@@ -65,6 +65,9 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
+/* Index of the only DPIO IRQ. */
+#define DPIO_IRQ_INDEX		0
+
 /*
  * Memory:
  *	0: cache-enabled part of the QBMan software portal.

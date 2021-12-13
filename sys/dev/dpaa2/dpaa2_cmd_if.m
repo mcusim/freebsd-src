@@ -549,6 +549,36 @@ CODE {
 				device_get_parent(dev), cmd, attr));
 		return (ENXIO);
 	}
+	static int
+	bypass_io_set_irq_mask(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint32_t mask)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_SET_IRQ_MASK(
+				device_get_parent(dev), cmd, irq_idx, mask));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint32_t *status)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_GET_IRQ_STATUS(
+				device_get_parent(dev), cmd, irq_idx, status));
+		return (ENXIO);
+	}
+	static int
+	bypass_io_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		bool en)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_SET_IRQ_ENABLE(
+				device_get_parent(dev), cmd, irq_idx, en));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_bp_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
@@ -1123,6 +1153,27 @@ METHOD int io_get_attributes {
 	dpaa2_cmd_t	 cmd;
 	dpaa2_io_attr_t	*attr;
 } DEFAULT bypass_io_get_attributes;
+
+METHOD int io_set_irq_mask {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	uint32_t	 mask;
+} DEFAULT bypass_io_set_irq_mask;
+
+METHOD int io_get_irq_status {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	uint32_t	*status;
+} DEFAULT bypass_io_get_irq_status;
+
+METHOD int io_set_irq_enable {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	bool		 en;
+} DEFAULT bypass_io_set_irq_enable;
 
 /**
  * @brief Data Path Buffer Pool (DPBP) commands.

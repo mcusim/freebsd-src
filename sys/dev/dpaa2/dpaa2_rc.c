@@ -125,6 +125,9 @@ __FBSDID("$FreeBSD$");
 #define CMDID_IO_DISABLE			CMD_IO(0x003)
 #define CMDID_IO_GET_ATTR			CMD_IO(0x004)
 #define CMDID_IO_RESET				CMD_IO(0x005)
+#define CMDID_IO_SET_IRQ_ENABLE			CMD_IO(0x012)
+#define CMDID_IO_SET_IRQ_MASK			CMD_IO(0x014)
+#define CMDID_IO_GET_IRQ_STATUS			CMD_IO(0x016)
 
 /* ------------------------- DPNI command IDs ------------------------------- */
 #define CMD_NI_BASE_VERSION	1
@@ -2275,6 +2278,100 @@ dpaa2_rc_io_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 }
 
 static int
+dpaa2_rc_io_set_irq_mask(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint32_t mask)
+{
+	/*
+	 * TODO: Extract similar *_set_irq_mask() into one function.
+	 */
+	struct __packed set_irq_mask_args {
+		uint32_t	mask;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_mask_args *) &cmd->params[0];
+	args->mask = mask;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_SET_IRQ_MASK));
+}
+
+static int
+dpaa2_rc_io_get_irq_status(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint32_t *status)
+{
+	/*
+	 * TODO: Extract similar *_get_irq_status() into one function.
+	 */
+	struct __packed get_irq_stat_args {
+		uint32_t	status;
+		uint8_t		irq_idx;
+	} *args;
+	struct __packed get_irq_stat_resp {
+		uint32_t	status;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !status)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct get_irq_stat_args *) &cmd->params[0];
+	args->status = *status;
+	args->irq_idx = irq_idx;
+
+	error = exec_command(sc->portal, cmd, CMDID_IO_GET_IRQ_STATUS);
+	if (!error) {
+		resp = (struct get_irq_stat_resp *) &cmd->params[0];
+		*status = resp->status;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_io_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    bool en)
+{
+	/*
+	 * TODO: Extract similar *_set_irq_enable() into one function.
+	 */
+	struct __packed set_irq_enable_args {
+		uint32_t	en;
+		uint8_t		irq_idx;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_irq_enable_args *) &cmd->params[0];
+	args->en = en ? 1u : 0u;
+	args->irq_idx = irq_idx;
+
+	return (exec_command(sc->portal, cmd, CMDID_IO_SET_IRQ_ENABLE));
+}
+
+static int
 dpaa2_rc_bp_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
     uint16_t *token)
 {
@@ -3542,6 +3639,9 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_io_disable,		dpaa2_rc_io_disable),
 	DEVMETHOD(dpaa2_cmd_io_reset,		dpaa2_rc_io_reset),
 	DEVMETHOD(dpaa2_cmd_io_get_attributes,	dpaa2_rc_io_get_attributes),
+	DEVMETHOD(dpaa2_cmd_io_set_irq_mask,	dpaa2_rc_io_set_irq_mask),
+	DEVMETHOD(dpaa2_cmd_io_get_irq_status,	dpaa2_rc_io_get_irq_status),
+	DEVMETHOD(dpaa2_cmd_io_set_irq_enable,	dpaa2_rc_io_set_irq_enable),
 	/*	DPBP commands */
 	DEVMETHOD(dpaa2_cmd_bp_open,		dpaa2_rc_bp_open),
 	DEVMETHOD(dpaa2_cmd_bp_close,		dpaa2_rc_bp_close),
