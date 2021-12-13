@@ -63,10 +63,27 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
+/* Index of the only DPMAC IRQ. */
+#define DPMAC_IRQ_INDEX		0
+
+/* DPMAC IRQ statuses. */
+#define DPMAC_IRQ_LINK_CFG_REQ	0x00000001 /* change in requested link config. */
+#define DPMAC_IRQ_LINK_CHANGED	0x00000002 /* link state changed */
+#define DPMAC_IRQ_LINK_UP_REQ	0x00000004 /* link up request */
+#define DPMAC_IRQ_LINK_DOWN_REQ	0x00000008 /* link down request */
+#define DPMAC_IRQ_EP_CHANGED	0x00000010 /* DPAA2 endpoint dis/connected */
+
 /* Forward declarations. */
 
-static const char *etf_if_to_str(enum dpaa2_mac_eth_if);
+static int	setup_dpmac_irqs(device_t);
+static int	setup_msi(struct dpaa2_mac_softc *);
+
+static const char *ethif_to_str(enum dpaa2_mac_eth_if);
 static const char *link_type_to_str(enum dpaa2_mac_link_type);
+
+/* ISRs */
+
+static void	dpmac_msi_intr(void *arg);
 
 /*
  * Device interface.
@@ -88,8 +105,6 @@ dpaa2_mac_attach(device_t dev)
 	struct dpaa2_mac_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
-	uint16_t rc_token, mac_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -98,10 +113,11 @@ dpaa2_mac_attach(device_t dev)
 	rcsc = device_get_softc(pdev);
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
+
 	memset(sc->addr, 0, ETHER_ADDR_LEN);
 
 	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
 	if (error) {
 		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
 		    error);
@@ -109,25 +125,25 @@ dpaa2_mac_attach(device_t dev)
 	}
 
 	/* Open resource container and DPMAC object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_MAC_OPEN(dev, cmd, dinfo->id, &mac_token);
+	error = DPAA2_CMD_MAC_OPEN(dev, sc->cmd, dinfo->id, &sc->mac_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
 
-	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, cmd, &sc->attr);
+	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPMAC attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_mac;
 	}
-	error = DPAA2_CMD_MAC_GET_ADDR(dev, cmd, sc->addr);
+	error = DPAA2_CMD_MAC_GET_ADDR(dev, sc->cmd, sc->addr);
 	if (error)
 		device_printf(dev, "Failed to get physical address: error=%d\n",
 		    error);
@@ -137,34 +153,41 @@ dpaa2_mac_attach(device_t dev)
 	if (bootverbose) {
 		device_printf(dev, "ether %6D\n", sc->addr, ":");
 		device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n",
-		    sc->attr.max_rate, etf_if_to_str(sc->attr.eth_if),
+		    sc->attr.max_rate, ethif_to_str(sc->attr.eth_if),
 		    link_type_to_str(sc->attr.link_type));
 	}
 
-	/* Close the DPMAC object and the resource container. */
-	error = DPAA2_CMD_MAC_CLOSE(dev, cmd);
+	error = setup_dpmac_irqs(dev);
 	if (error) {
-		device_printf(dev, "Failed to close DPMAC: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
-	if (error) {
-		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
-		goto err_free_cmd;
+		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
+		goto err_close_mac;
 	}
 
 	return (0);
 
- err_free_cmd:
-	dpaa2_mcp_free_command(cmd);
- err_exit:
+err_close_mac:
+	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(sc->cmd);
+err_exit:
 	return (ENXIO);
 }
 
 static int
 dpaa2_mac_detach(device_t dev)
 {
+	struct dpaa2_mac_softc *sc = device_get_softc(dev);
+
+	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	dpaa2_mcp_free_command(sc->cmd);
+
+	sc->cmd = NULL;
+	sc->rc_token = 0;
+	sc->mac_token = 0;
+
 	return (0);
 }
 
@@ -172,8 +195,116 @@ dpaa2_mac_detach(device_t dev)
  * Internal functions.
  */
 
+/**
+ * @internal
+ * @brief Configure DPMAC object to generate interrupts.
+ */
+static int
+setup_dpmac_irqs(device_t dev)
+{
+	struct dpaa2_mac_softc *sc = device_get_softc(dev);
+	dpaa2_cmd_t cmd = sc->cmd;
+	uint16_t mac_token = sc->mac_token;
+	uint32_t irq_mask;
+	int error;
+
+	/* Configure IRQs. */
+	error = setup_msi(sc);
+	if (error) {
+		device_printf(dev, "Failed to allocate MSI\n");
+		return (error);
+	}
+	if ((sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
+		device_printf(dev, "Failed to allocate IRQ resource\n");
+		return (ENXIO);
+	}
+	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, dpmac_msi_intr, sc, &sc->intr)) {
+		device_printf(dev, "Failed to setup IRQ resource\n");
+		return (ENXIO);
+	}
+
+	/* Configure DPNI to generate interrupts. */
+	irq_mask =
+	    DPMAC_IRQ_LINK_CFG_REQ |
+	    DPMAC_IRQ_LINK_CHANGED |
+	    DPMAC_IRQ_LINK_UP_REQ |
+	    DPMAC_IRQ_LINK_DOWN_REQ |
+	    DPMAC_IRQ_EP_CHANGED;
+	error = DPAA2_CMD_MAC_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, mac_token),
+	    DPMAC_IRQ_INDEX, irq_mask);
+	if (error) {
+		device_printf(dev, "Failed to set IRQ mask\n");
+		return (error);
+	}
+
+	/* Enable IRQ. */
+	error = DPAA2_CMD_MAC_SET_IRQ_ENABLE(dev, cmd, DPMAC_IRQ_INDEX, true);
+	if (error) {
+		device_printf(dev, "Failed to enable IRQ\n");
+		return (error);
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Allocate MSI interrupts for DPMAC.
+ */
+static int
+setup_msi(struct dpaa2_mac_softc *sc)
+{
+	int val;
+
+	val = pci_msi_count(sc->dev);
+	if (val < DPAA2_MAC_MSI_COUNT)
+		device_printf(sc->dev, "MSI: actual=%d, expected=%d\n", val,
+		    DPAA2_MAC_MSI_COUNT);
+	val = MIN(val, DPAA2_MAC_MSI_COUNT);
+
+	if (pci_alloc_msi(sc->dev, &val) != 0)
+		return (EINVAL);
+
+	for (int i = 0; i < val; i++)
+		sc->irq_rid[i] = i + 1;
+
+	return (0);
+}
+
+/**
+ * @internal
+ */
+static void
+dpmac_msi_intr(void *arg)
+{
+	struct dpaa2_mac_softc *sc = (struct dpaa2_mac_softc *) arg;
+	uint32_t status = ~0u; /* clear all IRQ status bits */
+	int error;
+
+	error = DPAA2_CMD_MAC_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->mac_token), DPNI_IRQ_INDEX, &status);
+	if (error) {
+		device_printf(sc->dev, "Failed to obtain IRQ status: "
+		    "error=%d\n", error);
+		return;
+	}
+
+	printf("%s: invoked\n", __func__);
+
+	if (status & DPMAC_IRQ_LINK_CHANGED)
+		printf("%s: link state changed\n", __func__);
+
+	if (status & DPMAC_IRQ_EP_CHANGED)
+		printf("%s: endpoint changed\n", __func__);
+}
+
+/**
+ * @internal
+ */
 static const char *
-etf_if_to_str(enum dpaa2_mac_eth_if eth_if)
+ethif_to_str(enum dpaa2_mac_eth_if eth_if)
 {
 	switch (eth_if) {
 	case DPAA2_MAC_ETH_IF_MII:
@@ -205,6 +336,9 @@ etf_if_to_str(enum dpaa2_mac_eth_if eth_if)
 	}
 }
 
+/**
+ * @internal
+ */
 static const char *
 link_type_to_str(enum dpaa2_mac_link_type link_type)
 {
