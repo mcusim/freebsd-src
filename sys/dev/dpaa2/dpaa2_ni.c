@@ -1104,6 +1104,11 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 	device_t dev = sc->dev;
 	int error;
 
+	if (bootverbose)
+		printf("%s: promisc=%s, allmulti=%s\n", __func__,
+		    en_promisc ? "TRUE" : "FALSE",
+		    en_allmulti ? "TRUE" : "FALSE");
+
 	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), en_allmulti);
 	if (error) {
