@@ -284,7 +284,7 @@ dpmac_msi_intr(void *arg)
 	int error;
 
 	error = DPAA2_CMD_MAC_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->mac_token), DPNI_IRQ_INDEX, &status);
+	    sc->mac_token), DPMAC_IRQ_INDEX, &status);
 	if (error) {
 		device_printf(sc->dev, "Failed to obtain IRQ status: "
 		    "error=%d\n", error);
