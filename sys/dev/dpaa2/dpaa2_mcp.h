@@ -34,7 +34,6 @@
 #include <sys/mutex.h>
 
 #include "dpaa2_types.h"
-#include "dpaa2_mac.h"
 
 /*
  * DPAA2 MC command interface helper routines.
