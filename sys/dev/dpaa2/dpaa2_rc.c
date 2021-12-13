@@ -197,6 +197,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_MAC_SET_LINK_STATE		CMD_MAC_V2(0x0C3)
 #define CMDID_MAC_SET_IRQ_MASK			CMD_MAC(0x014)
 #define CMDID_MAC_SET_IRQ_ENABLE		CMD_MAC(0x012)
+#define CMDID_MAC_GET_IRQ_STATUS		CMD_MAC(0x016)
 
 /* ------------------------- DPCON command IDs ------------------------------ */
 #define CMD_CON_BASE_VERSION	1
