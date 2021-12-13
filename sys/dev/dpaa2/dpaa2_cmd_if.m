@@ -686,6 +686,16 @@ CODE {
 				device_get_parent(dev), cmd, irq_idx, en));
 		return (ENXIO);
 	}
+	static int
+	bypass_mac_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+		uint32_t *status)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MAC_GET_IRQ_STATUS(
+				device_get_parent(dev), cmd, irq_idx, status));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_con_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
@@ -1189,6 +1199,13 @@ METHOD int mac_set_irq_enable {
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_mac_set_irq_enable;
+
+METHOD int mac_get_irq_status {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 irq_idx;
+	uint32_t	*status;
+} DEFAULT bypass_mac_get_irq_status;
 
 /**
  * @brief Data Path Concentrator (DPCON) commands.

@@ -164,6 +164,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_SET_OFFLOAD			CMD_NI(0x26C)
 #define CMDID_NI_SET_IRQ_MASK			CMD_NI(0x014)
 #define CMDID_NI_SET_IRQ_ENABLE			CMD_NI(0x012)
+#define CMDID_NI_GET_IRQ_STATUS			CMD_NI(0x016)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -2092,7 +2093,7 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 	args->status = *status;
 	args->irq_idx = irq_idx;
 
-	error = exec_command(sc->portal, cmd, CMDID_NI_SET_IRQ_ENABLE);
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_IRQ_STATUS);
 	if (!error) {
 		resp = (struct get_irq_stat_resp *) &cmd->params[0];
 		*status = resp->status;
@@ -2606,6 +2607,44 @@ dpaa2_rc_mac_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 	args->irq_idx = irq_idx;
 
 	return (exec_command(sc->portal, cmd, CMDID_MAC_SET_IRQ_ENABLE));
+}
+
+static int
+dpaa2_rc_mac_get_irq_status(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
+    uint32_t *status)
+{
+	/*
+	 * TODO: Implementation is the same as ni_get_irq_status().
+	 */
+	struct __packed get_irq_stat_args {
+		uint32_t	status;
+		uint8_t		irq_idx;
+	} *args;
+	struct __packed get_irq_stat_resp {
+		uint32_t	status;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !status)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct get_irq_stat_args *) &cmd->params[0];
+	args->status = *status;
+	args->irq_idx = irq_idx;
+
+	error = exec_command(sc->portal, cmd, CMDID_MAC_GET_IRQ_STATUS);
+	if (!error) {
+		resp = (struct get_irq_stat_resp *) &cmd->params[0];
+		*status = resp->status;
+	}
+
+	return (error);
 }
 
 static int
@@ -3469,6 +3508,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_mac_set_link_state,	dpaa2_rc_mac_set_link_state),
 	DEVMETHOD(dpaa2_cmd_mac_set_irq_mask,	dpaa2_rc_mac_set_irq_mask),
 	DEVMETHOD(dpaa2_cmd_mac_set_irq_enable,	dpaa2_rc_mac_set_irq_enable),
+	DEVMETHOD(dpaa2_cmd_mac_get_irq_status,	dpaa2_rc_mac_get_irq_status),
 	/*	DPCON commands */
 	DEVMETHOD(dpaa2_cmd_con_open,		dpaa2_rc_con_open),
 	DEVMETHOD(dpaa2_cmd_con_close,		dpaa2_rc_con_close),
