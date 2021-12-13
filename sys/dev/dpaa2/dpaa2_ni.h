@@ -44,11 +44,11 @@
 /* Name of the DPAA2 network interface. */
 #define DPAA2_NI_IFNAME		"dpaa2ni"
 
-#define DPAA2_NI_MAX_RESOURCES	9  /* max. # of resources per DPNI */
-#define DPAA2_NI_MSI_COUNT	1  /* supported by the DPNI objects */
+#define DPAA2_NI_MAX_RESOURCES	9  /* resources per DPNI */
+#define DPAA2_NI_MSI_COUNT	1  /* MSIs per DPNI */
 #define DPAA2_NI_MAX_CHANNELS	16 /* to distribute ingress traffic to cores */
-#define DPAA2_NI_MAX_TCS	8  /* max. # of traffic classes per DPNI */
-#define DPAA2_NI_MAX_POOLS	8  /* max. # of buffer pools per DPNI */
+#define DPAA2_NI_MAX_TCS	8  /* traffic classes per DPNI */
+#define DPAA2_NI_MAX_POOLS	8  /* buffer pools per DPNI */
 
 #define DPAA2_NI_MAX_RXQ_PER_TC	16 /* Rx queues per traffic class */
 #define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
@@ -433,6 +433,7 @@ struct dpaa2_ni_softc {
 	uint32_t		 num_fqs;
 	dpaa2_ni_fq_t		 fq[DPAA2_NI_MAX_QUEUES];
 
+	/* Interrupts. */
 	int			 irq_rid[DPAA2_NI_MSI_COUNT];
 	struct resource		*irq_res;
 	void			*intr; /* interrupt handle */

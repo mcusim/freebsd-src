@@ -100,7 +100,10 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
 #define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
 
-#define DPNI_IRQ_INDEX		0          /* of the only DPNI IRQ */
+/* Index of the only DPNI IRQ. */
+#define DPNI_IRQ_INDEX		0
+
+/* DPNI IRQ statuses. */
 #define DPNI_IRQ_LINK_CHANGED	0x00000001 /* link state changed */
 #define DPNI_IRQ_EP_CHANGED	0x00000002 /* DPAA2 endpoint dis/connected */
 
@@ -384,10 +387,11 @@ dpaa2_ni_detach(device_t dev)
 
 	DPAA2_CMD_NI_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->ni_token));
 	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	dpaa2_mcp_free_command(sc->cmd);
 
+	sc->cmd = NULL;
 	sc->ni_token = 0;
 	sc->rc_token = 0;
-	dpaa2_mcp_free_command(sc->cmd);
 
 	return (0);
 }
@@ -1018,7 +1022,7 @@ setup_dpni_irqs(device_t dev)
 
 /**
  * @internal
- * @brief Allocate MSI interrupts for this DPAA2 network interface object.
+ * @brief Allocate MSI interrupts for DPNI.
  */
 static int
 setup_msi(struct dpaa2_ni_softc *sc)
@@ -1042,7 +1046,7 @@ setup_msi(struct dpaa2_ni_softc *sc)
 
 /**
  * @internal
- * @brief Update DPNI according to the update interface capabilities.
+ * @brief Update DPNI according to the updated interface capabilities.
  */
 static int
 setup_if_caps(struct dpaa2_ni_softc *sc)
@@ -1605,14 +1609,13 @@ static void
 dpni_msi_intr(void *arg)
 {
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
-	device_t dev = sc->dev;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
 	int error;
 
-	error = DPAA2_CMD_NI_GET_IRQ_STATUS(dev, dpaa2_mcp_tk(sc->cmd,
+	error = DPAA2_CMD_NI_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), DPNI_IRQ_INDEX, &status);
 	if (error) {
-		device_printf(dev, "Failed to obtain IRQ status: error=%d\n",
+		device_printf(sc->dev, "Failed to obtain IRQ status: error=%d\n",
 		    error);
 		return;
 	}
