@@ -2104,6 +2104,53 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 }
 
 static int
+dpaa2_rc_ni_set_uni_promisc(device_t rcdev, dpaa2_cmd_t cmd, bool en)
+{
+	struct __packed set_uni_promisc_args {
+		uint8_t	en;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_uni_promisc_args *) &cmd->params[0];
+	args->en = en ? 1u : 0u;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_UNI_PROMISC));
+}
+
+static int
+dpaa2_rc_ni_set_multi_promisc(device_t rcdev, dpaa2_cmd_t cmd, bool en)
+{
+	/*
+	 * TODO: Implementation is the same as for ni_set_uni_promisc().
+	 */
+	struct __packed set_multi_promisc_args {
+		uint8_t	en;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct set_multi_promisc_args *) &cmd->params[0];
+	args->en = en ? 1u : 0u;
+
+	return (exec_command(sc->portal, cmd, CMDID_NI_SET_MULTI_PROMISC));
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -3484,6 +3531,8 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_irq_mask,	dpaa2_rc_ni_set_irq_mask),
 	DEVMETHOD(dpaa2_cmd_ni_set_irq_enable,	dpaa2_rc_ni_set_irq_enable),
 	DEVMETHOD(dpaa2_cmd_ni_get_irq_status,	dpaa2_rc_ni_get_irq_status),
+	DEVMETHOD(dpaa2_cmd_ni_set_uni_promisc,	dpaa2_rc_ni_set_uni_promisc),
+	DEVMETHOD(dpaa2_cmd_ni_set_multi_promisc, dpaa2_rc_ni_set_multi_promisc),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),

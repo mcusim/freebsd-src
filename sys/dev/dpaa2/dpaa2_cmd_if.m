@@ -474,6 +474,24 @@ CODE {
 				device_get_parent(dev), cmd, irq_idx, status));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_uni_promisc(device_t dev, dpaa2_cmd_t cmd, bool en)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_UNI_PROMISC(
+				device_get_parent(dev), cmd, en));
+		return (ENXIO);
+	}
+	static int
+	bypass_ni_set_multi_promisc(device_t dev, dpaa2_cmd_t cmd, bool en)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_MULTI_PROMISC(
+				device_get_parent(dev), cmd, en));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -1056,6 +1074,18 @@ METHOD int ni_get_irq_status {
 	uint8_t		 irq_idx;
 	uint32_t	*status;
 } DEFAULT bypass_ni_get_irq_status;
+
+METHOD int ni_set_uni_promisc {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	bool		 en;
+} DEFAULT bypass_ni_set_uni_promisc;
+
+METHOD int ni_set_multi_promisc {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	bool		 en;
+} DEFAULT bypass_ni_set_multi_promisc;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
