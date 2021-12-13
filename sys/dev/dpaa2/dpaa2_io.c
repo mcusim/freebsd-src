@@ -321,8 +321,6 @@ static int
 setup_dpio_irqs(device_t dev)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(dev);
-	dpaa2_cmd_t cmd = sc->cmd;
-	uint16_t io_token = sc->io_token;
 	int error;
 
 	/* Configure IRQs. */
@@ -344,15 +342,15 @@ setup_dpio_irqs(device_t dev)
 
 #if 0
 	/* Unmask all DPIO interrupts. */
-	error = DPAA2_CMD_IO_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, io_token),
-	    DPIO_IRQ_INDEX, 0xFFFFFFFFu);
+	error = DPAA2_CMD_IO_SET_IRQ_MASK(dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->io_token), DPIO_IRQ_INDEX, 0xFFFFFFFFu);
 	if (error) {
 		device_printf(dev, "Failed to set IRQ mask\n");
 		return (error);
 	}
 
 	/* Enable IRQ. */
-	error = DPAA2_CMD_IO_SET_IRQ_ENABLE(dev, cmd, DPIO_IRQ_INDEX, true);
+	error = DPAA2_CMD_IO_SET_IRQ_ENABLE(dev, sc->cmd, DPIO_IRQ_INDEX, true);
 	if (error) {
 		device_printf(dev, "Failed to enable IRQ\n");
 		return (error);
