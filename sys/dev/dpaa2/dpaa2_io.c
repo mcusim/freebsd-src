@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp.h"
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
+#include "dpaa2_io.h"
 
 /* Index of the only DPIO IRQ. */
 #define DPIO_IRQ_INDEX		0
@@ -86,6 +87,7 @@ static struct resource_spec dpaa2_io_spec[] = {
 
 /* Forward declarations. */
 
+static int	setup_dpio_irqs(device_t dev);
 static int	setup_msi(struct dpaa2_io_softc *sc);
 
 /* ISRs */
@@ -107,6 +109,16 @@ dpaa2_io_probe(device_t dev)
 static int
 dpaa2_io_detach(device_t dev)
 {
+	struct dpaa2_io_softc *sc = device_get_softc(dev);
+
+	DPAA2_CMD_IO_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->io_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	dpaa2_mcp_free_command(sc->cmd);
+
+	sc->cmd = NULL;
+	sc->io_token = 0;
+	sc->rc_token = 0;
+
 	return (0);
 }
 
@@ -119,9 +131,7 @@ dpaa2_io_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct resource_map_request req;
-	dpaa2_cmd_t cmd;
 	dpaa2_io_attr_t attr;
-	uint16_t rc_token, io_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -174,7 +184,7 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
 	if (error) {
 		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
 		    error);
@@ -182,49 +192,36 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Open resource container and DPIO object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_IO_OPEN(dev, cmd, dinfo->id, &io_token);
+	error = DPAA2_CMD_IO_OPEN(dev, sc->cmd, dinfo->id, &sc->io_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
 
 	/* Prepare DPIO object. */
-	error = DPAA2_CMD_IO_RESET(dev, cmd);
+	error = DPAA2_CMD_IO_RESET(dev, sc->cmd);
 	if (error) {
 		device_printf(dev, "Failed to reset DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_io;
 	}
-	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, cmd, &attr);
+	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, sc->cmd, &attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPIO attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_io;
 	}
-	error = DPAA2_CMD_IO_ENABLE(dev, cmd);
+	error = DPAA2_CMD_IO_ENABLE(dev, sc->cmd);
 	if (error) {
 		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-
-	/* Close the DPIO object and the resource container. */
-	error = DPAA2_CMD_IO_CLOSE(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to close DPIO: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
-	if (error) {
-		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
-		goto err_free_cmd;
+		goto err_close_io;
 	}
 
 	/* Prepare helper object to work with the QBMan software portal. */
@@ -241,40 +238,32 @@ dpaa2_io_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "Failed to initialize dpaa2_swp: error=%d\n",
 		    error);
-		goto err_free_cmd;
+		goto err_close_io;
 	}
 
 	/* Enable only DQRR interrupts for now */
 	dpaa2_swp_set_intr_trigger(sc->swp, DPAA2_SWP_INTR_DQRI);
-	dpaa2_swp_clear_intr_status(sc->swp, 0xffffffff);
+	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
 	if (sc->swp_desc.has_notif)
 		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 
-	/* Configure IRQs. */
-	error = setup_msi(sc);
+	error = setup_dpio_irqs(dev);
 	if (error) {
-		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
-		goto err_free_swp;
-	}
-	if ((sc->irq_resource = bus_alloc_resource_any(dev, SYS_RES_IRQ,
-	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
-		device_printf(dev, "Failed to allocate IRQ resource\n");
-		goto err_free_swp;
-	}
-	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, dpio_msi_intr, sc, &sc->intr)) {
-		device_printf(dev, "Failed to setup IRQ resource\n");
+		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_free_swp;
 	}
 
 	return (0);
 
- err_free_swp:
+err_free_swp:
 	dpaa2_swp_free_portal(sc->swp);
- err_free_cmd:
-	dpaa2_mcp_free_command(cmd);
- err_exit:
-	dpaa2_io_detach(dev);
+err_close_io:
+	DPAA2_CMD_IO_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->io_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(sc->cmd);
+err_exit:
 	return (ENXIO);
 }
 
@@ -326,6 +315,48 @@ dpaa2_io_conf_wq_channel(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
 
 /**
  * @internal
+ * @brief Configure DPNI object to generate interrupts.
+ */
+static int
+setup_dpio_irqs(device_t dev)
+{
+	/* Configure IRQs. */
+	error = setup_msi(sc);
+	if (error) {
+		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
+		return (error);
+	}
+	if ((sc->irq_resource = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
+		device_printf(dev, "Failed to allocate IRQ resource\n");
+		return (ENXIO);
+	}
+	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
+	    NULL, dpio_msi_intr, sc, &sc->intr)) {
+		device_printf(dev, "Failed to setup IRQ resource\n");
+		return (ENXIO);
+	}
+
+	/* Unmask all DPIO interrupts. */
+	error = DPAA2_CMD_IO_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, io_token),
+	    DPIO_IRQ_INDEX, 0xFFFFFFFFu);
+	if (error) {
+		device_printf(dev, "Failed to set IRQ mask\n");
+		return (error);
+	}
+
+	/* Enable IRQ. */
+	error = DPAA2_CMD_IO_SET_IRQ_ENABLE(dev, cmd, DPIO_IRQ_INDEX, true);
+	if (error) {
+		device_printf(dev, "Failed to enable IRQ\n");
+		return (error);
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
  * @brief Allocate MSI interrupts for this DPAA2 I/O object.
  */
 static int
@@ -355,8 +386,19 @@ setup_msi(struct dpaa2_io_softc *sc)
 static void
 dpio_msi_intr(void *arg)
 {
-	/* NOTE: Useless interrupt handler. */
-	printf("%s: invoked\n", __func__);
+	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
+	uint32_t status = ~0u; /* clear all IRQ status bits */
+	int error;
+
+	error = DPAA2_CMD_IO_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->io_token), DPIO_IRQ_INDEX, &status);
+	if (error) {
+		device_printf(sc->dev, "Failed to obtain IRQ status: error=%d\n",
+		    error);
+		return;
+	}
+
+	printf("%s: status=0x%x\n", __func__, status);
 }
 
 static device_method_t dpaa2_io_methods[] = {

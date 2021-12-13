@@ -39,21 +39,32 @@
 /* Maximum number of MSIs supported by the DPIO objects. */
 #define DPAA2_IO_MSI_COUNT	1
 
-/**
- * @brief Software context for the DPAA2 I/O driver.
- */
-struct dpaa2_io_softc {
-	device_t		 dev;
-	dpaa2_swp_desc_t	 swp_desc;
-	dpaa2_swp_t		 swp;
-
-	struct resource 	*res[3];
-	struct resource_map	 map[3];
-
-	int			 irq_rid[DPAA2_IO_MSI_COUNT];
-	struct resource		*irq_resource;
-	void			*intr; /* interrupt handle */
+enum dpaa2_io_chan_mode {
+	DPAA2_IO_NO_CHANNEL,
+	DPAA2_IO_LOCAL_CHANNEL
 };
+
+/**
+ * @brief Attributes of the DPIO object.
+ *
+ * swp_ce_paddr: Physical address of the software portal cache-enabled area.
+ * swp_ci_paddr: Physical address of the software portal cache-inhibited area.
+ * swp_version:	 Hardware IP version of the software portal.
+ * id:		 DPIO object ID.
+ * swp_id:	 Software portal ID.
+ * priors_num:	 Number of priorities for the notification channel (1-8);
+ *		 relevant only if channel mode is "local channel".
+ * chan_mode:	 Notification channel mode.
+ */
+typedef struct {
+	uint64_t	swp_ce_paddr;
+	uint64_t	swp_ci_paddr;
+	uint32_t	swp_version;
+	uint32_t	id;
+	uint16_t	swp_id;
+	uint8_t		priors_num;
+	enum dpaa2_io_chan_mode chan_mode;
+} dpaa2_io_attr_t;
 
 /**
  * @brief Context used by DPIO to configure data availability notifications
@@ -67,5 +78,26 @@ typedef struct dpaa2_io_notif_ctx {
 	uint16_t	fq_chan_id;
 	bool		cdan_en;
 } dpaa2_io_notif_ctx_t;
+
+/**
+ * @brief Software context for the DPAA2 I/O driver.
+ */
+struct dpaa2_io_softc {
+	device_t		 dev;
+	dpaa2_swp_desc_t	 swp_desc;
+	dpaa2_swp_t		 swp;
+
+	/* Help to send commands to MC. */
+	dpaa2_cmd_t		 cmd;
+	uint16_t		 rc_token;
+	uint16_t		 io_token;
+
+	struct resource 	*res[3];
+	struct resource_map	 map[3];
+
+	int			 irq_rid[DPAA2_IO_MSI_COUNT];
+	struct resource		*irq_resource;
+	void			*intr; /* interrupt handle */
+};
 
 #endif /* _DPAA2_IO_H */
