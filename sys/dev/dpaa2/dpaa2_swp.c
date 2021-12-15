@@ -446,7 +446,7 @@ dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask)
 /**
  * @brief Enable or disable push dequeue.
  *
- * p:		the software portal object
+ * swp:		the software portal object
  * chan_idx:	the channel index (0 to 15)
  * en:		enable or disable push dequeue
  */
