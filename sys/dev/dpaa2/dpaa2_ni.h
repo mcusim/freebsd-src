@@ -57,6 +57,13 @@
 #define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
     DPAA2_NI_MAX_RXEQ)
 
+/*
+ * Maximum number of buffers that can be acquired/released through a single
+ * QBMan command.
+ */
+#define DPAA2_NI_BUFS_PER_CMD	7
+#define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_NI_BUFS_PER_CMD)
+
 /* Error and status bits in the frame annotation status word. */
 #define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */
 #define DPAA2_NI_FAS_MS		0x40000000 /* MACSEC frame */
@@ -178,6 +185,11 @@ typedef struct {
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
+
+	/* for Buffer Pool. */
+	bus_dma_tag_t		 dtag;
+	bus_dmamap_t		 dmap[DPAA2_NI_BUFS_PER_CHAN];
+	uint32_t		 buf_num;
 } dpaa2_ni_channel_t;
 
 /**
@@ -450,7 +462,7 @@ struct dpaa2_ni_softc {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
 		device_t	 phy_dev;
-	} mac; /* Info about connected DPMAC (if exists) */
+	} mac; /* Info about connected DPMAC (if exists). */
 };
 
 extern struct resource_spec dpaa2_ni_spec[];
