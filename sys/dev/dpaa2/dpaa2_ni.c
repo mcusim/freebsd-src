@@ -225,6 +225,8 @@ static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 
+static int	seed_buf_pool(struct dpaa2_ni_softc *, dpaa2_ni_channel_t *);
+
 /* Callbacks. */
 
 static void	dpni_if_init(void *arg);
@@ -238,6 +240,8 @@ static void	dpni_ifmedia_tick(void *arg);
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
 static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
+static void	dpni_bp_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
+		    int error);
 
 static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
@@ -659,6 +663,30 @@ setup_channels(device_t dev)
 		if (error)
 			device_printf(dev, "Failed to close DPCON: id=%d, "
 			    "error=%d\n", con_info->id, error);
+
+		/* DMA tag to allocate buffers for buffer pool. */
+		error = bus_dma_tag_create(
+		    bus_get_dma_tag(dev),
+		    sc->rx_buf_align, 0,	/* alignment, boundary */
+		    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+		    BUS_SPACE_MAXADDR,		/* high restricted addr */
+		    NULL, NULL,			/* filter, filterarg */
+		    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
+		    ETH_RX_BUF_RAW_SIZE, 0,	/* maxsegsize, flags */
+		    NULL, NULL,			/* lockfunc, lockarg */
+		    &channel->dtag);
+		if (error) {
+			device_printf(dev, "Failed to create a DMA tag to "
+			    "allocate buffers for buffer pool.\n");
+			return (error);
+		}
+
+		channel->buf_num = 0;
+		error = seed_buf_pool(sc, channel);
+		if (error) {
+			device_printf(dev, "Failed to seed buffer pool.\n");
+			return (error);
+		}
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
@@ -1152,8 +1180,6 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	sc->rx_buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
 	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
 	    ? ETH_RX_BUF_ALIGN_V1 : ETH_RX_BUF_ALIGN;
-	if (bootverbose)
-		device_printf(dev, "RX buffer alignment=%d\n", sc->rx_buf_align);
 
 	/*
 	 * We need to ensure that the buffer size seen by WRIOP is a multiple
@@ -1161,7 +1187,8 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 */
 	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, sc->rx_buf_align);
 	if (bootverbose)
-		device_printf(dev, "RX buffer size=%d\n", sc->rx_bufsz);
+		device_printf(dev, "RX buffer: size=%d, alignment=%d\n",
+		    sc->rx_bufsz, sc->rx_buf_align);
 
 	/* TX buffer layout */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
@@ -1693,10 +1720,17 @@ dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
 	if (error)
 		return;
-	/*
-	 * Only one 256-bytes long segment has been requested for QoS key
-	 * configuration buffer.
-	 */
+	*(bus_addr_t *) arg = segs[0].ds_addr;
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_bp_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
+{
+	if (error)
+		return;
 	*(bus_addr_t *) arg = segs[0].ds_addr;
 }
 
@@ -1767,6 +1801,48 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 
 	return (num_chan > DPAA2_NI_MAX_CHANNELS
 	    ? DPAA2_NI_MAX_CHANNELS : num_chan);
+}
+
+/**
+ * @internal
+ * @brief Allocate buffers visible to QBMan and release them to the Buffer Pool.
+ *
+ * NOTE: DMA tag for the given channel should be created.
+ */
+static int
+seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
+{
+	bus_addr_t buf_pa[DPAA2_NI_BUFS_PER_CMD];
+	void *buf_va[DPAA2_NI_BUFS_PER_CMD];
+	bus_dmamap_t *dmap;
+	int error;
+
+	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
+		/*
+		 * Allocate enough buffers to release within one QBMan command.
+		 */
+		for (int j = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
+			dmap = &channel->dmap[i + j];
+
+			error = bus_dmamem_alloc(channel->dtag, &buf_va[j],
+			    BUS_DMA_ZERO | BUS_DMA_COHERENT, dmap);
+			if (error) {
+				device_printf(dev, "Failed to allocate a "
+				    "buffer\n");
+				return (error);
+			}
+
+			error = bus_dmamap_load(channel->dtag, *dmap, buf_va[j],
+			    ETH_RX_BUF_RAW_SIZE, dpni_bp_dmamap_cb, &buf_pa[j],
+			    BUS_DMA_NOWAIT);
+			if (error) {
+				device_printf(dev, "Failed to map a buffer\n");
+				return (error);
+			}
+		}
+	}
+
+	return (0);
 }
 
 static device_method_t dpaa2_ni_methods[] = {
