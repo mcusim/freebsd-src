@@ -405,6 +405,7 @@ struct dpaa2_ni_softc {
 	uint16_t		 api_major;
 	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;
+	uint16_t		 rx_buf_align;
 	uint16_t		 tx_data_off;
 	uint16_t		 tx_qdid;
 	uint32_t		 if_flags;
@@ -441,15 +442,14 @@ struct dpaa2_ni_softc {
 	struct {
 		bus_dma_tag_t	 dtag;
 		bus_dmamap_t	 dmap;
-		bus_addr_t	 buf_busaddr;
-		uint8_t		*buf;
+		bus_addr_t	 buf_pa;
+		uint8_t		*buf_va;
 	} qos_kcfg; /* QoS table key configuration. */
 
 	struct {
 		uint32_t	 dpmac_id;
 		uint8_t		 addr[ETHER_ADDR_LEN];
 		device_t	 phy_dev;
-		dpaa2_mac_link_state_t link_state;
 	} mac; /* Info about connected DPMAC (if exists) */
 };
 

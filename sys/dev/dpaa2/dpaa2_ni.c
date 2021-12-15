@@ -112,7 +112,7 @@ __FBSDID("$FreeBSD$");
 #define DPNI_VER_MINOR		0U
 
 /* RX buffer data alignment. */
-#define ETH_RX_BUF_ALIGN_REV1	256 /* limitation of WRIOP 1.0.0 */
+#define ETH_RX_BUF_ALIGN_V1	256 /* limitation of the WRIOP v1.0.0 */
 #define ETH_RX_BUF_ALIGN	64
 
 /* Frame's software annotation. The hardware options are either 0 or 64. */
@@ -277,10 +277,16 @@ dpaa2_ni_attach(device_t dev)
 	sc->miibus = NULL;
 	sc->mii = NULL;
 	sc->media_status = 0;
-	sc->mac.dpmac_id = 0;
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
 
+	sc->qos_kcfg.dtag = NULL;
+	sc->qos_kcfg.dmap = NULL;
+	sc->qos_kcfg.buf_pa = 0;
+	sc->qos_kcfg.buf_va = NULL;
+
+	sc->mac.dpmac_id = 0;
+	sc->mac.phy_dev = NULL;
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
@@ -1136,19 +1142,18 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	dpaa2_ni_buf_layout_t buf_layout = {0};
-	uint16_t rx_buf_align;
 	int error;
 
 	/*
-	 * We need to check for WRIOP version 1.0.0, but depending on the MC
-	 * version, this number is not always provided correctly on rev1.
-	 * We need to check for both alternatives in this situation.
+	 * Select RX buffer alignment. It's necessary to ensure that the buffer
+	 * size seen by WRIOP is a multiple of 64 or 256 bytes depending on the
+	 * WRIOP version.
 	 */
-	if (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
+	sc->rx_buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
 	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
-		rx_buf_align = ETH_RX_BUF_ALIGN_REV1;
-	else
-		rx_buf_align = ETH_RX_BUF_ALIGN;
+	    ? ETH_RX_BUF_ALIGN_REV1 : ETH_RX_BUF_ALIGN;
+	if (bootverbose)
+		device_printf(dev, "RX buffer alignment=%d\n", sc->rx_buf_align);
 
 	/*
 	 * We need to ensure that the buffer size seen by WRIOP is a multiple
@@ -1197,8 +1202,8 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	if (bootverbose)
 		device_printf(dev, "TX data offset=%d\n", sc->tx_data_off);
 	if ((sc->tx_data_off % 64) != 0)
-		device_printf(dev, "TX data offset (%d) not a multiple of 64B\n",
-		    sc->tx_data_off);
+		device_printf(dev, "TX data offset (%d) is not a multiplication "
+		    "of 64 bytes\n", sc->tx_data_off);
 
 	/* RX buffer */
 	/*
@@ -1207,7 +1212,7 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_RX;
 	buf_layout.head_size = sc->tx_data_off - ETH_RX_HWA_SIZE;
-	buf_layout.fd_align = rx_buf_align;
+	buf_layout.fd_align = sc->rx_buf_align;
 	buf_layout.pass_frame_status = true;
 	buf_layout.pass_parser_result = true;
 	buf_layout.pass_timestamp = true;
@@ -1305,8 +1310,9 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 		return (error);
 	}
 
-	error = bus_dmamem_alloc(sc->qos_kcfg.dtag, (void **) &sc->qos_kcfg.buf,
-	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->qos_kcfg.dmap);
+	error = bus_dmamem_alloc(sc->qos_kcfg.dtag,
+	    (void **) &sc->qos_kcfg.buf_va, BUS_DMA_ZERO | BUS_DMA_COHERENT,
+	    &sc->qos_kcfg.dmap);
 	if (error) {
 		device_printf(dev, "Failed to allocate a buffer for QoS key "
 		    "configuration\n");
@@ -1314,8 +1320,8 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	}
 
 	error = bus_dmamap_load(sc->qos_kcfg.dtag, sc->qos_kcfg.dmap,
-	    sc->qos_kcfg.buf, ETH_QOS_KCFG_BUF_SIZE, dpni_qos_kcfg_dmamap_cb,
-	    &sc->qos_kcfg.buf_busaddr, BUS_DMA_NOWAIT);
+	    sc->qos_kcfg.buf_va, ETH_QOS_KCFG_BUF_SIZE, dpni_qos_kcfg_dmamap_cb,
+	    &sc->qos_kcfg.buf_pa, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(dev, "Failed to map QoS key configuration buffer "
 		    "into bus space\n");
@@ -1325,7 +1331,7 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	tbl.default_tc = 0;
 	tbl.discard_on_miss = false;
 	tbl.keep_entries = false;
-	tbl.kcfg_busaddr = sc->qos_kcfg.buf_busaddr;
+	tbl.kcfg_busaddr = sc->qos_kcfg.buf_pa;
 	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, cmd, &tbl);
 	if (error) {
 		device_printf(dev, "Failed to set QoS table\n");
