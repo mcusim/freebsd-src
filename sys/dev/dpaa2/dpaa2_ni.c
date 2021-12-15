@@ -1151,7 +1151,7 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 */
 	sc->rx_buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
 	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
-	    ? ETH_RX_BUF_ALIGN_REV1 : ETH_RX_BUF_ALIGN;
+	    ? ETH_RX_BUF_ALIGN_V1 : ETH_RX_BUF_ALIGN;
 	if (bootverbose)
 		device_printf(dev, "RX buffer alignment=%d\n", sc->rx_buf_align);
 
@@ -1159,7 +1159,7 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
 	 * We need to ensure that the buffer size seen by WRIOP is a multiple
 	 * of 64 or 256 bytes depending on the WRIOP version.
 	 */
-	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, rx_buf_align);
+	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, sc->rx_buf_align);
 	if (bootverbose)
 		device_printf(dev, "RX buffer size=%d\n", sc->rx_bufsz);
 
