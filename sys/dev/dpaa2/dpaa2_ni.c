@@ -1816,13 +1816,13 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 	bus_addr_t buf_pa[DPAA2_NI_BUFS_PER_CMD];
 	void *buf_va[DPAA2_NI_BUFS_PER_CMD];
 	bus_dmamap_t *dmap;
-	int error;
+	int i, j, error;
 
-	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
+	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
 		/*
 		 * Allocate enough buffers to release within one QBMan command.
 		 */
-		for (int j = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
+		for (j = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
 			dmap = &channel->dmap[i + j];
 
 			error = bus_dmamem_alloc(channel->dtag, &buf_va[j],
@@ -1841,6 +1841,9 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 				return (error);
 			}
 		}
+
+		if (bootverbose)
+			device_printf(dev, "allocated %d buffers\n", i + j);
 	}
 
 	return (0);
