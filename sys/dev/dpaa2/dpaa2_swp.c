@@ -106,10 +106,12 @@ static uint8_t	cyc_diff(const uint8_t ringsize, const uint8_t first,
 
 static int	exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    dpaa2_swp_rsp_t rsp, const uint8_t cmdid);
-static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+static void	send_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    const uint8_t cmdid);
-static int	wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
-		    dpaa2_swp_rsp_t rsp);
+static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+		    const uint8_t cmdid, const uint32_t offset,
+		    struct resource_map *map);
+static int	wait_for_mgmt_response(dpaa2_swp_t swp, dpaa2_swp_rsp_t rsp);
 
 /* Management routines. */
 
@@ -296,6 +298,7 @@ dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags)
 	if (swp->cfg.atomic) {
 		mtx_lock_spin(&swp->lock);
 		*flags = swp->flags;
+		swp->flags |= DPAA2_SWP_LOCKED;
 	} else {
 		mtx_lock(&swp->lock);
 		while (swp->flags & DPAA2_SWP_LOCKED)
@@ -310,6 +313,7 @@ void
 dpaa2_swp_unlock(dpaa2_swp_t swp)
 {
 	if (swp->cfg.atomic) {
+		swp->flags &= ~DPAA2_SWP_LOCKED;
 		mtx_unlock_spin(&swp->lock);
 	} else {
 		mtx_lock(&swp->lock);
@@ -737,9 +741,12 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
 		return (ENOENT);
 	}
 
-	/* Send a command to QBMan and wait for the result. */
-	send_command(swp, cmd, cmdid);
-	error = wait_for_command(swp, cmd, rsp);
+	/*
+	 * Send a command to QBMan using Management Command register and wait
+	 * for response from the Management Response registers.
+	 */
+	send_mgmt_command(swp, cmd, cmdid);
+	error = wait_for_mgmt_response(swp, rsp);
 	if (error) {
 		dpaa2_swp_unlock(swp);
 		return (error);
@@ -758,14 +765,25 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
  * @internal
  */
 static void
-send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
+send_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
-	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
-	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
 	const uint32_t offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_CR_MEM
 	    : DPAA2_SWP_CENA_CR;
 	struct resource_map *map = swp->cfg.writes_cinh ? swp->cinh_map
 	    : swp->cena_map;
+
+	send_command(swp, cmd, cmdid, offset, map);
+}
+
+/**
+ * @internal
+ */
+static void
+send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid,
+    const uint32_t offset, struct resource_map *map)
+{
+	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
+	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
 
 	/* Write command bytes (without VERB byte). */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
@@ -790,12 +808,15 @@ send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
  * @internal
  */
 static int
-wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
+wait_for_mgmt_response(dpaa2_swp_t swp, dpaa2_swp_rsp_t rsp)
 {
 	const uint32_t attempts = swp->cfg.atomic ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
+	/* Management command response to be read from the only RR or RR0/RR1. */
+	const uint32_t offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_RR_MEM
+	    : DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 	struct resource_map *map = swp->cena_map;
-	uint32_t i, offset;
+	uint32_t i;
 	uint8_t verb;
 	int rc;
 
@@ -805,9 +826,6 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 	/* Wait for a command response from QBMan. */
 	for (i = 1; i <= attempts; i++) {
 		if (swp->cfg.mem_backed) {
-			/* Command response to be read from the only RR. */
-			offset = DPAA2_SWP_CENA_RR_MEM;
-
 			verb = bus_read_1(map, offset);
 			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
@@ -815,9 +833,6 @@ wait_for_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp)
 				goto wait;
 			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		} else {
-			/* Command response to be read from RR0/RR1. */
-			offset = DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
-
 			verb = bus_read_1(map, offset);
 			if (!(verb & ~DPAA2_SWP_VALID_BIT))
 				goto wait;

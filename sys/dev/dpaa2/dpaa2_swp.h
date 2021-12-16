@@ -74,7 +74,7 @@
 #define DPAA2_SWP_CENA_EQCR(n)		(0x000 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_DQRR(n)		(0x200 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR(n)		(0x400 + ((uint32_t)(n) << 6))
-#define DPAA2_SWP_CENA_CR		(0x600) /* Command Ring offset */
+#define DPAA2_SWP_CENA_CR		(0x600) /* Management Command reg. */
 #define DPAA2_SWP_CENA_RR(vb)		(0x700 + ((uint32_t)(vb) >> 1))
 #define DPAA2_SWP_CENA_VDQCR		(0x780)
 #define DPAA2_SWP_CENA_EQCR_CI		(0x840)
@@ -82,8 +82,8 @@
 /* CENA register offsets in memory-backed mode */
 #define DPAA2_SWP_CENA_DQRR_MEM(n)	(0x0800 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR_MEM(n)	(0x1400 + ((uint32_t)(n) << 6))
-#define DPAA2_SWP_CENA_CR_MEM		(0x1600) /* CR offset (memory backed) */
-#define DPAA2_SWP_CENA_RR_MEM		(0x1680)
+#define DPAA2_SWP_CENA_CR_MEM		(0x1600) /* Management Command reg. */
+#define DPAA2_SWP_CENA_RR_MEM		(0x1680) /* Management Response reg. */
 #define DPAA2_SWP_CENA_VDQCR_MEM	(0x1780)
 #define DPAA2_SWP_CENA_EQCR_CI_MEMBACK	(0x1840)
 
