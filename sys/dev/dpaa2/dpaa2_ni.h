@@ -176,6 +176,15 @@ typedef struct {
 } dpaa2_ni_attr_t;
 
 /**
+ * @brief Buffer for a buffer pool (visible to QBman).
+ */
+typedef struct {
+	bus_dmamap_t		 dmap;
+	bus_addr_t		 paddr;
+	void			*vaddr;
+} dpaa2_ni_buf_t;
+
+/**
  * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
  *
  * NOTE: Several WQs are organized into a single QBMan channel.
@@ -186,10 +195,10 @@ typedef struct {
 	device_t		 con_dev;
 	uint16_t		 id;
 
-	/* for Buffer Pool. */
+	/* Buffers for buffer pool. */
 	bus_dma_tag_t		 dtag;
-	bus_dmamap_t		 dmap[DPAA2_NI_BUFS_PER_CHAN];
 	uint32_t		 buf_num;
+	dpaa2_ni_buf_t		 buf[DPAA2_NI_BUFS_PER_CHAN];
 } dpaa2_ni_channel_t;
 
 /**

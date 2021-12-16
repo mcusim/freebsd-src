@@ -1813,37 +1813,39 @@ static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 {
 	device_t dev = sc->dev;
-	bus_addr_t buf_pa[DPAA2_NI_BUFS_PER_CMD];
-	void *buf_va[DPAA2_NI_BUFS_PER_CMD];
-	bus_dmamap_t *dmap;
-	int i, j, error;
+	dpaa2_ni_buf_t *buf;
+	bus_addr_t paddr[DPAA2_NI_BUFS_PER_CMD];
+	int error, bufn;
 
-	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
-		/*
-		 * Allocate enough buffers to release within one QBMan command.
-		 */
-		for (j = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
-			dmap = &channel->dmap[i + j];
+	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
+		/* Allocate enough buffers to release in one QBMan command. */
+		for (int j = bufn = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
+			buf = &channel->buf[i + j];
 
-			error = bus_dmamem_alloc(channel->dtag, &buf_va[j],
-			    BUS_DMA_ZERO | BUS_DMA_COHERENT, dmap);
+			error = bus_dmamem_alloc(channel->dtag, &buf->vaddr,
+			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
 			if (error) {
-				device_printf(dev, "Failed to allocate a "
-				    "buffer\n");
+				device_printf(sc->dev, "Failed to allocate a "
+				    "buffer for buffer pool\n");
 				return (error);
 			}
 
-			error = bus_dmamap_load(channel->dtag, *dmap, buf_va[j],
-			    ETH_RX_BUF_RAW_SIZE, dpni_bp_dmamap_cb, &buf_pa[j],
-			    BUS_DMA_NOWAIT);
+			error = bus_dmamap_load(channel->dtag, buf->dmap,
+			    buf->vaddr, ETH_RX_BUF_RAW_SIZE, dpni_bp_dmamap_cb,
+			    &buf->paddr, BUS_DMA_NOWAIT);
 			if (error) {
-				device_printf(dev, "Failed to map a buffer\n");
+				device_printf(sc->dev, "Failed to map a "
+				    "buffer for buffer pool\n");
 				return (error);
 			}
+			paddr[bufn] = buf->paddr;
+			bufn++
 		}
 
-		if (bootverbose)
-			device_printf(dev, "allocated %d buffers\n", i + j);
+		/* Release buffer to QBMan buffer pool. */
+		/*
+		 * ... A call to DPAA2_SWP_RELEASE_BUFS() goes here...
+		 */
 	}
 
 	return (0);
