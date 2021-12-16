@@ -1839,7 +1839,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 				return (error);
 			}
 			paddr[bufn] = buf->paddr;
-			bufn++
+			bufn++;
 		}
 
 		/* Release buffer to QBMan buffer pool. */
