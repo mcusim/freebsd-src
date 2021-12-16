@@ -528,6 +528,14 @@ dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	return (0);
 }
 
+int
+dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
+    uint32_t buf_num)
+{
+	return (0);
+}
+
+
 /*
  * Internal functions.
  */

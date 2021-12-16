@@ -303,6 +303,18 @@ dpaa2_io_conf_wq_channel(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
 	return (0);
 }
 
+/**
+ * @brief Release one or more buffer pointers to a QBMan buffer pool.
+ */
+static int
+dpaa2_io_release_bufs(device_t iodev, uint16_t bpid, bus_addr_t *buf,
+    uint32_t buf_num)
+{
+	struct dpaa2_io_softc *sc = device_get_softc(iodev);
+
+	return (dpaa2_swp_release_bufs(sc->swp, bpid, buf, buf_num));
+}
+
 /*
  * Internal functions.
  */
@@ -419,6 +431,7 @@ static device_method_t dpaa2_io_methods[] = {
 	/* QBMan software portal interface */
 	DEVMETHOD(dpaa2_swp_enq_multiple_fq,	dpaa2_io_enq_multiple_fq),
 	DEVMETHOD(dpaa2_swp_conf_wq_channel,	dpaa2_io_conf_wq_channel),
+	DEVMETHOD(dpaa2_swp_release_bufs,	dpaa2_io_release_bufs),
 
 	DEVMETHOD_END
 };

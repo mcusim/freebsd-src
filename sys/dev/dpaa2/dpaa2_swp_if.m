@@ -36,8 +36,7 @@
  * Software portals are used by data path software executing on a processor core
  * to communicate with the Queue Manager (QMan) which acts as a central resource
  * in DPAA2, managing the queueing of data between multiple processor cores,
- * network interfaces, and hardware accelerators in a multicore SoC. These
- * portals are memory mapped in the system.
+ * network interfaces, and hardware accelerators in a multicore SoC.
  */
 INTERFACE dpaa2_swp;
 
@@ -66,4 +65,19 @@ METHOD int enq_multiple_fq {
 METHOD int conf_wq_channel {
 	device_t		 dev;
 	dpaa2_io_notif_ctx_t	*ctx;
+};
+
+/**
+ * @brief Release one or more buffer pointers to a QBMan buffer pool.
+ *
+ * dev:		DPIO device.
+ * bpid:	Buffer pool ID.
+ * buf:		Array of buffers physical addresses.
+ * buf_num:	Number of the buffers in the array.
+ */
+METHOD int release_bufs {
+	device_t		 dev;
+	uint16_t		 bpid;
+	bus_addr_t		*buf;
+	uint32_t		 buf_num;
 };

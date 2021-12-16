@@ -347,5 +347,7 @@ void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
 void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
 int	 dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id,
 	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
+int	 dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
+	     uint32_t buf_num);
 
 #endif /* _DPAA2_SWP_H */
