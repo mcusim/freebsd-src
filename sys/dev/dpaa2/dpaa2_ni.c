@@ -1812,7 +1812,6 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 {
-	device_t dev = sc->dev;
 	dpaa2_ni_buf_t *buf;
 	bus_addr_t paddr[DPAA2_NI_BUFS_PER_CMD];
 	int error, bufn;
