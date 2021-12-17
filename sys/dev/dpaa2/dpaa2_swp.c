@@ -560,7 +560,8 @@ dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
 	for (uint32_t i = 0; i < buf_num; i++)
 		cmd.buf[i] = buf[i];
 	cmd.bpid = bpid;
-	cmd.verb = 1 << 5; /* Release command valid. */
+	cmd.verb |= 1 << 5; /* Release command valid. */
+	cmd.verb |= 1 << 6; /* Interrupt on command dispatch. */
 
 	error = exec_br_command(swp, (dpaa2_swp_cmd_t) &cmd, buf_num);
 	if (error) {
