@@ -65,16 +65,18 @@
 #define DPAA2_SWP_CINH_EQCR_AM_RT	0x980
 #define DPAA2_SWP_CINH_RCR_AM_RT	0x9C0
 #define DPAA2_SWP_CINH_DQPI		0xA00
+#define DPAA2_SWP_CINH_DQRR_ITR		0xA80
 #define DPAA2_SWP_CINH_DCAP		0xAC0
 #define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command ring */
 #define DPAA2_SWP_CINH_EQCR_AM_RT2	0xB40
 #define DPAA2_SWP_CINH_RCR_PI		0xC00 /* Release Ring, Producer Index */
 #define DPAA2_SWP_CINH_RAR		0xCC0 /* Release Array Allocation reg. */
+#define DPAA2_SWP_CINH_CFG		0xD00
 #define DPAA2_SWP_CINH_ISR		0xE00
 #define DPAA2_SWP_CINH_IER		0xE40
 #define DPAA2_SWP_CINH_ISDR		0xE80
 #define DPAA2_SWP_CINH_IIR		0xEC0
-#define DPAA2_SWP_CINH_CFG		0xD00
+#define DPAA2_SWP_CINH_ITPR		0xF40
 
 /* CENA register offsets */
 #define DPAA2_SWP_CENA_EQCR(n)		(0x000 + ((uint32_t)(n) << 6))
