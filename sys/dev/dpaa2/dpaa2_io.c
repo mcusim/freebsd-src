@@ -432,7 +432,7 @@ dpio_msi_intr(void *arg)
 		printf("%s: Volatile dequeue command interrupt\n", __func__);
 
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, status);
-	dpaa2_swP_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
+	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
