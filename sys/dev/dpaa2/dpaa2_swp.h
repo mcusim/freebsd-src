@@ -42,6 +42,12 @@
 #define DPAA2_SWP_CMD_PARAMS_N		8u
 #define DPAA2_SWP_RSP_PARAMS_N		8u
 
+/*
+ * Maximum number of buffers that can be acquired/released through a single
+ * QBMan command.
+ */
+#define DPAA2_SWP_BUFS_PER_CMD		7u
+
 /* Versions of the QBMan software portals. */
 #define DPAA2_SWP_REV_4000		0x04000000
 #define DPAA2_SWP_REV_4100		0x04010000
@@ -51,7 +57,7 @@
 #define DPAA2_SWP_REV_MASK		0xFFFF0000
 
 /* Register offsets in the cache-inhibited area */
-#define DPAA2_SWP_CINH_CR		0x600 /* Management Command */
+#define DPAA2_SWP_CINH_CR		0x600 /* Management Command reg.*/
 #define DPAA2_SWP_CINH_EQCR_PI		0x800 /* Enqueue Ring, Producer Index */
 #define DPAA2_SWP_CINH_EQCR_CI		0x840 /* Enqueue Ring, Consumer Index */
 #define DPAA2_SWP_CINH_CR_RT		0x900 /* CR Read Trigger */
@@ -60,10 +66,10 @@
 #define DPAA2_SWP_CINH_RCR_AM_RT	0x9C0
 #define DPAA2_SWP_CINH_DQPI		0xA00
 #define DPAA2_SWP_CINH_DCAP		0xAC0
-#define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command */
+#define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command ring */
 #define DPAA2_SWP_CINH_EQCR_AM_RT2	0xB40
 #define DPAA2_SWP_CINH_RCR_PI		0xC00 /* Release Ring, Producer Index */
-#define DPAA2_SWP_CINH_RAR		0xCC0
+#define DPAA2_SWP_CINH_RAR		0xCC0 /* Release Array Allocation reg. */
 #define DPAA2_SWP_CINH_ISR		0xE00
 #define DPAA2_SWP_CINH_IER		0xE40
 #define DPAA2_SWP_CINH_ISDR		0xE80
@@ -345,6 +351,9 @@ uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
 uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
 void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
 void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
+
+/* Software portal commands. */
+
 int	 dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id,
 	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
 int	 dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,

@@ -57,12 +57,8 @@
 #define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
     DPAA2_NI_MAX_RXEQ)
 
-/*
- * Maximum number of buffers that can be acquired/released through a single
- * QBMan command.
- */
-#define DPAA2_NI_BUFS_PER_CMD	7
-#define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_NI_BUFS_PER_CMD)
+/* Maximum buffers allocated for a channel. */
+#define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_SWP_BUFS_PER_CMD)
 
 /* Error and status bits in the frame annotation status word. */
 #define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */
