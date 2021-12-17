@@ -1813,12 +1813,12 @@ static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 {
 	dpaa2_ni_buf_t *buf;
-	bus_addr_t paddr[DPAA2_NI_BUFS_PER_CMD];
+	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
 
-	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_NI_BUFS_PER_CMD) {
+	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
 		/* Allocate enough buffers to release in one QBMan command. */
-		for (int j = bufn = 0; j < DPAA2_NI_BUFS_PER_CMD; j++) {
+		for (int j = bufn = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf = &channel->buf[i + j];
 
 			error = bus_dmamem_alloc(channel->dtag, &buf->vaddr,

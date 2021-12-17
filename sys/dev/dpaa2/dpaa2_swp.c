@@ -87,6 +87,11 @@ __FBSDID("$FreeBSD$");
 /* QBMan portal command result codes. */
 #define QBMAN_CMD_RC_OK			(0xF0)
 
+/* Release Array Allocation register helpers. */
+#define RAR_IDX(rar)			((rar) & 0x7u)
+#define RAR_VB(rar)			((rar) & 0x80u)
+#define RAR_SUCCESS(rar)		((rar) & 0x100u)
+
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
 /* Forward declarations. */
@@ -104,14 +109,14 @@ static int	swp_enq_mult_memback(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
 static uint8_t	cyc_diff(const uint8_t ringsize, const uint8_t first,
 		    const uint8_t last);
 
-static int	exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+static int	exec_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    dpaa2_swp_rsp_t rsp, const uint8_t cmdid);
 static void	send_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 		    const uint8_t cmdid);
-static void	send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
-		    const uint8_t cmdid, const uint32_t offset,
-		    struct resource_map *map);
 static int	wait_for_mgmt_response(dpaa2_swp_t swp, dpaa2_swp_rsp_t rsp);
+
+static int	exec_br_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
+		    const uint32_t buf_num);
 
 /* Management routines. */
 
@@ -500,7 +505,7 @@ dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 		uint16_t	_reserved2;
 		uint64_t	ctx;
 		uint8_t		_reserved3[48];
-	} cmd;
+	} cmd = {0};
 	struct __packed {
 		uint8_t		verb;
 		uint8_t		result;
@@ -509,14 +514,13 @@ dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id, uint8_t we_mask,
 	} rsp;
 	int error;
 
-	memset(&cmd, 0, sizeof(cmd));
 	cmd.chan_id = chan_id;
 	cmd.we = we_mask;
 	cmd.ctrl = cdan_en ? 1 : 0;
 	cmd.ctx = ctx;
 
-	error = exec_command(swp, (dpaa2_swp_cmd_t) &cmd, (dpaa2_swp_rsp_t) &rsp,
-	    CMDID_SWP_WQCHAN_CONFIGURE);
+	error = exec_mgmt_command(swp, (dpaa2_swp_cmd_t) &cmd,
+	    (dpaa2_swp_rsp_t) &rsp, CMDID_SWP_WQCHAN_CONFIGURE);
 	if (error) {
 		printf("%s: WQ channel configuration failed: error=%d\n",
 		    __func__, error);
@@ -536,6 +540,30 @@ int
 dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
     uint32_t buf_num)
 {
+	/* NOTE: 64 bytes command. */
+	struct __packed {
+		uint8_t		verb;
+		uint8_t		_reserved1;
+		uint16_t	bpid;
+		uint32_t	_reserved2;
+		uint64_t	buf[DPAA2_SWP_BUFS_PER_CMD];
+	} cmd = {0};
+	int error;
+
+	if (buf_num == 0u || buf_num > DPAA2_SWP_BUFS_PER_CMD)
+		return (EINVAL);
+
+	for (uint32_t i = 0; i < buf_num; i++)
+		cmd->buf[i] = buf[i];
+	cmd->bpid = bpid;
+	cmd->verb = 1 << 5; /* Release command valid. */
+
+	error = exec_br_command(swp, (dpaa2_swp_cmd_t) &cmd, buf_num);
+	if (error) {
+		printf("%s: buffers release command failed\n", __func__);
+		return (error);
+	}
+
 	return (0);
 }
 
@@ -719,9 +747,70 @@ cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
 
 /**
  * @internal
+ * @brief Execute Buffer Release Command (BRC).
  */
 static int
-exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
+exec_br_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint32_t buf_num)
+{
+	struct __packed with_verb {
+		uint8_t	verb;
+		uint8_t	_reserved[63];
+	} *c;
+	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
+	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
+	struct resource_map *map;
+	uint32_t offset, rar; /* Release Array Allocation register */
+	uint16_t flags;
+
+	if (!swp || !cmd)
+		return (EINVAL);
+
+	dpaa2_swp_lock(swp, &flags);
+	if (flags & DPAA2_SWP_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
+		dpaa2_swp_unlock(swp);
+		return (ENOENT);
+	}
+
+	rar = dpaa2_swp_read_reg(swp, DPAA2_SWP_CINH_RAR);
+	if (!RAR_SUCCESS(rar)) {
+		dpaa2_swp_unlock(swp);
+		return (EBUSY);
+	}
+	offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_RCR_MEM(RAR_IDX(rar))
+	    : DPAA2_SWP_CENA_RCR(RAR_IDX(rar));
+	map = swp->cfg.writes_cinh ? swp->cinh_map : swp->cena_map;
+	c = (struct with_verb *) cmd;
+
+	/* Write command bytes (without VERB byte). */
+	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+		bus_write_8(map, offset + sizeof(uint64_t) * i, cmd->params[i]);
+	bus_write_4(map, offset + 4, cmd_pdat32[1]);
+	for (uint32_t i = 1; i <= 3; i++)
+		bus_write_1(map, offset + i, cmd_pdat8[i]);
+
+	/* Write VERB byte and trigger command execution. */
+	if (swp->cfg.mem_backed) {
+		bus_write_1(map, offset, c->verb | RAR_VB(rar) | buf_num);
+		wmb();
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_RCR_AM_RT +
+		    RAR_IDX(rar) * 4, DPAA2_SWP_RT_MODE);
+	} else {
+		wmb();
+		bus_write_1(map, offset, c->verb | RAR_VB(rar) | buf_num);
+	}
+
+	dpaa2_swp_unlock(swp);
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Execute a QBMan management command.
+ */
+static int
+exec_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
     const uint8_t cmdid)
 {
 	struct __packed with_verb {
@@ -767,23 +856,13 @@ exec_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, dpaa2_swp_rsp_t rsp,
 static void
 send_mgmt_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid)
 {
-	const uint32_t offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_CR_MEM
-	    : DPAA2_SWP_CENA_CR;
-	struct resource_map *map = swp->cfg.writes_cinh ? swp->cinh_map
-	    : swp->cena_map;
-
-	send_command(swp, cmd, cmdid, offset, map);
-}
-
-/**
- * @internal
- */
-static void
-send_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint8_t cmdid,
-    const uint32_t offset, struct resource_map *map)
-{
 	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
+	struct resource_map *map;
+	uint32_t offset;
+
+	offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_CR_MEM : DPAA2_SWP_CENA_CR;
+	map = swp->cfg.writes_cinh ? swp->cinh_map : swp->cena_map;
 
 	/* Write command bytes (without VERB byte). */
 	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
