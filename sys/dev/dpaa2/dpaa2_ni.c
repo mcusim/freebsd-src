@@ -1812,9 +1812,14 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 {
+	device_t bp_dev;
+	struct dpaa2_bp_softc *bpsc;
 	dpaa2_ni_buf_t *buf;
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
+
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bpsc = device_get_softc(bp_dev);
 
 	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
 		/* Allocate enough buffers to release in one QBMan command. */
@@ -1842,9 +1847,13 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 		}
 
 		/* Release buffer to QBMan buffer pool. */
-		/*
-		 * ... A call to DPAA2_SWP_RELEASE_BUFS() goes here...
-		 */
+		error = DPAA2_SWP_RELEASE_BUFS(channel->io_dev, bpsc->attr.bpid,
+		    paddr, bufn);
+		if (error) {
+			device_printf(sc->dev, "Failed to release buffers to "
+			    "the buffer pool\n");
+			return (error);
+		}
 	}
 
 	return (0);
