@@ -408,20 +408,31 @@ setup_msi(struct dpaa2_io_softc *sc)
 static void
 dpio_msi_intr(void *arg)
 {
-#if 0
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
-	uint32_t status = ~0u; /* clear all IRQ status bits */
+	uint32_t status = 0u;
 	int error;
 
-	error = DPAA2_CMD_IO_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->io_token), DPIO_IRQ_INDEX, &status);
-	if (error) {
-		device_printf(sc->dev, "Failed to obtain IRQ status: error=%d\n",
-		    error);
+	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
+	if (status == 0u) {
+		printf("%s: status=0\n", __func__);
 		return;
 	}
-#endif
-	printf("%s: invoked\n", __func__);
+
+	if (status & DPAA2_SWP_INTR_EQRI)
+		printf("%s: EQCR ring interrupt\n", __func__);
+	if (status & DPAA2_SWP_INTR_EQDI)
+		printf("%s: Enqueue command dispatched interrupt\n", __func__);
+	if (status & DPAA2_SWP_INTR_DQRI)
+		printf("%s: DQRR non-empty interrupt\n", __func__);
+	if (status & DPAA2_SWP_INTR_RCRI)
+		printf("%s: RCR ring interrupt\n", __func__);
+	if (status & DPAA2_SWP_INTR_RCDI)
+		printf("%s: Release command dispatched interrupt\n", __func__);
+	if (status & DPAA2_SWP_INTR_VDCI)
+		printf("%s: Volatile dequeue command interrupt\n", __func__);
+
+	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, status);
+	dpaa2_swP_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
