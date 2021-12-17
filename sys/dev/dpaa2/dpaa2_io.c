@@ -410,7 +410,6 @@ dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	uint32_t status = 0u;
-	int error;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	if (status == 0u) {
