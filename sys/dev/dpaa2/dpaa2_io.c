@@ -234,7 +234,7 @@ dpaa2_io_attach(device_t dev)
 	sc->swp_desc.cena_map = &sc->map[0];
 	sc->swp_desc.cinh_res = sc->res[1];
 	sc->swp_desc.cinh_map = &sc->map[1];
-	error = dpaa2_swp_init_portal(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
+	error = dpaa2_swp_init_atomic(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
 	if (error) {
 		device_printf(dev, "Failed to initialize dpaa2_swp: error=%d\n",
 		    error);
