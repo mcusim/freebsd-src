@@ -261,6 +261,10 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	    & p->eqcr.pi_ci_mask;
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
+	/* Initialize the software portal with a IRQ timeout period of 0us. */
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_DQRR_ITR, p->dqrr.ring_size - 1);
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_ITPR, 0);
+
 	*portal = p;
 
 	return (0);
