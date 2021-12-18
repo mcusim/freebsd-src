@@ -1133,7 +1133,7 @@ METHOD int ni_get_statistics {
 	uint8_t		 page;
 	uint16_t	 param;
 	uint64_t	*cnt;
-} DEFAULT bypass_ni_get_statistics
+} DEFAULT bypass_ni_get_statistics;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
