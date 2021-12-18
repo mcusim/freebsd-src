@@ -1878,7 +1878,7 @@ print_statistics(struct dpaa2_ni_softc *sc)
 		if (error) {
 			device_printf(dev, "Failed to get statistics: page=%d, "
 			    "error=%d\n", i, error);
-			return;
+			continue;
 		}
 
 		switch (i) {
