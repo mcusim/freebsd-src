@@ -797,11 +797,11 @@ exec_br_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd, const uint32_t buf_num)
 	/* Write VERB byte and trigger command execution. */
 	if (swp->cfg.mem_backed) {
 		bus_write_1(map, offset, c->verb | RAR_VB(rar) | buf_num);
-		dsb(st)
+		dsb(st);
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_RCR_AM_RT +
 		    RAR_IDX(rar) * 4, DPAA2_SWP_RT_MODE);
 	} else {
-		dsb(st)
+		dsb(st);
 		bus_write_1(map, offset, c->verb | RAR_VB(rar) | buf_num);
 	}
 
