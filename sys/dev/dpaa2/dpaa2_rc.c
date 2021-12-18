@@ -170,6 +170,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_NI_GET_IRQ_STATUS			CMD_NI(0x016)
 #define CMDID_NI_SET_UNI_PROMISC		CMD_NI(0x222)
 #define CMDID_NI_SET_MULTI_PROMISC		CMD_NI(0x220)
+#define CMDID_NI_GET_STATISTICS			CMD_NI(0x25D)
 
 /* ------------------------- DPBP command IDs ------------------------------- */
 #define CMD_BP_BASE_VERSION	1
@@ -2156,6 +2157,42 @@ dpaa2_rc_ni_set_multi_promisc(device_t rcdev, dpaa2_cmd_t cmd, bool en)
 }
 
 static int
+dpaa2_rc_ni_get_statistics(device_t rcdev, dpaa2_cmd_t cmd, uint8_t page,
+    uint16_t param, uint64_t *cnt)
+{
+	struct __packed get_statistics_args {
+		uint8_t		page;
+		uint16_t	param;
+	} *args;
+	struct __packed get_statistics_resp {
+		uint64_t	cnt[7];
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !cnt)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct get_statistics_args *) &cmd->params[0];
+	args->page = page;
+	args->param = param;
+
+	error = exec_command(sc->portal, cmd, CMDID_NI_GET_STATISTICS);
+	if (!error) {
+		resp = (struct get_statistics_resp *) &cmd->params[0];
+		for (int i = 0; i < DPAA2_NI_STAT_COUNTERS; i++)
+			cnt[i] = resp->cnt[i];
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_io_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
     uint16_t *token)
 {
@@ -3632,6 +3669,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_irq_status,	dpaa2_rc_ni_get_irq_status),
 	DEVMETHOD(dpaa2_cmd_ni_set_uni_promisc,	dpaa2_rc_ni_set_uni_promisc),
 	DEVMETHOD(dpaa2_cmd_ni_set_multi_promisc, dpaa2_rc_ni_set_multi_promisc),
+	DEVMEtHOD(dpaa2_cmd_ni_get_statistics,	dpaa2_rc_ni_get_statistics),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
