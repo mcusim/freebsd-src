@@ -418,17 +418,17 @@ dpio_msi_intr(void *arg)
 	}
 
 	if (status & DPAA2_SWP_INTR_EQRI)
-		printf("%s: EQCR ring interrupt\n", __func__);
+		device_printf(sc->dev, "EQCR ring interrupt\n");
 	if (status & DPAA2_SWP_INTR_EQDI)
-		printf("%s: Enqueue command dispatched interrupt\n", __func__);
+		device_printf(sc->dev, "Enqueue command dispatched interrupt\n");
 	if (status & DPAA2_SWP_INTR_DQRI)
-		printf("%s: DQRR non-empty interrupt\n", __func__);
+		device_printf(sc->dev, "DQRR non-empty interrupt\n");
 	if (status & DPAA2_SWP_INTR_RCRI)
-		printf("%s: RCR ring interrupt\n", __func__);
+		device_printf(sc->dev, "RCR ring interrupt\n");
 	if (status & DPAA2_SWP_INTR_RCDI)
-		printf("%s: Release command dispatched interrupt\n", __func__);
+		device_printf(sc->dev, "Release command dispatched interrupt\n");
 	if (status & DPAA2_SWP_INTR_VDCI)
-		printf("%s: Volatile dequeue command interrupt\n", __func__);
+		device_printf(sc->dev, "Volatile dequeue command interrupt\n");
 
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_ISR, status);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
