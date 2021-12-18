@@ -2176,6 +2176,8 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, dpaa2_cmd_t cmd, uint8_t page,
 	if (!sc->portal || !cmd || !cnt)
 		return (DPAA2_CMD_STAT_EINVAL);
 
+	printf("%s: invoked\n", __func__);
+
 	reset_cmd_params(cmd);
 
 	args = (struct get_statistics_args *) &cmd->params[0];
