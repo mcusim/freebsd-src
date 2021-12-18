@@ -1637,8 +1637,8 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				if (changed & IFF_PROMISC ||
 				    changed & IFF_ALLMULTI) {
 					rc = setup_if_flags(sc);
-					print_statistics(sc);
 				}
+				print_statistics(sc);
 			} else {
 				DPNI_UNLOCK(sc);
 				if (bootverbose) {
