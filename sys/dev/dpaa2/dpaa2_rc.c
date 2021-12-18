@@ -3669,7 +3669,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_get_irq_status,	dpaa2_rc_ni_get_irq_status),
 	DEVMETHOD(dpaa2_cmd_ni_set_uni_promisc,	dpaa2_rc_ni_set_uni_promisc),
 	DEVMETHOD(dpaa2_cmd_ni_set_multi_promisc, dpaa2_rc_ni_set_multi_promisc),
-	DEVMEtHOD(dpaa2_cmd_ni_get_statistics,	dpaa2_rc_ni_get_statistics),
+	DEVMETHOD(dpaa2_cmd_ni_get_statistics,	dpaa2_rc_ni_get_statistics),
 	/*	DPIO commands */
 	DEVMETHOD(dpaa2_cmd_io_open,		dpaa2_rc_io_open),
 	DEVMETHOD(dpaa2_cmd_io_close,		dpaa2_rc_io_close),
