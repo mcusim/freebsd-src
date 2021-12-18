@@ -60,6 +60,8 @@
 /* Maximum buffers allocated for a channel. */
 #define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_SWP_BUFS_PER_CMD)
 
+#define DPAA2_NI_STAT_COUNTERS	7u
+
 /* Error and status bits in the frame annotation status word. */
 #define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */
 #define DPAA2_NI_FAS_MS		0x40000000 /* MACSEC frame */

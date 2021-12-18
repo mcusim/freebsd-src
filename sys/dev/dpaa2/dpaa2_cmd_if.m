@@ -492,6 +492,16 @@ CODE {
 				device_get_parent(dev), cmd, en));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_get_statistics(device_t dev, dpaa2_cmd_t cmd, uint8_t page,
+		uint16_t param, uint64_t *cnt)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_GET_STATISTICS(
+				device_get_parent(dev), cmd, page, param, cnt));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -1116,6 +1126,14 @@ METHOD int ni_set_multi_promisc {
 	dpaa2_cmd_t	 cmd;
 	bool		 en;
 } DEFAULT bypass_ni_set_multi_promisc;
+
+METHOD int ni_get_statistics {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint8_t		 page;
+	uint16_t	 param;
+	uint64_t	*cnt;
+} DEFAULT bypass_ni_get_statistics
 
 /**
  * @brief Data Path I/O (DPIO) commands.
