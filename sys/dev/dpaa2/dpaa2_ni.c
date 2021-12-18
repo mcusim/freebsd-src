@@ -1883,19 +1883,19 @@ print_statistics(struct dpaa2_ni_softc *sc)
 
 		switch (i) {
 		case 0:
-			device_printf(dev, "INGRESS_ALL_FRAMES=%ul\n", cnt[0]);
-			device_printf(dev, "INGRESS_ALL_BYTES=%ul\n", cnt[1]);
-			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%ul\n", cnt[2]);
+			device_printf(dev, "INGRESS_ALL_FRAMES=%lu\n", cnt[0]);
+			device_printf(dev, "INGRESS_ALL_BYTES=%lu\n", cnt[1]);
+			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%lu\n", cnt[2]);
 			break;
 		case 1:
-			device_printf(dev, "EGRESS_ALL_FRAMES=%ul\n", cnt[0]);
-			device_printf(dev, "EGRESS_ALL_BYTES=%ul\n", cnt[1]);
-			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%ul\n", cnt[2]);
+			device_printf(dev, "EGRESS_ALL_FRAMES=%lu\n", cnt[0]);
+			device_printf(dev, "EGRESS_ALL_BYTES=%lu\n", cnt[1]);
+			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%lu\n", cnt[2]);
 			break;
 		case 2:
-			device_printf(dev, "INGRESS_FILTERED_FRAMES=%ul\n", cnt[0]);
-			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%ul\n", cnt[1]);
-			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%ul\n", cnt[2]);
+			device_printf(dev, "INGRESS_FILTERED_FRAMES=%lu\n", cnt[0]);
+			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%lu\n", cnt[1]);
+			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%lu\n", cnt[2]);
 			break;
 		default:
 			/* Other pages aren't interesting at the moment. */
