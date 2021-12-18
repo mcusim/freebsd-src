@@ -224,6 +224,7 @@ static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
+static void	print_statistics(struct dpaa2_ni_softc *);
 
 static int	seed_buf_pool(struct dpaa2_ni_softc *, dpaa2_ni_channel_t *);
 
@@ -1139,7 +1140,7 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 	int error;
 
 	if (bootverbose)
-		printf("%s: promisc=%s, allmulti=%s\n", __func__,
+		device_printf(sc->dev, "promisc=%s, allmulti=%s\n",
 		    en_promisc ? "TRUE" : "FALSE",
 		    en_allmulti ? "TRUE" : "FALSE");
 
@@ -1629,13 +1630,14 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				changed = ifp->if_flags ^ sc->if_flags;
 
 				if (bootverbose)
-					printf("%s: SIOCSIFFLAGS: up and "
-					    "running (changed=0x%x)\n",
-					    __func__, changed);
+					device_printf(sc->dev, "SIOCSIFFLAGS: "
+					    "up and running (changed=0x%x)\n",
+					    changed);
 
 				if (changed & IFF_PROMISC ||
 				    changed & IFF_ALLMULTI) {
 					rc = setup_if_flags(sc);
+					print_statistics(sc);
 				}
 			} else {
 				DPNI_UNLOCK(sc);
@@ -1857,6 +1859,49 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 	}
 
 	return (0);
+}
+
+/**
+ * @internal
+ * @brief Print statistics of the network interface.
+ */
+static void
+print_statistics(struct dpaa2_ni_softc *sc)
+{
+	device_t dev = sc->dev;
+	uint64_t cnt[DPAA2_NI_STAT_COUNTERS];
+	int error, pages = 3;
+
+	for (int i = 0; i < pages; i++) {
+		error = DPAA2_CMD_NI_GET_STATISTICS(dev,
+		    dpaa2_mcp_tk(sc->cmd, sc->ni_token), i, 0, cnt);
+		if (error) {
+			device_printf(dev, "Failed to get statistics: page=%d, "
+			    "error=%d\n", i, error);
+			return;
+		}
+
+		switch (i) {
+		case 0:
+			device_printf(dev, "INGRESS_ALL_FRAMES=%ul\n", cnt[0]);
+			device_printf(dev, "INGRESS_ALL_BYTES=%ul\n", cnt[1]);
+			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%ul\n", cnt[2]);
+			break;
+		case 1:
+			device_printf(dev, "EGRESS_ALL_FRAMES=%ul\n", cnt[0]);
+			device_printf(dev, "EGRESS_ALL_BYTES=%ul\n", cnt[1]);
+			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%ul\n", cnt[2]);
+			break;
+		case 2:
+			device_printf(dev, "INGRESS_FILTERED_FRAMES=%ul\n", cnt[0]);
+			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%ul\n", cnt[1]);
+			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%ul\n", cnt[2]);
+			break;
+		default:
+			/* Other pages aren't interesting at the moment. */
+			break;
+		}
+	}
 }
 
 static device_method_t dpaa2_ni_methods[] = {
