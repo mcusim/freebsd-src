@@ -840,17 +840,16 @@ setup_dpni_binding(device_t dev)
 static int
 setup_rx_distribution(device_t dev)
 {
-	/* error = dpaa2_eth_set_hash(net_dev, DPAA2_RXH_DEFAULT); */
-	/* if (err && err != -EOPNOTSUPP) */
-	/* 	dev_err(dev, "Failed to configure hashing\n"); */
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	int error;
 
-	/*
-	 * Configure the flow classification key; it includes all supported
-	 * header fields and cannot be modified at runtime.
-	 */
-	/* err = dpaa2_eth_set_default_cls(priv); */
-	/* if (err && err != -EOPNOTSUPP) */
-	/* 	dev_err(dev, "Failed to configure Rx classification key\n"); */
+	error = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
+	    sc->ni_token), 1, 0, DPAA2_NI_DIST_MODE_NONE);
+	if (error) {
+		device_printf(dev, "Failed to set distribution mode and size "
+		    "for the traffic class\n");
+		return (error);
+	}
 
 	return (0);
 }
