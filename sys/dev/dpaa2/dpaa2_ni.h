@@ -137,6 +137,12 @@ enum dpaa2_ni_ofl_type {
 	DPAA2_NI_OFL_FLCTYPE_HASH /* FD flow context for AIOP/CTLU */
 };
 
+enum dpaa2_ni_dist_mode {
+	DPAA2_NI_DIST_MODE_NONE = 0,
+	DPAA2_NI_DIST_MODE_HASH,
+	DPAA2_NI_DIST_MODE_FS
+};
+
 /**
  * @brief DPNI behavior in case of errors.
  */

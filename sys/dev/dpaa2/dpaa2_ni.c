@@ -582,14 +582,12 @@ setup_channels(device_t dev)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_io_softc *iosc;
 	struct dpaa2_con_softc *consc;
-	struct dpaa2_devinfo *io_info;
-	struct dpaa2_devinfo *con_info;
+	struct dpaa2_devinfo *io_info, *con_info;
 	dpaa2_ni_channel_t *channel;
 	dpaa2_io_notif_ctx_t *ctx;
 	dpaa2_con_notif_cfg_t notif_cfg;
 	dpaa2_cmd_t cmd = sc->cmd;
-	uint16_t rc_token = sc->rc_token;
-	uint16_t con_token;
+	uint16_t con_token, rc_token = sc->rc_token;
 	int error;
 
 	sc->num_chan = calc_channels_num(sc);
@@ -707,6 +705,7 @@ setup_frame_queues(device_t dev)
 
 	sc->num_fqs = 0;
 
+	/* Tx-conf queues. */
 	for (i = 0; i < sc->num_chan; i++) {
 		sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_TX_CONF;
 		sc->fq[sc->num_fqs].flowid = (uint16_t) i;
@@ -715,6 +714,7 @@ setup_frame_queues(device_t dev)
 	}
 	txc_fqs = sc->num_chan;
 
+	/* Rx queues. */
 	for (j = 0; j < sc->attr.num.rx_tcs; j++) {
 		for (i = 0; i < sc->num_chan; i++) {
 			sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX;
@@ -834,8 +834,8 @@ setup_dpni_binding(device_t dev)
  * @internal
  * @brief Setup ingress traffic distribution.
  *
- * NOTE: Distribution functionality is valid only when DPNI_OPT_NO_FS option
- *	 hasn't been specified for DPNI and a number of DPNI queues > 1.
+ * NOTE: Ingress traffic distribution is valid only when DPNI_OPT_NO_FS option
+ *	 hasn't been set for DPNI and a number of DPNI queues > 1.
  */
 static int
 setup_rx_distribution(device_t dev)
@@ -1308,7 +1308,7 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	if (sc->attr.num.rx_tcs == 1 ||
 	    !(sc->attr.options & DPNI_OPT_HAS_KEY_MASKING)) {
 		if (bootverbose)
-			device_printf(dev, "VLAN-based QoS classification is "
+			device_printf(dev, "Ingress traffic classification is "
 			    "not supported\n");
 		return (0);
 	}

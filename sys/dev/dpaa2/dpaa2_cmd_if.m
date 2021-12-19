@@ -502,6 +502,18 @@ CODE {
 				device_get_parent(dev), cmd, page, param, cnt));
 		return (ENXIO);
 	}
+	static int
+	bypass_ni_set_rx_tc_dist(device_t dev, dpaa2_cmd_t cmd,
+		uint16_t dist_size, uint8_t tc,
+		enum dpaa2_ni_dist_mode dist_mode)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_SET_RX_TC_DIST(
+				device_get_parent(dev), cmd, dist_size, tc,
+				dist_mode));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
@@ -1134,6 +1146,14 @@ METHOD int ni_get_statistics {
 	uint16_t	 param;
 	uint64_t	*cnt;
 } DEFAULT bypass_ni_get_statistics;
+
+METHOD int ni_set_rx_tc_dist {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint16_t	 dist_size;
+	uint8_t		 tc;
+	enum dpaa2_ni_dist_mode dist_mode;
+} DEFAULT bypass_ni_set_rx_tc_dist;
 
 /**
  * @brief Data Path I/O (DPIO) commands.
