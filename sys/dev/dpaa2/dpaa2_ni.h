@@ -57,8 +57,8 @@
 #define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
     DPAA2_NI_MAX_RXEQ)
 
-/* Maximum buffers allocated for a channel. */
-#define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_SWP_BUFS_PER_CMD)
+/* Maximum number of buffers allocated per channel. */
+#define DPAA2_NI_BUFS_PER_CHAN	(300 * DPAA2_SWP_BUFS_PER_CMD)
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
