@@ -459,7 +459,7 @@ setup_dpni(device_t dev)
 		return (error);
 	}
 	if (bootverbose) {
-		device_printf(dev, "options=%#x queues=%d tx_channels=%d "
+		device_printf(dev, "options=0x%#x queues=%d tx_channels=%d "
 		    "wriop_version=%#x\n", sc->attr.options, sc->attr.num.queues,
 		    sc->attr.num.channels, sc->attr.wriop_ver);
 		device_printf(dev, "\ttraffic classes: rx=%d tx=%d "
@@ -490,13 +490,8 @@ setup_dpni(device_t dev)
 		device_printf(dev, "Failed to obtain an object DPNI is "
 		    "connected to: error=%d\n", error);
 	else {
-		/*
-		 * NOTE: For the DPAA2 link to be up, both objects must be in
-		 * enabled state.
-		 */
-		device_printf(dev, "connected to %s (id=%d), DPAA2 link %s\n",
-		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id,
-		    link ? "up" : "down");
+		device_printf(dev, "connected to %s (id=%d)\n",
+		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id);
 
 		if (ep2_desc.type == DPAA2_DEV_MAC) {
 			/*
@@ -682,6 +677,7 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
+		/* Allocate and map buffers for the buffer pool. */
 		channel->buf_num = 0;
 		error = seed_buf_pool(sc, channel);
 		if (error) {
@@ -1820,6 +1816,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
 
+	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
 

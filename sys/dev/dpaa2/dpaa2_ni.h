@@ -60,6 +60,7 @@
 /* Maximum buffers allocated for a channel. */
 #define DPAA2_NI_BUFS_PER_CHAN	(183 * DPAA2_SWP_BUFS_PER_CMD)
 
+/* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
 
 /* Error and status bits in the frame annotation status word. */
