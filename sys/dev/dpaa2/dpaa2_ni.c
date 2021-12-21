@@ -847,7 +847,7 @@ setup_rx_distribution(device_t dev)
 	int error;
 
 	error = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->ni_token), 1, 7, DPAA2_NI_DIST_MODE_NONE);
+	    sc->ni_token), 1, 0, DPAA2_NI_DIST_MODE_NONE);
 	if (error) {
 		device_printf(dev, "Failed to set distribution mode and size "
 		    "for the traffic class\n");
