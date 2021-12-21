@@ -879,12 +879,10 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	fq->fqid = queue_cfg.fqid;
 
-#if 0
 	if (bootverbose)
 		device_printf(dev, "Rx queue: tc=%d, flowid=%d, fqid=%d, "
 		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx, queue_cfg.fqid,
 		    con_info->id);
-#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
@@ -928,6 +926,11 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 			return (error);
 		}
 		fq->tx_fqid[i] = queue_cfg.fqid;
+
+		if (bootverbose)
+			device_printf(dev, "Tx queue: tc=%d, flowid=%d, fqid=%d, "
+			    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
+			    queue_cfg.fqid, con_info->id);
 	}
 
 	/* All Tx queues which belong to the same flowid have the same qdbin. */
@@ -945,6 +948,11 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	}
 
 	fq->fqid = queue_cfg.fqid;
+
+	if (bootverbose)
+		device_printf(dev, "TxConf queue: tc=%d, flowid=%d, fqid=%d, "
+		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
+		    queue_cfg.fqid, con_info->id);
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
@@ -987,6 +995,11 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 	}
 
 	fq->fqid = queue_cfg.fqid;
+
+	if (bootverbose)
+		device_printf(dev, "RxErr queue: tc=%d, flowid=%d, fqid=%d, "
+		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
+		    queue_cfg.fqid, con_info->id);
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
