@@ -645,7 +645,7 @@ setup_channels(device_t dev)
 
 		/* Register DPCON notification with MC. */
 		notif_cfg.dpio_id = io_info->id;
-		notif_cfg.prior = 0;
+		notif_cfg.prior = 7;
 		notif_cfg.qman_ctx = ctx->qman_ctx;
 		error = DPAA2_CMD_CON_SET_NOTIF(dev, cmd, &notif_cfg);
 		if (error) {
@@ -847,7 +847,7 @@ setup_rx_distribution(device_t dev)
 	int error;
 
 	error = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->ni_token), 1, 0, DPAA2_NI_DIST_MODE_NONE);
+	    sc->ni_token), 1, 7, DPAA2_NI_DIST_MODE_NONE);
 	if (error) {
 		device_printf(dev, "Failed to set distribution mode and size "
 		    "for the traffic class\n");
@@ -889,7 +889,7 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 7;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
@@ -959,7 +959,7 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 7;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
@@ -1006,7 +1006,7 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 7;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
