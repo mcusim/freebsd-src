@@ -131,7 +131,6 @@ dpaa2_io_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct resource_map_request req;
-	dpaa2_io_attr_t attr;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -211,7 +210,7 @@ dpaa2_io_attach(device_t dev)
 		    dinfo->id, error);
 		goto err_close_io;
 	}
-	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, sc->cmd, &attr);
+	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPIO attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
@@ -226,10 +225,10 @@ dpaa2_io_attach(device_t dev)
 
 	/* Prepare helper object to work with the QBMan software portal. */
 	sc->swp_desc.dpio_dev = dev;
-	sc->swp_desc.swp_version = attr.swp_version;
-	sc->swp_desc.swp_id = attr.swp_id;
-	sc->swp_desc.has_notif = attr.priors_num ? true : false;
-	sc->swp_desc.has_8prio = attr.priors_num == 8u ? true : false;
+	sc->swp_desc.swp_version = sc->attr.swp_version;
+	sc->swp_desc.swp_id = sc->attr.swp_id;
+	sc->swp_desc.has_notif = sc->attr.priors_num ? true : false;
+	sc->swp_desc.has_8prio = sc->attr.priors_num == 8u ? true : false;
 	sc->swp_desc.cena_res = sc->res[0];
 	sc->swp_desc.cena_map = &sc->map[0];
 	sc->swp_desc.cinh_res = sc->res[1];
