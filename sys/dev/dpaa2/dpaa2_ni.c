@@ -146,7 +146,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* for DPIO resources */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
-#define IO_RES_NUM		(4u)
+#define IO_RES_NUM		(1u)
 /* for DPBP resources */
 #define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
@@ -154,7 +154,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* for DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
-#define CON_RES_NUM		(4u)
+#define CON_RES_NUM		(1u)
 /* for DPMCP resources */
 #define MCP_RID_OFF		(CON_RID_OFF + CON_RES_NUM)
 #define MCP_RID(rid)		((rid) + MCP_RID_OFF)
@@ -169,9 +169,9 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 * interface that has produced ingress data to that core.
 	 */
 	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
-	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	/* { DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
 	/*
 	 * DPBP resources.
 	 *
@@ -187,9 +187,9 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 * the DPCONs must be private to the DPNIs.
 	 */
 	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
-	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
-	{ DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL },
+	/* { DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL }, */
+	/* { DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL }, */
+ 	/* { DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL }, */
 	/*
 	 * DPMCP resources.
 	 *
@@ -889,7 +889,7 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 1;
+	queue_cfg.priority = 0;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
@@ -1006,7 +1006,7 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 1;
+	queue_cfg.priority = 0;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
