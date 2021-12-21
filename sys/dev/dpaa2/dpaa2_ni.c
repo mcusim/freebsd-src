@@ -596,6 +596,9 @@ setup_channels(device_t dev)
 	sc->num_chan = sc->num_chan > sc->attr.num.queues
 	    ? sc->attr.num.queues : sc->num_chan;
 
+	if (bootverbose)
+		device_printf(dev, "channels=%d\n", sc->num_chan);
+
 	for (uint32_t i = 0; i < sc->num_chan; i++) {
 		channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
 		    M_WAITOK | M_ZERO);
