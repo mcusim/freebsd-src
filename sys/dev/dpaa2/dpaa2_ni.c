@@ -688,8 +688,8 @@ setup_channels(device_t dev)
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
-			    "channel_id=%d\n", io_info->id, con_info->id,
-			    channel->id);
+			    "chan_id=%d, priorities=%d\n", io_info->id,
+			    con_info->id, channel->id, consc->attr.prior_num);
 	}
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
 	return (0);
