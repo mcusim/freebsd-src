@@ -170,8 +170,8 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 */
 	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
 	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	/* { DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	{ DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	/*
 	 * DPBP resources.
 	 *
@@ -188,8 +188,8 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 */
 	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
 	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
-	/* { DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL }, */
+	{ DPAA2_DEV_CON, CON_RID(2),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(3),  RF_ACTIVE | RF_OPTIONAL },
 	/*
 	 * DPMCP resources.
 	 *
