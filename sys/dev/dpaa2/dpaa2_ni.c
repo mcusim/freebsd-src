@@ -590,6 +590,7 @@ setup_channels(device_t dev)
 	uint16_t con_token, rc_token = sc->rc_token;
 	int error;
 
+	/* Calculate a number of channels based on the allocated resources. */
 	sc->num_chan = calc_channels_num(sc);
 
 	/* Allocate no more channels than DPNI queues. */
@@ -598,6 +599,22 @@ setup_channels(device_t dev)
 
 	if (bootverbose)
 		device_printf(dev, "channels=%d\n", sc->num_chan);
+
+	/* DMA tag to allocate buffers for buffer pool. */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    sc->rx_buf_align, 0,	/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
+	    ETH_RX_BUF_RAW_SIZE, 0,	/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->bp_dtag);
+	if (error) {
+		device_printf(dev, "Failed to create buffer pool DMA tag\n");
+		return (error);
+	}
 
 	for (uint32_t i = 0; i < sc->num_chan; i++) {
 		channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
@@ -618,6 +635,7 @@ setup_channels(device_t dev)
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
+		channel->buf_num = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -661,25 +679,7 @@ setup_channels(device_t dev)
 			device_printf(dev, "Failed to close DPCON: id=%d, "
 			    "error=%d\n", con_info->id, error);
 
-		/* DMA tag to allocate buffers for buffer pool. */
-		error = bus_dma_tag_create(
-		    bus_get_dma_tag(dev),
-		    sc->rx_buf_align, 0,	/* alignment, boundary */
-		    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
-		    BUS_SPACE_MAXADDR,		/* high restricted addr */
-		    NULL, NULL,			/* filter, filterarg */
-		    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
-		    ETH_RX_BUF_RAW_SIZE, 0,	/* maxsegsize, flags */
-		    NULL, NULL,			/* lockfunc, lockarg */
-		    &channel->dtag);
-		if (error) {
-			device_printf(dev, "Failed to create a DMA tag to "
-			    "allocate buffers for buffer pool.\n");
-			return (error);
-		}
-
 		/* Allocate and map buffers for the buffer pool. */
-		channel->buf_num = 0;
 		error = seed_buf_pool(sc, channel);
 		if (error) {
 			device_printf(dev, "Failed to seed buffer pool.\n");
@@ -1818,7 +1818,7 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 
 /**
  * @internal
- * @brief Allocate buffers visible to QBMan and release them to the Buffer Pool.
+ * @brief Allocate buffers visible to QBMan and release them to the buffer pool.
  *
  * NOTE: DMA tag for the given channel should be created.
  */
@@ -1840,7 +1840,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 		for (int j = bufn = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf = &channel->buf[i + j];
 
-			error = bus_dmamem_alloc(channel->dtag, &buf->vaddr,
+			error = bus_dmamem_alloc(sc->bp_dtag, &buf->vaddr,
 			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
 			if (error) {
 				device_printf(sc->dev, "Failed to allocate a "
@@ -1848,7 +1848,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 				return (error);
 			}
 
-			error = bus_dmamap_load(channel->dtag, buf->dmap,
+			error = bus_dmamap_load(sc->bp_dtag, buf->dmap,
 			    buf->vaddr, ETH_RX_BUF_RAW_SIZE, dpni_bp_dmamap_cb,
 			    &buf->paddr, BUS_DMA_NOWAIT);
 			if (error) {

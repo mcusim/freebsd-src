@@ -137,6 +137,9 @@ enum dpaa2_ni_ofl_type {
 	DPAA2_NI_OFL_FLCTYPE_HASH /* FD flow context for AIOP/CTLU */
 };
 
+/**
+ * @brief DPNI ingress traffic distribution mode.
+ */
 enum dpaa2_ni_dist_mode {
 	DPAA2_NI_DIST_MODE_NONE = 0,
 	DPAA2_NI_DIST_MODE_HASH,
@@ -201,7 +204,6 @@ typedef struct {
 	uint16_t		 id;
 
 	/* Buffers for buffer pool. */
-	bus_dma_tag_t		 dtag;
 	uint32_t		 buf_num;
 	dpaa2_ni_buf_t		 buf[DPAA2_NI_BUFS_PER_CHAN];
 } dpaa2_ni_channel_t;
@@ -452,6 +454,9 @@ struct dpaa2_ni_softc {
 	struct mii_data		*mii;
 	struct callout		 mii_callout;
 	int			 media_status;
+
+	/* DMA tag to allocate buffers for a buffer pool. */
+	bus_dma_tag_t		 bp_dtag;
 
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
