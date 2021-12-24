@@ -336,8 +336,6 @@ setup_dpio_irqs(device_t dev)
 	    DPAA2_SWP_INTR_RCRI | DPAA2_SWP_INTR_RCDI | DPAA2_SWP_INTR_VDCI
 	);
 	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
-	if (sc->swp_desc.has_notif)
-		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 
 	/* Configure IRQs. */
 	error = setup_msi(sc);
@@ -355,23 +353,6 @@ setup_dpio_irqs(device_t dev)
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		return (ENXIO);
 	}
-
-#if 0
-	/* Unmask all DPIO interrupts. */
-	error = DPAA2_CMD_IO_SET_IRQ_MASK(dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->io_token), DPIO_IRQ_INDEX, 0xFFFFFFFFu);
-	if (error) {
-		device_printf(dev, "Failed to set IRQ mask\n");
-		return (error);
-	}
-
-	/* Enable IRQ. */
-	error = DPAA2_CMD_IO_SET_IRQ_ENABLE(dev, sc->cmd, DPIO_IRQ_INDEX, true);
-	if (error) {
-		device_printf(dev, "Failed to enable IRQ\n");
-		return (error);
-	}
-#endif
 
 	return (0);
 }
