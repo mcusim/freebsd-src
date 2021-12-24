@@ -323,11 +323,12 @@ static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 static void	print_statistics(struct dpaa2_ni_softc *);
-
 static int	seed_buf_pool(struct dpaa2_ni_softc *, dpaa2_ni_channel_t *);
-
 static int	dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg,
 		    uint8_t *key_cfg_buf);
+static int	dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags);
+static int	dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc,
+		    enum dpaa2_ni_dist_mode type, uint64_t flags);
 
 /* Callbacks. */
 
@@ -2183,7 +2184,7 @@ dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 	return 0;
 }
 
-STATIC device_method_t dpaa2_ni_methods[] = {
+static device_method_t dpaa2_ni_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_ni_probe),
 	DEVMETHOD(device_attach,	dpaa2_ni_attach),
