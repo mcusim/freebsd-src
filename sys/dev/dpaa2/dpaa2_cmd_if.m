@@ -504,14 +504,14 @@ CODE {
 	}
 	static int
 	bypass_ni_set_rx_tc_dist(device_t dev, dpaa2_cmd_t cmd,
-		uint16_t dist_size, uint8_t tc,
-		enum dpaa2_ni_dist_mode dist_mode)
+		uint16_t dist_size, uint8_t tc, enum dpaa2_ni_dist_mode dist_mode,
+		bus_addr_t key_cfg_buf)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_NI_SET_RX_TC_DIST(
 				device_get_parent(dev), cmd, dist_size, tc,
-				dist_mode));
+				dist_mode, key_cfg_buf));
 		return (ENXIO);
 	}
 
@@ -1153,6 +1153,7 @@ METHOD int ni_set_rx_tc_dist {
 	uint16_t	 dist_size;
 	uint8_t		 tc;
 	enum dpaa2_ni_dist_mode dist_mode;
+	bus_addr_t	 key_cfg_buf;
 } DEFAULT bypass_ni_set_rx_tc_dist;
 
 /**

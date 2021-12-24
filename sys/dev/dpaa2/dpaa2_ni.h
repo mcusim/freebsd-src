@@ -40,6 +40,7 @@
 #include "dpaa2_swp.h"
 #include "dpaa2_io.h"
 #include "dpaa2_mac.h"
+#include "dpaa2_ni_dpkg.h"
 
 /* Name of the DPAA2 network interface. */
 #define DPAA2_NI_IFNAME		"dpaa2ni"
@@ -415,6 +416,40 @@ typedef struct {
 	bool		keep_entries;
 } dpaa2_ni_qos_table_t;
 
+struct dpaa2_eth_dist_fields {
+	uint64_t	rxnfc_field;
+	enum net_prot	cls_prot;
+	int		cls_field;
+	int		size;
+	uint64_t	id;
+};
+
+struct __packed dpni_mask_cfg {
+	uint8_t		mask;
+	uint8_t		offset;
+};
+
+struct __packed dpni_dist_extract {
+	uint8_t		prot;
+	uint8_t		efh_type; /* EFH type is in the 4 LSBs. */
+	uint8_t		size;
+	uint8_t		offset;
+	uint32_t	field;
+	uint8_t		hdr_index;
+	uint8_t		constant;
+	uint8_t		num_of_repeats;
+	uint8_t		num_of_byte_masks;
+	uint8_t		extract_type; /* Extraction type is in the 4 LSBs */
+	uint8_t		_reserved[3];
+	struct dpni_mask_cfg masks[4];
+};
+
+struct __packed dpni_ext_set_rx_tc_dist {
+	uint8_t		num_extracts;
+	uint8_t		_reserved[7];
+	struct dpni_dist_extract extracts[DPKG_MAX_NUM_OF_EXTRACTS];
+};
+
 /**
  * @brief Software context for the DPAA2 Network Interface driver.
  *
@@ -439,6 +474,7 @@ struct dpaa2_ni_softc {
 	uint32_t		 if_flags;
 	uint32_t		 link_options;
 	int			 link_state;
+	uint64_t		 rx_hash_fields;
 
 	dpaa2_ni_attr_t		 attr;
 
@@ -476,6 +512,13 @@ struct dpaa2_ni_softc {
 		bus_addr_t	 buf_pa;
 		uint8_t		*buf_va;
 	} qos_kcfg; /* QoS table key configuration. */
+
+	struct {
+		bus_dma_tag_t	 dtag;
+		bus_dmamap_t	 dmap;
+		bus_addr_t	 paddr;
+		void		*vaddr;
+	} rx_dist_kcfg; /* Key configuration for Rx traffic distribution. */
 
 	struct {
 		uint32_t	 dpmac_id;
