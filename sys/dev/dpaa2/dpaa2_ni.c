@@ -794,11 +794,15 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
+		if (iosc->swp_desc.has_notif)
+			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
+
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d dpcon_id=%d "
 			    "chan_id=%d, priorities=%d\n", io_info->id,
 			    con_info->id, channel->id, consc->attr.prior_num);
 	}
+
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
 	return (0);
 }
