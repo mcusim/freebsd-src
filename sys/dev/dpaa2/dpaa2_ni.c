@@ -2050,7 +2050,7 @@ static int
 dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
     uint64_t flags)
 {
-	struct device_t dev = sc->dev;
+	device_t dev = sc->dev;
 	struct dpkg_profile_cfg cls_cfg;
 	uint32_t rx_hash_fields = 0;
 	bus_addr_t paddr;
@@ -2152,8 +2152,7 @@ dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 			    cfg->extracts[i].extract.from_hdr.type & 0x0Fu;
 			extr->size = cfg->extracts[i].extract.from_hdr.size;
 			extr->offset = cfg->extracts[i].extract.from_hdr.offset;
-			extr->field = cpu_to_le32(
-				cfg->extracts[i].extract.from_hdr.field);
+			extr->field = cfg->extracts[i].extract.from_hdr.field;
 			extr->hdr_index =
 				cfg->extracts[i].extract.from_hdr.hdr_index;
 			break;
