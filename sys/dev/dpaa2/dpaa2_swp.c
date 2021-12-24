@@ -87,12 +87,37 @@ __FBSDID("$FreeBSD$");
 /* QBMan portal command result codes. */
 #define QBMAN_CMD_RC_OK			(0xF0)
 
+/* SDQCR attribute codes */
+#define QB_SDQCR_FC_SHIFT 		29u
+#define QB_SDQCR_FC_MASK		0x1u
+#define QB_SDQCR_DCT_SHIFT		24u
+#define QB_SDQCR_DCT_MASK		0x3u
+#define QB_SDQCR_TOK_SHIFT		16u
+#define QB_SDQCR_TOK_MASK		0xFFu
+#define QB_SDQCR_SRC_SHIFT		0u
+#define QB_SDQCR_SRC_MASK		0xFFFFu
+
+/* Opaque token for static dequeues. */
+#define QMAN_SDQCR_TOKEN		0xBBu
+
 /* Release Array Allocation register helpers. */
 #define RAR_IDX(rar)			((rar) & 0x7u)
 #define RAR_VB(rar)			((rar) & 0x80u)
 #define RAR_SUCCESS(rar)		((rar) & 0x100u)
 
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
+
+enum qbman_sdqcr_dct {
+	qbman_sdqcr_dct_null = 0,
+	qbman_sdqcr_dct_prio_ics,
+	qbman_sdqcr_dct_active_ics,
+	qbman_sdqcr_dct_active
+};
+
+enum qbman_sdqcr_fc {
+	qbman_sdqcr_fc_one = 0,
+	qbman_sdqcr_fc_up_to_3 = 1
+};
 
 /* Forward declarations. */
 
@@ -176,6 +201,12 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->cena_map = desc->cena_map;
 	p->cinh_res = desc->cinh_res;
 	p->cinh_map = desc->cinh_map;
+
+	/* Static Dequeue Command Register configuration. */
+	p->sdq = 0;
+	p->sdq |= qbman_sdqcr_dct_prio_ics << QB_SDQCR_DCT_SHIFT;
+	p->sdq |= qbman_sdqcr_fc_up_to_3 << QB_SDQCR_FC_SHIFT;
+	p->sdq |= QMAN_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
 
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
