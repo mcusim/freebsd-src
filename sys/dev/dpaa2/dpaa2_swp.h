@@ -67,7 +67,7 @@
 #define DPAA2_SWP_CINH_DQPI		0xA00
 #define DPAA2_SWP_CINH_DQRR_ITR		0xA80
 #define DPAA2_SWP_CINH_DCAP		0xAC0
-#define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command ring */
+#define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command reg. */
 #define DPAA2_SWP_CINH_EQCR_AM_RT2	0xB40
 #define DPAA2_SWP_CINH_RCR_PI		0xC00 /* Release Ring, Producer Index */
 #define DPAA2_SWP_CINH_RAR		0xCC0 /* Release Array Allocation reg. */
@@ -290,7 +290,8 @@ struct dpaa2_swp {
 	struct cv		 cv;
 	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
-	uint32_t		 sdq;
+
+	uint32_t		 sdq; /* Static Dequeue Command Register value */
 
 	struct {
 		bool		 atomic;
