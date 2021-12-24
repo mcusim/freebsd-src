@@ -205,7 +205,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	/* Static Dequeue Command Register configuration. */
 	p->sdq = 0;
 	p->sdq |= qbman_sdqcr_dct_prio_ics << QB_SDQCR_DCT_SHIFT;
-	p->sdq |= qbman_sdqcr_fc_up_to_3 << QB_SDQCR_FC_SHIFT;
+	p->sdq |= qbman_sdqcr_fc_one << QB_SDQCR_FC_SHIFT;
 	p->sdq |= QMAN_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
 
 	/* Dequeue Response Ring configuration */
@@ -516,7 +516,7 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
 		 */
 		dqsrc = (swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
 		    DPAA2_SDQCR_SRC_MASK;
-		printf("%s: sdq=%d\n", __func__, swp->sdq);
+		printf("%s: sdq=0x%x\n", __func__, swp->sdq);
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
 		    ? swp->sdq : 0);
 	} else
