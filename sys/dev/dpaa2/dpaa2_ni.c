@@ -83,7 +83,9 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_cmd_if.h"
 #include "dpaa2_ni.h"
 
+#define BIT(x)			(1ul << (x))
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
+#define ARRAY_SIZE(a)		(sizeof(a) / sizeof((a)[0]))
 
 #define	ALIGN_UP(x, y)		roundup2((x), (y))
 #define	ALIGN_DOWN(x, y)	rounddown2((x), (y))
@@ -129,6 +131,9 @@ __FBSDID("$FreeBSD$");
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
 
+/* Required by struct dpni_rx_tc_dist_cfg::key_cfg_iova */
+#define DPAA2_CLASSIFIER_DMA_SIZE 256
+
 /* Buffers layout options. */
 #define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
 #define DPNI_BUF_LAYOUT_OPT_PARSER_RESULT	0x00000002
@@ -140,6 +145,32 @@ __FBSDID("$FreeBSD$");
 
 /* Enables TCAM for Flow Steering and QoS look-ups. */
 #define DPNI_OPT_HAS_KEY_MASKING		0x000010
+
+/* Unique IDs for the supported Rx classification header fields */
+#define DPAA2_ETH_DIST_ETHDST			BIT(0)
+#define DPAA2_ETH_DIST_ETHSRC			BIT(1)
+#define DPAA2_ETH_DIST_ETHTYPE			BIT(2)
+#define DPAA2_ETH_DIST_VLAN			BIT(3)
+#define DPAA2_ETH_DIST_IPSRC			BIT(4)
+#define DPAA2_ETH_DIST_IPDST			BIT(5)
+#define DPAA2_ETH_DIST_IPPROTO			BIT(6)
+#define DPAA2_ETH_DIST_L4SRC			BIT(7)
+#define DPAA2_ETH_DIST_L4DST			BIT(8)
+#define DPAA2_ETH_DIST_ALL			(~0ULL)
+
+/* L3-L4 network traffic flow hash options */
+#define	RXH_L2DA	(1 << 1)
+#define	RXH_VLAN	(1 << 2)
+#define	RXH_L3_PROTO	(1 << 3)
+#define	RXH_IP_SRC	(1 << 4)
+#define	RXH_IP_DST	(1 << 5)
+#define	RXH_L4_B_0_1	(1 << 6) /* src port in case of TCP/UDP/SCTP */
+#define	RXH_L4_B_2_3	(1 << 7) /* dst port in case of TCP/UDP/SCTP */
+#define	RXH_DISCARD	(1 << 31)
+
+/* Default Rx hash options, set during attaching */
+#define DPAA2_RXH_DEFAULT	(RXH_L3_PROTO | RXH_IP_SRC | RXH_IP_DST | \
+				 RXH_L4_B_0_1 | RXH_L4_B_2_3)
 
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
@@ -201,6 +232,73 @@ struct resource_spec dpaa2_ni_spec[] = {
 	RESOURCE_SPEC_END
 };
 
+/* Supported header fields for Rx hash distribution key */
+static const struct dpaa2_eth_dist_fields dist_fields[] = {
+	{
+		/* L2 header */
+		.rxnfc_field = RXH_L2DA,
+		.cls_prot = NET_PROT_ETH,
+		.cls_field = NH_FLD_ETH_DA,
+		.id = DPAA2_ETH_DIST_ETHDST,
+		.size = 6,
+	}, {
+		.cls_prot = NET_PROT_ETH,
+		.cls_field = NH_FLD_ETH_SA,
+		.id = DPAA2_ETH_DIST_ETHSRC,
+		.size = 6,
+	}, {
+		/* This is the last ethertype field parsed:
+		 * depending on frame format, it can be the MAC ethertype
+		 * or the VLAN etype.
+		 */
+		.cls_prot = NET_PROT_ETH,
+		.cls_field = NH_FLD_ETH_TYPE,
+		.id = DPAA2_ETH_DIST_ETHTYPE,
+		.size = 2,
+	}, {
+		/* VLAN header */
+		.rxnfc_field = RXH_VLAN,
+		.cls_prot = NET_PROT_VLAN,
+		.cls_field = NH_FLD_VLAN_TCI,
+		.id = DPAA2_ETH_DIST_VLAN,
+		.size = 2,
+	}, {
+		/* IP header */
+		.rxnfc_field = RXH_IP_SRC,
+		.cls_prot = NET_PROT_IP,
+		.cls_field = NH_FLD_IP_SRC,
+		.id = DPAA2_ETH_DIST_IPSRC,
+		.size = 4,
+	}, {
+		.rxnfc_field = RXH_IP_DST,
+		.cls_prot = NET_PROT_IP,
+		.cls_field = NH_FLD_IP_DST,
+		.id = DPAA2_ETH_DIST_IPDST,
+		.size = 4,
+	}, {
+		.rxnfc_field = RXH_L3_PROTO,
+		.cls_prot = NET_PROT_IP,
+		.cls_field = NH_FLD_IP_PROTO,
+		.id = DPAA2_ETH_DIST_IPPROTO,
+		.size = 1,
+	}, {
+		/* Using UDP ports, this is functionally equivalent to raw
+		 * byte pairs from L4 header.
+		 */
+		.rxnfc_field = RXH_L4_B_0_1,
+		.cls_prot = NET_PROT_UDP,
+		.cls_field = NH_FLD_UDP_PORT_SRC,
+		.id = DPAA2_ETH_DIST_L4SRC,
+		.size = 2,
+	}, {
+		.rxnfc_field = RXH_L4_B_2_3,
+		.cls_prot = NET_PROT_UDP,
+		.cls_field = NH_FLD_UDP_PORT_DST,
+		.id = DPAA2_ETH_DIST_L4DST,
+		.size = 2,
+	},
+};
+
 /* Forward declarations. */
 
 static int	setup_dpni(device_t dev);
@@ -228,6 +326,9 @@ static void	print_statistics(struct dpaa2_ni_softc *);
 
 static int	seed_buf_pool(struct dpaa2_ni_softc *, dpaa2_ni_channel_t *);
 
+static int	dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg,
+		    uint8_t *key_cfg_buf);
+
 /* Callbacks. */
 
 static void	dpni_if_init(void *arg);
@@ -239,10 +340,8 @@ static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
 static void	dpni_ifmedia_tick(void *arg);
 
 static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
-static void	dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
+static void	dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
 		    int nseg, int error);
-static void	dpni_bp_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
-		    int error);
 
 static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
 		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
@@ -846,13 +945,29 @@ setup_rx_distribution(device_t dev)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	int error;
 
-	error = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->ni_token), 1, 0, DPAA2_NI_DIST_MODE_NONE);
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    PAGE_SIZE, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    DPAA2_CLASSIFIER_DMA_SIZE, 1, /* maxsize, nsegments */
+	    DPAA2_CLASSIFIER_DMA_SIZE, 0, /* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->rx_dist_kcfg.dtag);
 	if (error) {
-		device_printf(dev, "Failed to set distribution mode and size "
-		    "for the traffic class\n");
+		device_printf(dev, "Failed to create a DMA tag for Rx traffic "
+		    "distribution key configuration buffer\n");
 		return (error);
 	}
+
+	/*
+	 * Have the interface implicitly distribute traffic based on the default
+	 * hash key.
+	 */
+	error = dpaa2_eth_set_hash(sc, DPAA2_RXH_DEFAULT);
+	if (error && error != EOPNOTSUPP)
+		device_printf(dev, "Failed to configure hashing\n");
 
 	return (0);
 }
@@ -1359,8 +1474,8 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 	}
 
 	error = bus_dmamap_load(sc->qos_kcfg.dtag, sc->qos_kcfg.dmap,
-	    sc->qos_kcfg.buf_va, ETH_QOS_KCFG_BUF_SIZE, dpni_qos_kcfg_dmamap_cb,
-	    &sc->qos_kcfg.buf_pa, BUS_DMA_NOWAIT);
+	    sc->qos_kcfg.buf_va, ETH_QOS_KCFG_BUF_SIZE,
+	    dpni_single_seg_dmamap_cb, &sc->qos_kcfg.buf_pa, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(dev, "Failed to map QoS key configuration buffer "
 		    "into bus space\n");
@@ -1725,22 +1840,11 @@ dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
 
 /**
  * @internal
- * @brief Callback function to obtain an address of the QoS table key
- * configuration buffer in the device visible address space.
+ * @brief Callback to obtain a physical address of the only DMA mapped segment.
  */
 static void
-dpni_qos_kcfg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
-{
-	if (error)
-		return;
-	*(bus_addr_t *) arg = segs[0].ds_addr;
-}
-
-/**
- * @internal
- */
-static void
-dpni_bp_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
+dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
+    int error)
 {
 	if (error)
 		return;
@@ -1849,8 +1953,9 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
 			}
 
 			error = bus_dmamap_load(sc->bp_dtag, buf->dmap,
-			    buf->vaddr, ETH_RX_BUF_RAW_SIZE, dpni_bp_dmamap_cb,
-			    &buf->paddr, BUS_DMA_NOWAIT);
+			    buf->vaddr, ETH_RX_BUF_RAW_SIZE,
+			    dpni_single_seg_dmamap_cb, &buf->paddr,
+			    BUS_DMA_NOWAIT);
 			if (error) {
 				device_printf(sc->dev, "Failed to map a "
 				    "buffer for buffer pool\n");
@@ -1916,7 +2021,169 @@ print_statistics(struct dpaa2_ni_softc *sc)
 	}
 }
 
-static device_method_t dpaa2_ni_methods[] = {
+/**
+ * @internal
+ */
+static int
+dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags)
+{
+	uint64_t key = 0;
+	int i;
+
+	if (!(sc->attr.num.queues > 1))
+		return (EOPNOTSUPP);
+
+	for (i = 0; i < ARRAY_SIZE(dist_fields); i++)
+		if (dist_fields[i].rxnfc_field & flags)
+			key |= dist_fields[i].id;
+
+	return dpaa2_eth_set_dist_key(sc, DPAA2_NI_DIST_MODE_HASH, key);
+}
+
+/**
+ * @internal
+ * @brief Set Rx distribution (hash or flow classification) key flags is a
+ * combination of RXH_ bits.
+ */
+static int
+dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
+    uint64_t flags)
+{
+	struct device_t dev = sc->dev;
+	struct dpkg_profile_cfg cls_cfg;
+	uint32_t rx_hash_fields = 0;
+	bus_addr_t paddr;
+	uint8_t *vaddr;
+	int i, err = 0;
+
+	memset(&cls_cfg, 0, sizeof(cls_cfg));
+
+	/* Configure extracts according to the given flags. */
+	for (i = 0; i < ARRAY_SIZE(dist_fields); i++) {
+		struct dpkg_extract *key =
+		    &cls_cfg.extracts[cls_cfg.num_extracts];
+
+		if (!(flags & dist_fields[i].id))
+			continue;
+		if (type == DPAA2_NI_DIST_MODE_HASH)
+			rx_hash_fields |= dist_fields[i].rxnfc_field;
+
+		if (cls_cfg.num_extracts >= DPKG_MAX_NUM_OF_EXTRACTS) {
+			device_printf(dev, "Failed to add key extraction rule "
+			    "(too many rules?)\n");
+			return (E2BIG);
+		}
+
+		key->type = DPKG_EXTRACT_FROM_HDR;
+		key->extract.from_hdr.prot = dist_fields[i].cls_prot;
+		key->extract.from_hdr.type = DPKG_FULL_FIELD;
+		key->extract.from_hdr.field = dist_fields[i].cls_field;
+		cls_cfg.num_extracts++;
+	}
+
+	err = bus_dmamem_alloc(sc->rx_dist_kcfg.dtag, &sc->rx_dist_kcfg.vaddr,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->rx_dist_kcfg.dmap);
+	if (err) {
+		device_printf(dev, "Failed to allocate a buffer for Rx traffic "
+		    "distribution key configuration\n");
+		return (err);
+	}
+
+	err = dpni_prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rx_dist_kcfg.vaddr);
+	if (err) {
+		device_printf(dev, "dpni_prepare_key_cfg error %d\n", err);
+		return (err);
+	}
+
+	/* Prepare for setting the Rx dist. */
+	err = bus_dmamap_load(sc->rx_dist_kcfg.dtag, sc->rx_dist_kcfg.dmap,
+	    sc->rx_dist_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE,
+	    dpni_single_seg_dmamap_cb, &sc->rx_dist_kcfg.paddr, BUS_DMA_NOWAIT);
+	if (err) {
+		device_printf(sc->dev, "Failed to map a buffer for Rx traffic "
+		    "distribution key configuration\n");
+		return (err);
+	}
+
+	if (type == DPAA2_NI_DIST_MODE_HASH) {
+		err = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
+		    sc->ni_token), sc->attr.num.queues, 0,
+		    DPAA2_NI_DIST_MODE_HASH, sc->rx_dist_kcfg.paddr);
+		if (err)
+			device_printf(dev, "Failed to set distribution mode "
+			    "and size for the traffic class\n");
+	}
+
+	return err;
+}
+
+/**
+ * dpni_prepare_key_cfg() - function prepare extract parameters
+ * @cfg: defining a full Key Generation profile (rule)
+ * @key_cfg_buf: Zeroed 256 bytes of memory before mapping it to DMA
+ *
+ * This function has to be called before the following functions:
+ *	- dpni_set_rx_tc_dist()
+ *	- dpni_set_qos_table()
+ *
+ * Return:	'0' on Success; Error code otherwise.
+ */
+static int
+dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
+{
+	struct dpni_ext_set_rx_tc_dist *dpni_ext;
+	struct dpni_dist_extract *extr;
+	int i, j;
+
+	if (cfg->num_extracts > DPKG_MAX_NUM_OF_EXTRACTS)
+		return (EINVAL);
+
+	dpni_ext = (struct dpni_ext_set_rx_tc_dist *)key_cfg_buf;
+	dpni_ext->num_extracts = cfg->num_extracts;
+
+	for (i = 0; i < cfg->num_extracts; i++) {
+		extr = &dpni_ext->extracts[i];
+
+		switch (cfg->extracts[i].type) {
+		case DPKG_EXTRACT_FROM_HDR:
+			extr->prot = cfg->extracts[i].extract.from_hdr.prot;
+			extr->efh_type =
+			    cfg->extracts[i].extract.from_hdr.type & 0x0Fu;
+			extr->size = cfg->extracts[i].extract.from_hdr.size;
+			extr->offset = cfg->extracts[i].extract.from_hdr.offset;
+			extr->field = cpu_to_le32(
+				cfg->extracts[i].extract.from_hdr.field);
+			extr->hdr_index =
+				cfg->extracts[i].extract.from_hdr.hdr_index;
+			break;
+		case DPKG_EXTRACT_FROM_DATA:
+			extr->size = cfg->extracts[i].extract.from_data.size;
+			extr->offset =
+				cfg->extracts[i].extract.from_data.offset;
+			break;
+		case DPKG_EXTRACT_FROM_PARSE:
+			extr->size = cfg->extracts[i].extract.from_parse.size;
+			extr->offset =
+				cfg->extracts[i].extract.from_parse.offset;
+			break;
+		default:
+			return (EINVAL);
+		}
+
+		extr->num_of_byte_masks = cfg->extracts[i].num_of_byte_masks;
+		extr->extract_type = cfg->extracts[i].type & 0x0Fu;
+
+		for (j = 0; j < DPKG_NUM_OF_MASKS; j++) {
+			extr->masks[j].mask = cfg->extracts[i].masks[j].mask;
+			extr->masks[j].offset =
+				cfg->extracts[i].masks[j].offset;
+		}
+	}
+
+	return 0;
+}
+
+STATIC device_method_t dpaa2_ni_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		dpaa2_ni_probe),
 	DEVMETHOD(device_attach,	dpaa2_ni_attach),

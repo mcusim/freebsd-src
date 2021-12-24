@@ -141,7 +141,7 @@
 
 /* "Write Enable" bitmask for a command to configure SWP WQ Channel.*/
 #define DPAA2_WQCHAN_WE_EN		(0x1u)
-#define DPAA2_WQCHAN_WE_ICD		(0x1u) /* Interrupt Coalescing Disable */
+#define DPAA2_WQCHAN_WE_ICD		(0x2u) /* Interrupt Coalescing Disable */
 #define DPAA2_WQCHAN_WE_CTX		(0x4u)
 
 /*

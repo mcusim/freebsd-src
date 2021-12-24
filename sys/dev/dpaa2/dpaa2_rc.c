@@ -2195,12 +2195,15 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, dpaa2_cmd_t cmd, uint8_t page,
 
 static int
 dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, dpaa2_cmd_t cmd, uint16_t dist_size,
-    uint8_t tc, enum dpaa2_ni_dist_mode dist_mode)
+    uint8_t tc, enum dpaa2_ni_dist_mode dist_mode, bus_addr_t key_cfg_buf)
 {
 	struct __packed set_rx_tc_dist_args {
 		uint16_t	dist_size;
 		uint8_t		tc;
 		uint8_t		ma_dm; /* miss action + dist. mode */
+		uint32_t	_reserved1;
+		uint64_t	_reserved2[5];
+		uint64_t	key_cfg_iova;
 	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2216,6 +2219,7 @@ dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, dpaa2_cmd_t cmd, uint16_t dist_size,
 	args->dist_size = dist_size;
 	args->tc = tc;
 	args->ma_dm = ((uint8_t) dist_mode) & 0x0Fu;
+	args->key_cfg_iova = key_cfg_buf;
 
 	return (exec_command(sc->portal, cmd, CMDID_NI_SET_RX_TC_DIST));
 }
