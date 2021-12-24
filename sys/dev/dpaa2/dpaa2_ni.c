@@ -2053,8 +2053,6 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
 	device_t dev = sc->dev;
 	struct dpkg_profile_cfg cls_cfg;
 	uint32_t rx_hash_fields = 0;
-	bus_addr_t paddr;
-	uint8_t *vaddr;
 	int i, err = 0;
 
 	memset(&cls_cfg, 0, sizeof(cls_cfg));
