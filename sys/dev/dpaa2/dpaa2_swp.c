@@ -516,7 +516,7 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
 		 */
 		dqsrc = (swp->sdq >> DPAA2_SDQCR_SRC_SHIFT) &
 		    DPAA2_SDQCR_SRC_MASK;
-		printf("%s: dqsrc=%d\n", __func__, dqsrc);
+		printf("%s: sdq=%d\n", __func__, swp->sdq);
 		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_SDQCR, dqsrc != 0
 		    ? swp->sdq : 0);
 	} else
