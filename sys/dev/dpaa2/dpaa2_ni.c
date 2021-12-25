@@ -826,9 +826,6 @@ setup_channels(device_t dev)
 				    consc->attr.prior_num);
 		}
 
-		/* Exclude DPCON0. */
-		sc->num_chan--;
-
 		error = DPAA2_CMD_IO_ADD_STATIC_DQ_CHAN(dev, dpaa2_mcp_tk(cmd,
 		    iosc->io_token), 0, &chan_idx);
 		if (error) {
@@ -841,6 +838,9 @@ setup_channels(device_t dev)
 		if (iosc->swp_desc.has_notif)
 			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
 	}
+
+	/* Exclude DPCON0. */
+	sc->num_chan--;
 
 	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
 	return (0);
