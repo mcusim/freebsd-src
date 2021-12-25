@@ -86,6 +86,7 @@ struct dpaa2_io_softc {
 	device_t		 dev;
 	dpaa2_swp_desc_t	 swp_desc;
 	dpaa2_swp_t		 swp;
+
 	dpaa2_io_attr_t		 attr;
 
 	/* Help to send commands to MC. */

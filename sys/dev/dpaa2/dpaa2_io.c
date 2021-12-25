@@ -222,6 +222,16 @@ dpaa2_io_attach(device_t dev)
 		    dinfo->id, error);
 		goto err_close_io;
 	}
+	/*
+	 * TODO: Enable debug output via sysctl (to reduce output).
+	 */
+	if (bootverbose)
+		device_printf(dev, "dpio_id=%d, swp_id=%d, chan_mode=%s, "
+		    "notif_priors=%d, swp_version=0x%x\n",
+		    sc->attr.id, sc->attr.swp_id,
+		    sc->attr.chan_mode == DPAA2_IO_LOCAL_CHANNEL
+		    ? "local_channel" : "no_channel", sc->attr.priors_num,
+		    sc->attr.swp_version);
 
 	/* Prepare helper object to work with the QBMan software portal. */
 	sc->swp_desc.dpio_dev = dev;
