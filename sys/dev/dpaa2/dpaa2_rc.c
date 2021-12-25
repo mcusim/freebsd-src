@@ -3747,7 +3747,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_io_set_irq_mask,	dpaa2_rc_io_set_irq_mask),
 	DEVMETHOD(dpaa2_cmd_io_get_irq_status,	dpaa2_rc_io_get_irq_status),
 	DEVMETHOD(dpaa2_cmd_io_set_irq_enable,	dpaa2_rc_io_set_irq_enable),
-	DEVMEtHOD(dpaa2_cmd_io_add_static_dq_chan, dpaa2_rc_io_add_static_dq_chan),
+	DEVMETHOD(dpaa2_cmd_io_add_static_dq_chan, dpaa2_rc_io_add_static_dq_chan),
 	/*	DPBP commands */
 	DEVMETHOD(dpaa2_cmd_bp_open,		dpaa2_rc_bp_open),
 	DEVMETHOD(dpaa2_cmd_bp_close,		dpaa2_rc_bp_close),
