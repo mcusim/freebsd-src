@@ -601,6 +601,16 @@ CODE {
 				device_get_parent(dev), cmd, irq_idx, en));
 		return (ENXIO);
 	}
+	static int
+	bypass_io_add_static_dq_chan(device_t dev, dpaa2_cmd_t cmd,
+		uint32_t dpcon_id, uint8_t *chan_idx)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_IO_ADD_STATIC_DQ_CHAN(
+				device_get_parent(dev), cmd, dpcon_id, chan_idx));
+		return (ENXIO);
+	}
 
 	static int
 	bypass_bp_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
@@ -1213,6 +1223,13 @@ METHOD int io_set_irq_enable {
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_io_set_irq_enable;
+
+METHOD int io_add_static_dq_chan {
+	device_t	 dev;
+	dpaa2_cmd_t	 cmd;
+	uint32_t	 dpcon_id;
+	uint8_t		*chan_idx;
+} DEFAULT bypass_io_add_static_dq_chan;
 
 /**
  * @brief Data Path Buffer Pool (DPBP) commands.
