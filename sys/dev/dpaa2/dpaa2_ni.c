@@ -185,7 +185,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* for DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
-#define CON_RES_NUM		(8u)
+#define CON_RES_NUM		(16u)
 /* for DPMCP resources */
 #define MCP_RID_OFF		(CON_RID_OFF + CON_RES_NUM)
 #define MCP_RID(rid)		((rid) + MCP_RID_OFF)
@@ -225,6 +225,14 @@ struct resource_spec dpaa2_ni_spec[] = {
  	{ DPAA2_DEV_CON, CON_RID(5),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(6),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(7),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(8),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(9),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
 	/*
 	 * DPMCP resources.
 	 *
