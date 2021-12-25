@@ -1016,7 +1016,7 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 1;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
@@ -1133,7 +1133,7 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
-	queue_cfg.priority = 0;
+	queue_cfg.priority = 1;
 	queue_cfg.user_ctx = (uint64_t)(uintmax_t) fq;
 	queue_cfg.options = DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
@@ -1833,10 +1833,9 @@ dpni_msi_intr(void *arg)
 	}
 
 	if (status & DPNI_IRQ_LINK_CHANGED)
-		printf("%s: link state changed\n", __func__);
-
+		device_printf(sc->dev, "irq: link state changed\n");
 	if (status & DPNI_IRQ_EP_CHANGED)
-		printf("%s: endpoint changed\n", __func__);
+		device_printf(sc->dev, "irq: endpoint changed\n");
 }
 
 /**
