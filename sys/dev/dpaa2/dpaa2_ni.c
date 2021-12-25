@@ -702,7 +702,7 @@ setup_channels(device_t dev)
 	dpaa2_con_notif_cfg_t notif_cfg;
 	dpaa2_cmd_t cmd = sc->cmd;
 	uint16_t con_token, rc_token = sc->rc_token;
-	uint8_t chan_idx;
+	/* uint8_t chan_idx; */
 	int error;
 
 	/*
