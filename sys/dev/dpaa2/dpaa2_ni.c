@@ -702,7 +702,7 @@ setup_channels(device_t dev)
 	dpaa2_con_notif_cfg_t notif_cfg;
 	dpaa2_cmd_t cmd = sc->cmd;
 	uint16_t con_token, rc_token = sc->rc_token;
-	/* uint8_t chan_idx; */
+	uint8_t chan_idx;
 	int error;
 
 	/*
@@ -752,14 +752,16 @@ setup_channels(device_t dev)
 			if (con_info->id == 0u)
 				continue;
 
-			channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
-			    M_WAITOK | M_ZERO);
-			if (!channel) {
-				device_printf(dev, "Failed to allocate a "
-				    "channel\n");
-				return (ENOMEM);
+			if (sc->channel[i] == NULL) {
+				channel = malloc(sizeof(dpaa2_ni_channel_t),
+				    M_DPAA2_NI, M_WAITOK | M_ZERO);
+				if (!channel) {
+					device_printf(dev, "Failed to allocate "
+					    "a channel\n");
+					return (ENOMEM);
+				}
+				sc->channel[i] = channel;
 			}
-			sc->channel[i] = channel;
 
 			channel->io_dev = io_dev;
 			channel->con_dev = con_dev;
@@ -826,7 +828,6 @@ setup_channels(device_t dev)
 				    consc->attr.prior_num);
 		}
 
-#if 0
 		error = DPAA2_CMD_IO_ADD_STATIC_DQ_CHAN(dev, dpaa2_mcp_tk(cmd,
 		    iosc->io_token), 0, &chan_idx);
 		if (error) {
@@ -835,10 +836,17 @@ setup_channels(device_t dev)
 			return (error);
 		}
 		device_printf(dev, "static dequeue channel idx=%d\n", chan_idx);
-#endif
 
 		if (iosc->swp_desc.has_notif)
 			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
+	}
+
+	/* Fill the gap of DPCON0 in the channels array. */
+	for (uint32_t i = 0, j = UINT32_MAX; i < sc->num_chan; i++) {
+		if (sc->channel[i] == NULL)
+			j = i;
+		if (i > j)
+			sc->channel[i-1] = sc->channel[i];
 	}
 
 	/* Exclude DPCON0. */
