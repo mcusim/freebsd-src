@@ -128,6 +128,7 @@ __FBSDID("$FreeBSD$");
 #define CMDID_IO_SET_IRQ_ENABLE			CMD_IO(0x012)
 #define CMDID_IO_SET_IRQ_MASK			CMD_IO(0x014)
 #define CMDID_IO_GET_IRQ_STATUS			CMD_IO(0x016)
+#define CMDID_IO_ADD_STATIC_DQ_CHAN		CMD_IO(0x122)
 
 /* ------------------------- DPNI command IDs ------------------------------- */
 #define CMD_NI_BASE_VERSION	1
@@ -2441,6 +2442,39 @@ dpaa2_rc_io_set_irq_enable(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 }
 
 static int
+dpaa2_rc_io_add_static_dq_chan(device_t rcdev, dpaa2_cmd_t cmd,
+    uint32_t dpcon_id, uint8_t *chan_idx)
+{
+	struct __packed add_static_dq_chan_args {
+		uint32_t	dpcon_id;
+	} *args;
+	struct __packed add_static_dq_chan_resp {
+		uint8_t		chan_idx;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	int error;
+
+	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	if (!sc->portal || !cmd || !chan_idx)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	reset_cmd_params(cmd);
+
+	args = (struct add_static_dq_chan_args *) &cmd->params[0];
+	args->dpcon_id = dpcon_id;
+
+	error = exec_command(sc->portal, cmd, CMDID_IO_ADD_STATIC_DQ_CHAN);
+	if (!error) {
+		resp = (struct add_static_dq_chan_resp *) &cmd->params[0];
+		*chan_idx = resp->chan_idx;
+	}
+
+	return (error);
+}
+
+static int
 dpaa2_rc_bp_open(device_t rcdev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
     uint16_t *token)
 {
@@ -3713,6 +3747,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_io_set_irq_mask,	dpaa2_rc_io_set_irq_mask),
 	DEVMETHOD(dpaa2_cmd_io_get_irq_status,	dpaa2_rc_io_get_irq_status),
 	DEVMETHOD(dpaa2_cmd_io_set_irq_enable,	dpaa2_rc_io_set_irq_enable),
+	DEVMEtHOD(dpaa2_cmd_io_add_static_dq_chan, dpaa2_rc_io_add_static_dq_chan),
 	/*	DPBP commands */
 	DEVMETHOD(dpaa2_cmd_bp_open,		dpaa2_rc_bp_open),
 	DEVMETHOD(dpaa2_cmd_bp_close,		dpaa2_rc_bp_close),
