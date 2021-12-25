@@ -837,8 +837,10 @@ setup_channels(device_t dev)
 		}
 		device_printf(dev, "static dequeue channel idx=%d\n", chan_idx);
 
-		if (iosc->swp_desc.has_notif)
+		if (iosc->swp_desc.has_notif) {
 			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
+			dpaa2_swp_set_push_dequeue(iosc->swp, chan_idx, true);
+		}
 	}
 
 	/* Fill the gap of DPCON0 in the channels array. */
