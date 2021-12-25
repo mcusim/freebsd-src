@@ -826,6 +826,7 @@ setup_channels(device_t dev)
 				    consc->attr.prior_num);
 		}
 
+#if 0
 		error = DPAA2_CMD_IO_ADD_STATIC_DQ_CHAN(dev, dpaa2_mcp_tk(cmd,
 		    iosc->io_token), 0, &chan_idx);
 		if (error) {
@@ -834,6 +835,7 @@ setup_channels(device_t dev)
 			return (error);
 		}
 		device_printf(dev, "static dequeue channel idx=%d\n", chan_idx);
+#endif
 
 		if (iosc->swp_desc.has_notif)
 			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
