@@ -59,7 +59,7 @@
     DPAA2_NI_MAX_RXEQ)
 
 /* Maximum number of buffers allocated per channel. */
-#define DPAA2_NI_BUFS_PER_CHAN	(300 * DPAA2_SWP_BUFS_PER_CMD)
+#define DPAA2_NI_BUFS_PER_CHAN	(100 * DPAA2_SWP_BUFS_PER_CMD)
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
@@ -496,6 +496,7 @@ struct dpaa2_ni_softc {
 
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
+	uint8_t			 num_swp;
 	dpaa2_ni_channel_t	*channel[DPAA2_NI_MAX_CHANNELS];
  	/* Frame queues. */
 	uint32_t		 num_fqs;
