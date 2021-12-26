@@ -1164,6 +1164,7 @@ setup_dpni_irqs(device_t dev)
 	int error;
 
 	/* Configure IRQs. */
+#if 0
 	error = setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI\n");
@@ -1194,6 +1195,7 @@ setup_dpni_irqs(device_t dev)
 		device_printf(dev, "Failed to enable DPNI IRQ\n");
 		return (error);
 	}
+#endif
 
 	return (0);
 }
