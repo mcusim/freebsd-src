@@ -793,6 +793,7 @@ setup_channels(device_t dev)
 				device_printf(dev, "Failed to seed buffer pool\n");
 				return (error);
 			}
+			device_printf(io_dev, "seed buffer pool\n");
 		}
 
 		if (bootverbose)
