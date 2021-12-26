@@ -1212,6 +1212,11 @@ dpaa2_rc_set_obj_irq(device_t rcdev, dpaa2_cmd_t cmd, uint8_t irq_idx,
 	args->obj_id = obj_id;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
+	if (bootverbose)
+		device_printf(rcdev, "set object irq: idx=%d, addr=%jx, "
+		    "data=0x%x, irq_usr=%d, obj_id=%d, obj_type=%s\n",
+		    irq_idx, addr, data, irq_usr, obj_id, type);
+
 	return (exec_command(sc->portal, cmd, CMDID_RC_SET_OBJ_IRQ));
 }
 
