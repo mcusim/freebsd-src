@@ -239,19 +239,6 @@ typedef struct {
 } dpaa2_ep_desc_t;
 
 /**
- * @brief Attributes of the DPCON object.
- *
- * id:		DPCON object ID.
- * chan_id:	QBMan channel ID to be used for dequeue operations.
- * prior_num:	Number of priorities for the DPCON channel (1-8).
- */
-typedef struct {
-	uint32_t	id;
-	uint16_t	chan_id;
-	uint8_t		prior_num;
-} dpaa2_con_attr_t;
-
-/**
  * @brief Configuration of the channel data availability notification (CDAN).
  *
  * qman_ctx:	Context value provided with each CDAN message.

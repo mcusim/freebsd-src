@@ -45,6 +45,7 @@
 #include "dpaa2_ni.h"
 #include "dpaa2_io.h"
 #include "dpaa2_mac.h"
+#include "dpaa2_con.h"
 
 /*
  * Flags for DPAA2 devices as resources.
@@ -109,14 +110,6 @@ struct dpaa2_rc_softc {
 struct dpaa2_bp_softc {
 	device_t		 dev;
 	dpaa2_bp_attr_t		 attr;
-};
-
-/**
- * @brief Software context for the DPAA2 Concentrator driver.
- */
-struct dpaa2_con_softc {
-	device_t		 dev;
-	dpaa2_con_attr_t	 attr;
 };
 
 /**
