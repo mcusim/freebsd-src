@@ -426,9 +426,9 @@ dpaa2_rc_alloc_multi_resource(device_t rcdev, device_t child, int type, int *rid
 	 * they are issued from QMan using a 4 byte write.
 	 *
 	 * TODO: However this default behavior can be changed by programming one
-	 * or more software portals to issue their interrupts via a dedicated
-	 * software portal interrupt wire. See registers SWP_INTW0_CFG to
-	 * SWP_INTW3_CFG for details.
+	 *	 or more software portals to issue their interrupts via a
+	 *	 dedicated software portal interrupt wire.
+	 *	 See registers SWP_INTW0_CFG to SWP_INTW3_CFG for details.
 	 */
 	if (type == SYS_RES_IRQ && *rid == 0)
 		return (NULL);

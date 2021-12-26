@@ -387,8 +387,19 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
     uint32_t *data)
 {
 #if defined(INTRNG)
-	return (intr_map_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child), irq,
-	    addr, data));
+	uint64_t a = 0;
+	uint32_t d = 0;
+	int error;
+
+	error = intr_map_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child), irq,
+	    &a, &d);
+
+	*addr = a;
+	*data = d;
+	device_printf(child, "mapped MSI: irq=%d, addr=%#jx, data=%#x, "
+	    "error=%d\n", irq, a, d, error);
+
+	return (error);
 #else
 	return (ENXIO);
 #endif
