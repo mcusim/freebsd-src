@@ -694,9 +694,6 @@ setup_channels(device_t dev)
 	dpaa2_ni_channel_t *channel;
 	dpaa2_io_notif_ctx_t *ctx;
 	dpaa2_con_notif_cfg_t notif_cfg;
-	dpaa2_cmd_t cmd = sc->cmd;
-	uint16_t con_token, rc_token = sc->rc_token;
-	uint8_t chan_idx;
 	int error;
 
 	/* Calculate a number of channels based on the allocated resources. */
@@ -783,7 +780,7 @@ setup_channels(device_t dev)
 		    consc->con_token), &notif_cfg);
 		if (error) {
 			device_printf(dev, "Failed to set DPCON notification: "
-			    "dpcon_id, chan_id=%d\n", con_info->id,
+			    "dpcon_id=%d, chan_id=%d\n", con_info->id,
 			    consc->attr.chan_id);
 			return (error);
 		}
