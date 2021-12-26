@@ -252,7 +252,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    0, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
 		    0  /* EQCR_CI stashing priority */				/* EP */
 		);
-		reg &= ~(1 << DPAA2_SWP_CFG_CPBS_SHIFT) /* QMan-backed mode */
+		reg &= ~(1 << DPAA2_SWP_CFG_CPBS_SHIFT); /* QMan-backed mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);
