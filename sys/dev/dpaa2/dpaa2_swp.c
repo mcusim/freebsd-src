@@ -205,7 +205,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	/* Static Dequeue Command Register configuration. */
 	p->sdq = 0;
 	p->sdq |= qbman_sdqcr_dct_prio_ics << QB_SDQCR_DCT_SHIFT;
-	p->sdq |= qbman_sdqcr_fc_one << QB_SDQCR_FC_SHIFT;
+	p->sdq |= qbman_sdqcr_fc_up_to_3 << QB_SDQCR_FC_SHIFT;
 	p->sdq |= QMAN_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
 
 	/* Dequeue Response Ring configuration */
@@ -237,20 +237,22 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	} else {
 		bus_set_region_4(p->cena_map, 0, 0,
 		    rman_get_size(p->cena_res) / 4);
+
 		reg = dpaa2_swp_set_cfg(
-		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */
-		    1, /* writes enabled in the CINH memory only */
-		    1, /* EQCR_CI stashing threshold */
-		    3, /* RPM: RCR in array mode */
-		    2, /* DCM: Discrete consumption ack */
-		    0, /* EPM: EQCR in ring mode (FIFO) */
-		    1, /* mem stashing drop enable */
-		    1, /* mem stashing priority enable */
-		    1, /* mem stashing enable */
-		    1, /* dequeue stashing priority enable */
-		    0, /* dequeue stashing enable */
-		    0  /* EQCR_CI stashing priority enable */
+		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */	/* DQRR_MF */
+		    1, /* writes enabled in the CINH memory only */		/* WN */
+		    1, /* EQCR_CI stashing threshold */				/* EST */
+		    3, /* RPM: RCR in array mode */				/* RPM */
+		    2, /* DCM: Discrete consumption ack */			/* DCM */
+		    0, /* EPM: EQCR in ring mode (FIFO) */			/* EPM */
+		    1, /* Dequeued frame data, annotation, and FQ context stashing drop enable */		/* SD */
+		    1, /* Dequeued frame data, annotation, and FQ context stashing priority */			/* SP */
+		    0, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
+		    1, /* Dequeue response ring (DQRR) entry stashing priority */				/* DP */
+		    0, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
+		    0  /* EQCR_CI stashing priority */				/* EP */
 		);
+		reg &= ~(1 << DPAA2_SWP_CFG_CPBS_SHIFT) /* QMan-backed mode */
 	}
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_CFG, reg);
 	reg = dpaa2_swp_read_reg(p, DPAA2_SWP_CINH_CFG);

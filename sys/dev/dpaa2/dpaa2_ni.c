@@ -193,11 +193,11 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
 struct resource_spec dpaa2_ni_spec[] = {
 	/*
-	 * DPIO resources.
+	 * DPIO resources (software portals).
 	 *
 	 * NOTE: One per running core. While DPIOs are the source of data
-	 * availability interrupts, the DPCONs are used to identify the network
-	 * interface that has produced ingress data to that core.
+	 *	 availability interrupts, the DPCONs are used to identify the
+	 *	 network interface that has produced ingress data to that core.
 	 */
 	{ DPAA2_DEV_IO,  IO_RID(0),   RF_ACTIVE | RF_SHAREABLE },
 	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
@@ -214,12 +214,13 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 */
 	{ DPAA2_DEV_BP,  BP_RID(0),   RF_ACTIVE },
 	/*
-	 * DPCON resources.
+	 * DPCON  resources (channels).
 	 *
-	 * NOTE: One concentrator per core where Rx or Tx confirmation traffic
-	 * to be distributed to. Since it is necessary to distinguish between
-	 * traffic from different network interfaces arriving on the same core,
-	 * the DPCONs must be private to the DPNIs.
+	 * NOTE: One DPCON per core where Rx or Tx confirmation traffic to be
+	 *	 distributed to.
+	 * NOTE: Since it is necessary to distinguish between traffic from
+	 *	 different network interfaces arriving on the same core, the
+	 *	 DPCONs must be private to the DPNIs.
 	 */
 	{ DPAA2_DEV_CON, CON_RID(0),  RF_ACTIVE },
 	{ DPAA2_DEV_CON, CON_RID(1),  RF_ACTIVE | RF_OPTIONAL },
