@@ -362,7 +362,7 @@ setup_dpio_irqs(device_t dev)
 	}
 
 	if (sc->swp_desc.has_notif)
-		dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
+		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 
 	return (0);
 }
