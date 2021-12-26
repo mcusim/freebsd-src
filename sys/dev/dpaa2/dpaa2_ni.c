@@ -177,7 +177,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* for DPIO resources */
 #define IO_RID_OFF		(0u)
 #define IO_RID(rid)		((rid) + IO_RID_OFF)
-#define IO_RES_NUM		(4u)
+#define IO_RES_NUM		(8u)
 /* for DPBP resources */
 #define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
 #define BP_RID(rid)		((rid) + BP_RID_OFF)
@@ -185,7 +185,7 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* for DPCON resources */
 #define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)		((rid) + CON_RID_OFF)
-#define CON_RES_NUM		(16u)
+#define CON_RES_NUM		(8u)
 /* for DPMCP resources */
 #define MCP_RID_OFF		(CON_RID_OFF + CON_RES_NUM)
 #define MCP_RID(rid)		((rid) + MCP_RID_OFF)
@@ -203,6 +203,10 @@ struct resource_spec dpaa2_ni_spec[] = {
 	{ DPAA2_DEV_IO,  IO_RID(1),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(2),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(3),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(4),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(5),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(6),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(7),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	/*
 	 * DPBP resources.
 	 *
@@ -225,14 +229,6 @@ struct resource_spec dpaa2_ni_spec[] = {
  	{ DPAA2_DEV_CON, CON_RID(5),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(6),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(7),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(8),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(9),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
 	/*
 	 * DPMCP resources.
 	 *
@@ -332,8 +328,6 @@ static int	set_qos_table(device_t, dpaa2_cmd_t);
 static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
 
 static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
-static uint8_t	calc_swp_num(struct dpaa2_ni_softc *sc);
-
 static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
 		    uint16_t minor);
 static void	print_statistics(struct dpaa2_ni_softc *);
@@ -705,21 +699,14 @@ setup_channels(device_t dev)
 	uint8_t chan_idx;
 	int error;
 
-	/*
-	 * Calculate a number of software portals and channels based on the
-	 * allocated resources.
-	 */
-	sc->num_swp = calc_swp_num(sc);
+	/* Calculate a number of channels based on the allocated resources. */
 	sc->num_chan = calc_channels_num(sc);
 
 	/* Setup no more channels than DPNI queues. */
 	sc->num_chan = sc->num_chan > sc->attr.num.queues
 	    ? sc->attr.num.queues : sc->num_chan;
 
-	if (bootverbose) {
-		device_printf(dev, "portals=%d\n", sc->num_swp);
-		device_printf(dev, "channels=%d\n", sc->num_chan);
-	}
+	device_printf(dev, "channels=%d\n", sc->num_chan);
 
 	/* DMA tag to allocate buffers for buffer pool. */
 	error = bus_dma_tag_create(
@@ -737,124 +724,88 @@ setup_channels(device_t dev)
 		return (error);
 	}
 
-	for (uint32_t j = 0; j < sc->num_swp; j++) {
+	/* Setup channels for the portal. */
+	for (uint32_t i = 0; i < sc->num_chan; i++) {
 		/* Select software portal. */
-		io_dev = (device_t) rman_get_start(sc->res[IO_RID(j)]);
+		io_dev = (device_t) rman_get_start(sc->res[IO_RID(i)]);
 		iosc = device_get_softc(io_dev);
 		io_info = device_get_ivars(io_dev);
 
-		/* Setup channels for the portal. */
-		for (uint32_t i = 0; i < sc->num_chan; i++) {
-			con_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
-			consc = device_get_softc(con_dev);
-			con_info = device_get_ivars(con_dev);
+		/* Select DPCON (channel). */
+		con_dev = (device_t) rman_get_start(sc->res[CON_RID(i)]);
+		consc = device_get_softc(con_dev);
+		con_info = device_get_ivars(con_dev);
 
-			if (con_info->id == 0u)
-				continue;
-
-			if (sc->channel[i] == NULL) {
-				channel = malloc(sizeof(dpaa2_ni_channel_t),
-				    M_DPAA2_NI, M_WAITOK | M_ZERO);
-				if (!channel) {
-					device_printf(dev, "Failed to allocate "
-					    "a channel\n");
-					return (ENOMEM);
-				}
-				sc->channel[i] = channel;
-			}
-
-			channel->io_dev = io_dev;
-			channel->con_dev = con_dev;
-			channel->id = consc->attr.chan_id;
-			channel->buf_num = 0;
-
-			/* Setup WQ channel notification context. */
-			ctx = &channel->ctx;
-			ctx->cb = dpni_cdan_cb;
-			ctx->qman_ctx = (uint64_t) ctx;
-			ctx->cdan_en = true;
-			ctx->fq_chan_id = channel->id;
-			ctx->io_dev = channel->io_dev;
-
-			/* Register the new notification context. */
-			error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
-			if (error) {
-				device_printf(dev, "Failed to register "
-				    "notification\n");
-				return (error);
-			}
-
-			/* Open data path concentrator object. */
-			error = DPAA2_CMD_CON_OPEN(dev, dpaa2_mcp_tk(cmd,
-			    rc_token), con_info->id, &con_token);
-			if (error) {
-				device_printf(dev, "Failed to open DPCON: "
-				    "id=%d\n", con_info->id);
-				return (error);
-			}
-
-			/* Register DPCON notification with MC. */
-			notif_cfg.dpio_id = io_info->id;
-			notif_cfg.prior = 0;
-			notif_cfg.qman_ctx = ctx->qman_ctx;
-			error = DPAA2_CMD_CON_SET_NOTIF(dev, cmd, &notif_cfg);
-			if (error) {
-				device_printf(dev, "Failed to set DPCON "
-				    "notification: id=%d\n", con_info->id);
-				DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(cmd,
-				    con_token));
-				return (error);
-			}
-
-			/* Close data path concentrator object. */
-			error = DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(cmd,
-			    con_token));
-			if (error)
-				device_printf(dev, "Failed to close DPCON: "
-				    "id=%d, error=%d\n", con_info->id, error);
-
-			/* Allocate and map buffers for the buffer pool. */
-			error = seed_buf_pool(sc, channel);
-			if (error) {
-				device_printf(dev, "Failed to seed buffer "
-				    "pool.\n");
-				return (error);
-			}
-
-			if (bootverbose)
-				device_printf(dev, "channel: dpio_id=%d "
-				    "dpcon_id=%d chan_id=%d, priorities=%d\n",
-				    io_info->id, con_info->id, channel->id,
-				    consc->attr.prior_num);
-		}
-
-		error = DPAA2_CMD_IO_ADD_STATIC_DQ_CHAN(dev, dpaa2_mcp_tk(cmd,
-		    iosc->io_token), 0, &chan_idx);
+		/* Enable selected channel. */
+		error = DPAA2_CMD_CON_ENABLE(dev, dpaa2_mcp_tk(consc->cmd,
+		    consc->con_token));
 		if (error) {
-			device_printf(dev, "Failed to add static dequeue "
-			    "channel\n");
+			device_printf(dev, "Failed to enable channel: "
+			    "dpcon_id=%d, chan_id=%d\n", con_info->id,
+			    consc->attr.chan_id);
 			return (error);
 		}
-		device_printf(dev, "static dequeue channel idx=%d\n", chan_idx);
 
-		if (iosc->swp_desc.has_notif) {
-			dpaa2_swp_set_push_dequeue(iosc->swp, 0, true);
-			dpaa2_swp_set_push_dequeue(iosc->swp, chan_idx, true);
+		channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
+		    M_WAITOK | M_ZERO);
+		if (!channel) {
+			device_printf(dev, "Failed to allocate a channel\n");
+			return (ENOMEM);
 		}
+
+		sc->channel[i] = channel;
+
+		channel->io_dev = io_dev;
+		channel->con_dev = con_dev;
+		channel->id = consc->attr.chan_id;
+		channel->buf_num = 0;
+
+		/* Setup WQ channel notification context. */
+		ctx = &channel->ctx;
+		ctx->cb = dpni_cdan_cb;
+		ctx->qman_ctx = (uint64_t) ctx;
+		ctx->cdan_en = true;
+		ctx->fq_chan_id = channel->id;
+		ctx->io_dev = channel->io_dev;
+
+		/* Register the new notification context. */
+		error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
+		if (error) {
+			device_printf(dev, "Failed to register notification\n");
+			return (error);
+		}
+
+		/* Register DPCON notification with MC. */
+		notif_cfg.dpio_id = io_info->id;
+		notif_cfg.prior = 0;
+		notif_cfg.qman_ctx = ctx->qman_ctx;
+		error = DPAA2_CMD_CON_SET_NOTIF(dev, dpaa2_mcp_tk(consc->cmd,
+		    consc->con_token), &notif_cfg);
+		if (error) {
+			device_printf(dev, "Failed to set DPCON notification: "
+			    "dpcon_id, chan_id=%d\n", con_info->id,
+			    consc->attr.chan_id);
+			return (error);
+		}
+
+		/* Allocate and map buffers for the buffer pool. */
+		error = seed_buf_pool(sc, channel);
+		if (error) {
+			device_printf(dev, "Failed to seed buffer pool\n");
+			return (error);
+		}
+
+		if (bootverbose)
+			device_printf(dev, "channel: dpio_id=%d "
+			    "dpcon_id=%d chan_id=%d, priorities=%d\n",
+			    io_info->id, con_info->id, channel->id,
+			    consc->attr.prior_num);
 	}
 
-	/* Fill the gap of DPCON0 in the channels array. */
-	for (uint32_t i = 0, j = UINT32_MAX; i < sc->num_chan; i++) {
-		if (sc->channel[i] == NULL)
-			j = i;
-		if (i > j)
-			sc->channel[i-1] = sc->channel[i];
-	}
+	/*
+	 * TODO: De-allocate redundant DPIOs or DPCONs if exist.
+	 */
 
-	/* Exclude DPCON0. */
-	sc->num_chan--;
-
-	/* TODO: De-allocate redundant DPIOs or DPCONs if exist. */
 	return (0);
 }
 
@@ -929,6 +880,7 @@ setup_dpni_binding(device_t dev)
 	dpaa2_ni_err_cfg_t err_cfg;
 	int error;
 
+	/* Select buffer pool (only one available at the moment). */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bp_info = device_get_ivars(bp_dev);
 
@@ -1966,31 +1918,20 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 {
 	uint8_t i, num_chan;
 
-	/* Number of the allocated DPCONs. */
-	for (i = 0; i < CON_RES_NUM; i++)
-		if (!sc->res[CON_RID(i)])
-			break;
-	num_chan = i;
-
-	return (num_chan > DPAA2_NI_MAX_CHANNELS
-	    ? DPAA2_NI_MAX_CHANNELS : num_chan);
-}
-
-/**
- * @internal
- * @brief
- */
-static uint8_t
-calc_swp_num(struct dpaa2_ni_softc *sc)
-{
-	uint8_t i;
-
 	/* Number of the allocated DPIOs. */
 	for (i = 0; i < IO_RES_NUM; i++)
 		if (!sc->res[IO_RID(i)])
 			break;
+	num_chan = i;
 
-	return (i);
+	/* Number of the allocated DPCONs. */
+	for (i = 0; i < CON_RES_NUM; i++)
+		if (!sc->res[CON_RID(i)])
+			break;
+	num_chan = i < num_chan ? i : num_chan;
+
+	return (num_chan > DPAA2_NI_MAX_CHANNELS
+	    ? DPAA2_NI_MAX_CHANNELS : num_chan);
 }
 
 /**

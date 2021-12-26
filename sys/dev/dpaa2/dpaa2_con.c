@@ -85,6 +85,22 @@ dpaa2_con_probe(device_t dev)
 }
 
 static int
+dpaa2_con_detach(device_t dev)
+{
+	struct dpaa2_con_softc *sc = device_get_softc(dev);
+
+	DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->con_token));
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	dpaa2_mcp_free_command(sc->cmd);
+
+	sc->cmd = NULL;
+	sc->con_token = 0;
+	sc->rc_token = 0;
+
+	return (0);
+}
+
+static int
 dpaa2_con_attach(device_t dev)
 {
 	device_t pdev;
@@ -92,8 +108,6 @@ dpaa2_con_attach(device_t dev)
 	struct dpaa2_con_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
-	uint16_t rc_token, con_token;
 	int error;
 
 	sc = device_get_softc(dev);
@@ -104,7 +118,7 @@ dpaa2_con_attach(device_t dev)
 	dinfo = device_get_ivars(dev);
 
 	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
 	if (error) {
 		device_printf(dev, "Failed to allocate dpaa2_cmd: error=%d\n",
 		    error);
@@ -112,71 +126,47 @@ dpaa2_con_attach(device_t dev)
 	}
 
 	/* Open resource container and DPCON object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_CON_OPEN(dev, cmd, dinfo->id, &con_token);
+	error = DPAA2_CMD_CON_OPEN(dev, sc->cmd, dinfo->id, &sc->con_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPCON: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_rc;
 	}
 
 	/* Prepare DPCON object. */
-	error = DPAA2_CMD_CON_RESET(dev, cmd);
+	error = DPAA2_CMD_CON_RESET(dev, sc->cmd);
 	if (error) {
 		device_printf(dev, "Failed to reset DPCON: id=%d, error=%d\n",
 		    dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_con;
 	}
-	error = DPAA2_CMD_CON_GET_ATTRIBUTES(dev, cmd, &sc->attr);
+	error = DPAA2_CMD_CON_GET_ATTRIBUTES(dev, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPCON attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
-		goto err_free_cmd;
+		goto err_close_con;
 	}
-	/*
-	 * TODO: Enable debug output via sysctl (to reduce output).
-	 */
+
+	/* TODO: Enable debug output via sysctl (to reduce output). */
 	if (bootverbose)
-		device_printf(dev, "chan_id=%d, work_queues=%d\n",
+		device_printf(dev, "chan_id=%d, priorities=%d\n",
 		    sc->attr.chan_id, sc->attr.prior_num);
 
-	error = DPAA2_CMD_CON_ENABLE(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to enable DPCON: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-
-	/* Close the DPCON object and the resource container. */
-	error = DPAA2_CMD_CON_CLOSE(dev, cmd);
-	if (error) {
-		device_printf(dev, "Failed to close DPCON: id=%d, error=%d\n",
-		    dinfo->id, error);
-		goto err_free_cmd;
-	}
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
-	if (error) {
-		device_printf(dev, "Failed to close DPRC: error=%d\n", error);
-		goto err_free_cmd;
-	}
-
 	return (0);
 
+ err_close_con:
+	DPAA2_CMD_CON_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->con_token));
+ err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
  err_free_cmd:
-	dpaa2_mcp_free_command(cmd);
+	dpaa2_mcp_free_command(sc->cmd);
  err_exit:
-	dpaa2_con_detach(dev);
 	return (ENXIO);
-}
-
-static int
-dpaa2_con_detach(device_t dev)
-{
-	return (0);
 }
 
 static device_method_t dpaa2_con_methods[] = {
