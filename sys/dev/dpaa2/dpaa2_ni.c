@@ -787,13 +787,10 @@ setup_channels(device_t dev)
 		}
 
 		/* Allocate and map buffers for the buffer pool. */
-		if (io_info->id == 1) {
-			error = seed_buf_pool(sc, channel);
-			if (error) {
-				device_printf(dev, "Failed to seed buffer pool\n");
-				return (error);
-			}
-			device_printf(io_dev, "seed buffer pool\n");
+		error = seed_buf_pool(sc, channel);
+		if (error) {
+			device_printf(dev, "Failed to seed buffer pool\n");
+			return (error);
 		}
 
 		if (bootverbose)
