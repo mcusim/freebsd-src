@@ -695,7 +695,6 @@ setup_channels(device_t dev)
 	dpaa2_ni_channel_t *channel;
 	dpaa2_io_notif_ctx_t *ctx;
 	dpaa2_con_notif_cfg_t notif_cfg;
-	bool bp_seeded = false;
 	int error;
 
 	/* Calculate a number of channels based on the allocated resources. */
@@ -788,13 +787,12 @@ setup_channels(device_t dev)
 		}
 
 		/* Allocate and map buffers for the buffer pool. */
-		if (!bp_seeded) {
+		if (io_info->id == 1) {
 			error = seed_buf_pool(sc, channel);
 			if (error) {
 				device_printf(dev, "Failed to seed buffer pool\n");
 				return (error);
 			}
-			bp_seeded = true;
 		}
 
 		if (bootverbose)
