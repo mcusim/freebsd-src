@@ -351,7 +351,7 @@ setup_dpio_irqs(device_t dev)
 		return (error);
 	}
 	if ((sc->irq_resource = bus_alloc_resource_any(dev, SYS_RES_IRQ,
-	    &sc->irq_rid[0], RF_ACTIVE)) == NULL) {
+	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
 		device_printf(dev, "Failed to allocate IRQ resource\n");
 		return (ENXIO);
 	}
