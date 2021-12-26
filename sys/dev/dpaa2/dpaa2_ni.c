@@ -1158,13 +1158,13 @@ setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 static int
 setup_dpni_irqs(device_t dev)
 {
+#if 0
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	dpaa2_cmd_t cmd = sc->cmd;
 	uint16_t ni_token = sc->ni_token;
 	int error;
 
 	/* Configure IRQs. */
-#if 0
 	error = setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI\n");
