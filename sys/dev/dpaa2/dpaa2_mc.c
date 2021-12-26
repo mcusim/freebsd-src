@@ -396,7 +396,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 
 	*addr = a;
 	*data = d;
-	device_printf(child, "mapped MSI: irq=%d, addr=%#jx, data=%#x, "
+	device_printf(child, "mapped MSI: irq=%d, addr=%#jx, data=0x%x, "
 	    "error=%d\n", irq, a, d, error);
 
 	return (error);
