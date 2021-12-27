@@ -1511,7 +1511,8 @@ intr_map_msi(device_t pci, device_t child, intptr_t xref, int irq,
 		return (EINVAL);
 
 	/* For debug purposed only! */
-	device_printf(child, "%s: irq=%d, isrc=%#jx\n", __func__, irq, isrc);
+	device_printf(child, "%s: irq=%d, isrc=%#jx\n", __func__, irq,
+	    (uintmax_t)isrc);
 
 	err = MSI_MAP_MSI(pic->pic_dev, child, isrc, addr, data);
 
