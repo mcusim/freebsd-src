@@ -97,6 +97,7 @@ struct dpaa2_mc_softc {
 
 	struct mtx		 msi_lock;
 	struct dpaa2_mc_msi	 msi[DPAA2_MC_MSI_COUNT];
+	device_t		 msi_owner;
 	bool			 msi_allocated;
 };
 

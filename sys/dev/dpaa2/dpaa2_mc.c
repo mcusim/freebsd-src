@@ -116,6 +116,7 @@ dpaa2_mc_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	sc->msi_allocated = false;
+	sc->msi_owner = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
 	if (error) {
@@ -373,9 +374,8 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 
 	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
 	if (!sc->msi_allocated) {
-		error = intr_alloc_msi(device_get_parent(mcdev), mcdev,
-		    dpaa2_mc_get_xref(mcdev, child), DPAA2_MC_MSI_COUNT,
-		    DPAA2_MC_MSI_COUNT, msi_irqs);
+		error = intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev,
+		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
 		if (error) {
 			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
 			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
@@ -392,6 +392,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 		}
 		mtx_unlock(&sc->msi_lock);
 
+		sc->msi_owner = child;
 		sc->msi_allocated = true;
 	}
 
