@@ -373,8 +373,9 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 
 	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
 	if (!sc->msi_allocated) {
-		error = intr_alloc_msi(mcdev, mcdev, dpaa2_mc_get_xref(mcdev,
-		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
+		error = intr_alloc_msi(device_get_parent(mcdev), mcdev,
+		    dpaa2_mc_get_xref(mcdev, child), DPAA2_MC_MSI_COUNT,
+		    DPAA2_MC_MSI_COUNT, msi_irqs);
 		if (error) {
 			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
 			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
