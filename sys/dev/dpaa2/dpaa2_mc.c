@@ -440,20 +440,22 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	uint64_t a = 0;
 	uint32_t d = 0;
-	device_t c = NULL;
-	int error;
+	int error = EINVAL;
 
 	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
 	mtx_lock(&sc->msi_lock);
 	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
-		if (sc->msi[i].child != NULL && sc->msi[i].irq == irq) {
-			c = sc->msi[i].child;
+		if (sc->msi[i].child == child && sc->msi[i].irq == irq) {
+			error = 0;
 			break;
 		}
 	}
 	mtx_unlock(&sc->msi_lock);
+	if (error)
+		return (error);
 
-	error = intr_map_msi(mcdev, c, dpaa2_mc_get_xref(mcdev, c), irq, &a, &d);
+	error = intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
+	    sc->msi_owner), irq, &a, &d);
 
 	*addr = a;
 	*data = d;
