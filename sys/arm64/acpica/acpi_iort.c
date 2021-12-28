@@ -669,6 +669,9 @@ acpi_iort_map_named_msi(const char *devname, u_int rid, u_int *xref,
 	/* This should be an ITS node */
 	KASSERT(node->type == ACPI_IORT_NODE_ITS_GROUP, ("bad group"));
 
+	/* For debug purposed only! */
+	printf("%s: node->nentries=%d\n", __func__, node->nentries);
+
 	/* Return first node, we don't handle more than that now. */
 	*xref = node->entries.its[0].xref;
 	return (0);
