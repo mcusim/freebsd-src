@@ -397,7 +397,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 	}
 
 	/* Allocate no more then 1 MSI per invocation for now. */
-	if (cound > 1 || maxcount > 1)
+	if (count > 1 || maxcount > 1)
 		return (EINVAL);
 
 	error = ENOENT;
@@ -437,6 +437,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq_idx, uint64_t *addr,
     uint32_t *data)
 {
 #if defined(INTRNG)
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	uint64_t a = 0;
 	uint32_t d = 0;
 	device_t c;
