@@ -420,8 +420,8 @@ dpio_msi_intr(void *arg)
 	if (status & DPAA2_SWP_INTR_VDCI)
 		device_printf(sc->dev, "irq: Volatile dequeue command\n");
 
-	dpaa2_swp_clear_intr_status(sc->swp, status);
-	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
+	/* dpaa2_swp_clear_intr_status(sc->swp, status); */
+	/* dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0); */
 }
 
 static device_method_t dpaa2_io_methods[] = {
