@@ -409,7 +409,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 		if (sc->msi[i].child != NULL)
 			continue;
 		sc->msi[i].child = child;
-		irqs[0] = sc->msi[i].irq;
+		irqs[0] = i;
 		error = 0;
 		break;
 	}
@@ -433,16 +433,22 @@ dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 }
 
 int
-dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
+dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq_idx, uint64_t *addr,
     uint32_t *data)
 {
 #if defined(INTRNG)
 	uint64_t a = 0;
 	uint32_t d = 0;
-	int error;
+	device_t c;
+	int irq, error;
 
-	error = intr_map_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child), irq,
-	    &a, &d);
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	c = sc->msi[irq_idx].child;
+	irq = sc->msi[irq_idx].irq;
+	mtx_unlock(&sc->msi_lock);
+
+	error = intr_map_msi(mcdev, c, dpaa2_mc_get_xref(mcdev, c), irq, &a, &d);
 
 	*addr = a;
 	*data = d;
