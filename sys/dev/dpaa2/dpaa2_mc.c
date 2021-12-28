@@ -368,13 +368,13 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 {
 #if defined(INTRNG)
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
-	int irqs[DPAA2_MC_MSI_COUNT];
+	int msi_irqs[DPAA2_MC_MSI_COUNT];
 	int error;
 
 	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
 	if (!sc->msi_allocated) {
 		error = intr_alloc_msi(mcdev, mcdev, dpaa2_mc_get_xref(mcdev,
-		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, irqs);
+		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
 		if (error) {
 			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
 			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
@@ -387,7 +387,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 			sc->msi[i].child = NULL;
 			sc->msi[i].addr = 0;
 			sc->msi[i].data = 0;
-			sc->msi[i].irq = irqs[i];
+			sc->msi[i].irq = msi_irqs[i];
 		}
 		mtx_unlock(&sc->msi_lock);
 
