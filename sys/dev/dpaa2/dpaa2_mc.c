@@ -88,6 +88,13 @@ struct dpaa2_mc_devinfo {
 	uint32_t	owners;
 };
 
+struct dpaa2_mc_msi {
+	device_t	child;
+	uint64_t	addr;
+	uint32_t	data;
+	int		irq;
+};
+
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc", "DPAA2 Management Complex");
 
 static struct resource_spec dpaa2_mc_spec[] = {
@@ -115,6 +122,7 @@ dpaa2_mc_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
+	sc->msi_allocated = false;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
 	if (error) {
@@ -197,6 +205,8 @@ dpaa2_mc_attach(device_t dev)
 	/* Initialize a list of non-allocatable DPAA2 devices. */
 	mtx_init(&sc->mdev_lock, "MC portal mdev lock", NULL, MTX_DEF);
 	STAILQ_INIT(&sc->mdev_list);
+
+	mtx_init(&sc->msi_lock, "MC MSI lock", NULL, MTX_DEF);
 
 	/*
 	 * Add a root resource container as the only child of the bus. All of
@@ -364,6 +374,33 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
 #if defined(INTRNG)
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+	int irqs[DPAA2_MC_MSI_COUNT];
+	int error;
+
+	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
+	if (!sc->msi_allocated) {
+		error = intr_alloc_msi(mcdev, mcdev, dpaa2_mc_get_xref(mcdev,
+		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, irqs);
+		if (error) {
+			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
+			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
+			return (error);
+		}
+
+		mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+		mtx_lock(&sc->msi_lock);
+		for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+			sc->msi[i].child = NULL;
+			sc->msi[i].addr = 0;
+			sc->msi[i].data = 0;
+			sc->msi[i].irq = irqs[i];
+		}
+		mtx_unlock(&sc->msi_lock);
+
+		sc->msi_allocated = true;
+	}
+
 	return (intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
 	    count, maxcount, irqs));
 #else

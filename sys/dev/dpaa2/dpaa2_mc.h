@@ -47,15 +47,16 @@
 #include "dpaa2_mac.h"
 #include "dpaa2_con.h"
 
-/*
- * Flags for DPAA2 devices as resources.
- */
+/* Maximum number of MSIs supported by the MC. */
+#define DPAA2_MC_MSI_COUNT	50
+
+/* Flags for DPAA2 devices as resources. */
 #define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to manage by DPAA2-specific rman */
 #define DPAA2_MC_DEV_ASSOCIATED	 0x02u /* to obtain info about DPAA2 device  */
 #define DPAA2_MC_DEV_SHAREABLE	 0x04u /* to be shared among DPAA2 devices */
 
-/* An element in the queue of the managed DPAA2 devices. */
-struct dpaa2_mc_devinfo;
+struct dpaa2_mc_devinfo; /* Info about managed DPAA2 device. */
+struct dpaa2_mc_msi;
 
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.
@@ -87,6 +88,10 @@ struct dpaa2_mc_softc {
 	/* For managed DPAA2 objects. */
 	struct mtx		 mdev_lock;
 	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
+
+	struct mtx		 msi_lock;
+	struct dpaa2_mc_msi	 msi[DPAA2_MC_MSI_COUNT];
+	bool			 msi_allocated;
 };
 
 /**
