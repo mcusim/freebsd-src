@@ -56,7 +56,13 @@
 #define DPAA2_MC_DEV_SHAREABLE	 0x04u /* to be shared among DPAA2 devices */
 
 struct dpaa2_mc_devinfo; /* Info about managed DPAA2 device. */
-struct dpaa2_mc_msi;
+
+struct dpaa2_mc_msi {
+	device_t	child;
+	uint64_t	addr;
+	uint32_t	data;
+	int		irq;
+};
 
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.

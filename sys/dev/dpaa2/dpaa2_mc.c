@@ -88,13 +88,6 @@ struct dpaa2_mc_devinfo {
 	uint32_t	owners;
 };
 
-struct dpaa2_mc_msi {
-	device_t	child;
-	uint64_t	addr;
-	uint32_t	data;
-	int		irq;
-};
-
 MALLOC_DEFINE(M_DPAA2_MC, "dpaa2_mc", "DPAA2 Management Complex");
 
 static struct resource_spec dpaa2_mc_spec[] = {
