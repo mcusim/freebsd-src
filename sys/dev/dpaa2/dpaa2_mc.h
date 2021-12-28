@@ -48,7 +48,7 @@
 #include "dpaa2_con.h"
 
 /* Maximum number of MSIs supported by the MC. */
-#define DPAA2_MC_MSI_COUNT	50
+#define DPAA2_MC_MSI_COUNT	32
 
 /* Flags for DPAA2 devices as resources. */
 #define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to manage by DPAA2-specific rman */

@@ -396,8 +396,26 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 		sc->msi_allocated = true;
 	}
 
-	return (intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
-	    count, maxcount, irqs));
+	/* Allocate no more then 1 MSI per invocation for now. */
+	if (cound > 1 || maxcount > 1)
+		return (EINVAL);
+
+	error = ENOENT;
+
+	/* Find the first free MSI from the pre-allocated pool. */
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child != NULL)
+			continue;
+		sc->msi[i].child = child;
+		irqs[0] = sc->msi[i].irq;
+		error = 0;
+		break;
+	}
+	mtx_unlock(&sc->msi_lock);
+
+	return (error);
 #else
 	return (ENXIO);
 #endif
