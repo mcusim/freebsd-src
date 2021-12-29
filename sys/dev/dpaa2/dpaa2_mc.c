@@ -115,7 +115,7 @@ dpaa2_mc_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	sc->msi_allocated = 0;
+	sc->msi_allocated = false;
 	sc->msi_owner = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
@@ -199,6 +199,8 @@ dpaa2_mc_attach(device_t dev)
 	/* Initialize a list of non-allocatable DPAA2 devices. */
 	mtx_init(&sc->mdev_lock, "MC portal mdev lock", NULL, MTX_DEF);
 	STAILQ_INIT(&sc->mdev_list);
+
+	mtx_init(&sc->msi_lock, "MC MSI lock", NULL, MTX_DEF);
 
 	/*
 	 * Add a root resource container as the only child of the bus. All of
@@ -367,19 +369,52 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 {
 #if defined(INTRNG)
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+	int msi_irqs[DPAA2_MC_MSI_COUNT];
 	int error;
 
-	KASSERT(sc->msi_allocated + count <= DPAA2_MC_MSI_COUNT,
-	    ("cannot allocate more MSIs: allocated=%d, requested=%d",
-	    sc->msi_allocated, count));
+	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
+	if (!sc->msi_allocated) {
+		error = intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev,
+		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
+		if (error) {
+			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
+			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
+			return (error);
+		}
 
-	if (sc->msi_owner == NULL)
+		mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+		mtx_lock(&sc->msi_lock);
+		for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+			sc->msi[i].child = NULL;
+			sc->msi[i].addr = 0;
+			sc->msi[i].data = 0;
+			sc->msi[i].irq = msi_irqs[i];
+		}
+		mtx_unlock(&sc->msi_lock);
+
 		sc->msi_owner = child;
+		sc->msi_allocated = true;
+	}
 
-	error = intr_alloc_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
-	    sc->msi_owner), count, maxcount, irqs);
-	if (!error)
-		sc->msi_allocated += count;
+	/* Allocate no more then 1 MSI per invocation for now. */
+	if (count > 1 || maxcount > 1)
+		return (EINVAL);
+
+	error = ENOENT;
+
+	/* Find the first free MSI from the pre-allocated pool. */
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child != NULL)
+			continue;
+		sc->msi[i].child = child;
+		irqs[0] = sc->msi[i].irq;
+		error = 0;
+		break;
+	}
+	mtx_unlock(&sc->msi_lock);
+
 	return (error);
 #else
 	return (ENXIO);
@@ -390,17 +425,8 @@ int
 dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 {
 #if defined(INTRNG)
-	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
-	int error;
-
-	KASSERT(sc->msi_owner != NULL, ("MSI owner is NULL (MSI was not "
-	    "allocated?)"));
-
-	error = intr_release_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
-	    sc->msi_owner), count, irqs);
-	if (!error)
-		sc->msi_allocated -= count;
-	return (error);
+	return (intr_release_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
+	    count, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -414,10 +440,19 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	uint64_t a = 0;
 	uint32_t d = 0;
-	int error;
+	int error = EINVAL;
 
-	KASSERT(sc->msi_owner != NULL, ("MSI owner is NULL (MSI was not "
-	    "allocated?)"));
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child == child && sc->msi[i].irq == irq) {
+			error = 0;
+			break;
+		}
+	}
+	mtx_unlock(&sc->msi_lock);
+	if (error)
+		return (error);
 
 	error = intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
 	    sc->msi_owner), irq, &a, &d);
@@ -426,6 +461,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	*data = d;
 	device_printf(child, "mapped MSI: irq=%d, addr=%#jx, data=0x%x, "
 	    "error=%d\n", irq, a, d, error);
+
 	return (error);
 #else
 	return (ENXIO);
