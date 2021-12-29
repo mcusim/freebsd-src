@@ -438,8 +438,6 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 {
 #if defined(INTRNG)
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
-	uint64_t a = 0;
-	uint32_t d = 0;
 	int error = EINVAL;
 
 	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
@@ -455,13 +453,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 		return (error);
 
 	error = intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
-	    sc->msi_owner), irq, &a, &d);
-
-	*addr = a;
-	*data = d;
-	device_printf(child, "mapped MSI: irq=%d, addr=%#jx, data=0x%x, "
-	    "error=%d\n", irq, a, d, error);
-
+	    sc->msi_owner), irq, addr, data);
 	return (error);
 #else
 	return (ENXIO);
