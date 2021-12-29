@@ -377,7 +377,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 		sc->msi_owner = child;
 
 	error = intr_alloc_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
-	    msi_owner), count, maxcount, irqs);
+	    sc->msi_owner), count, maxcount, irqs);
 	if (!error)
 		sc->msi_allocated += count;
 	return (error);
