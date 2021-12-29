@@ -1465,9 +1465,6 @@ gicv3_its_map_msi(device_t dev, device_t child, struct intr_irqsrc *isrc,
 	sc = device_get_softc(dev);
 	girq = (struct gicv3_its_irqsrc *)isrc;
 
-	/* For debug purposed only! */
-	device_printf(child, "%s: isrc=%#jx\n", __func__, (uintmax_t)isrc);
-
 	*addr = vtophys(rman_get_virtual(sc->sc_its_res)) + GITS_TRANSLATER;
 	*data = girq->gi_id;
 
