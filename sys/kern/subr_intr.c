@@ -1510,28 +1510,11 @@ intr_map_msi(device_t pci, device_t child, intptr_t xref, int irq,
 	if (isrc == NULL)
 		return (EINVAL);
 
-	/* For debug purposed only! */
-	device_printf(child, "%s: irq=%d, isrc=%#jx\n", __func__, irq,
-	    (uintmax_t)isrc);
-
 	err = MSI_MAP_MSI(pic->pic_dev, child, isrc, addr, data);
 
-	/* For debug purposed only! */
-	device_printf(child, "%s: mapped MSI: addr=%#jx\n", __func__, *addr);
-
 #ifdef IOMMU
-	if (isrc->isrc_iommu != NULL) {
+	if (isrc->isrc_iommu != NULL)
 		iommu_translate_msi(isrc->isrc_iommu, addr);
-		/* For debug purposed only! */
-		device_printf(child, "%s: translated MSI: addr=%#jx\n",
-		    __func__, *addr);
-	} else {
-		/* For debug purposed only! */
-		device_printf(child, "%s: isrc_iommu is NULL\n", __func__);
-	}
-#else
-	/* For debug purposed only! */
-	device_printf(child, "%s: IOMMU is not defined\n", __func__);
 #endif
 
 	return (err);
