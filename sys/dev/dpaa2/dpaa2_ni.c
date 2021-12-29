@@ -1853,7 +1853,6 @@ dpni_msi_intr(void *arg)
 		device_printf(sc->dev, "irq: link state changed\n");
 	if (status & DPNI_IRQ_EP_CHANGED)
 		device_printf(sc->dev, "irq: endpoint changed\n");
-	device_printf(sc->dev, "irq: invoked\n");
 }
 
 /**
