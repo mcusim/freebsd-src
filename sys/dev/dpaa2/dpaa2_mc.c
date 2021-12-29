@@ -813,7 +813,7 @@ alloc_msi(device_t mcdev, device_t child, int count, int maxcount, int *irqs)
 		error = 0;
 		for (int j = 0; j < count; j++) {
 			if (i + j >= DPAA2_MC_MSI_COUNT) {
-				device_printf(dev, "requested %d MSIs exceed "
+				device_printf(mcdev, "requested %d MSIs exceed "
 				    "limit of %d available\n", count,
 				    DPAA2_MC_MSI_COUNT);
 				error = E2BIG;
