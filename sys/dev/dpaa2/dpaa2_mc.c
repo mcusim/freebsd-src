@@ -97,9 +97,14 @@ static struct resource_spec dpaa2_mc_spec[] = {
 };
 
 /* Forward declarations. */
+
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
 static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
+
+static int alloc_msi(device_t, device_t, int count, int maxcount, int *irqs);
+static int release_msi(device_t, device_t, int count, int *irqs);
+static int map_msi(device_t, device_t, int irq, uint64_t *addr, uint32_t *data);
 
 /*
  * For device interface.
@@ -368,54 +373,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
 #if defined(INTRNG)
-	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
-	int msi_irqs[DPAA2_MC_MSI_COUNT];
-	int error;
-
-	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
-	if (!sc->msi_allocated) {
-		error = intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev,
-		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
-		if (error) {
-			device_printf(mcdev, "Failed to pre-allocate %d MSI: "
-			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
-			return (error);
-		}
-
-		mtx_assert(&sc->msi_lock, MA_NOTOWNED);
-		mtx_lock(&sc->msi_lock);
-		for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
-			sc->msi[i].child = NULL;
-			sc->msi[i].addr = 0;
-			sc->msi[i].data = 0;
-			sc->msi[i].irq = msi_irqs[i];
-		}
-		mtx_unlock(&sc->msi_lock);
-
-		sc->msi_owner = child;
-		sc->msi_allocated = true;
-	}
-
-	/* Allocate no more then 1 MSI per invocation for now. */
-	if (count > 1 || maxcount > 1)
-		return (EINVAL);
-
-	error = ENOENT;
-
-	/* Find the first free MSI from the pre-allocated pool. */
-	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
-	mtx_lock(&sc->msi_lock);
-	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
-		if (sc->msi[i].child != NULL)
-			continue;
-		sc->msi[i].child = child;
-		irqs[0] = sc->msi[i].irq;
-		error = 0;
-		break;
-	}
-	mtx_unlock(&sc->msi_lock);
-
-	return (error);
+	return (alloc_msi(mcdev, child, count, maxcount, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -425,8 +383,7 @@ int
 dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 {
 #if defined(INTRNG)
-	return (intr_release_msi(mcdev, child, dpaa2_mc_get_xref(mcdev, child),
-	    count, irqs));
+	return (release_msi(mcdev, child, count, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -437,24 +394,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
     uint32_t *data)
 {
 #if defined(INTRNG)
-	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
-	int error = EINVAL;
-
-	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
-	mtx_lock(&sc->msi_lock);
-	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
-		if (sc->msi[i].child == child && sc->msi[i].irq == irq) {
-			error = 0;
-			break;
-		}
-	}
-	mtx_unlock(&sc->msi_lock);
-	if (error)
-		return (error);
-
-	error = intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
-	    sc->msi_owner), irq, addr, data);
-	return (error);
+	return (map_msi(mcdev, child, irq, addr, data));
 #else
 	return (ENXIO);
 #endif
@@ -824,6 +764,132 @@ dpaa2_mc_rman(device_t mcdev, int type)
 
 	return (NULL);
 }
+
+#if defined(INTRNG) && !defined(IOMMU)
+
+/**
+ * @internal
+ * @brief Allocates requested number of MSIs.
+ *
+ * NOTE: This function is a part of fallback solution when IOMMU isn't available.
+ *	 Total number of IRQs is limited to 32.
+ */
+static int
+alloc_msi(device_t mcdev, device_t child, int count, int maxcount, int *irqs)
+{
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+	int msi_irqs[DPAA2_MC_MSI_COUNT];
+	int error;
+
+	/* Pre-allocate a bunch of MSIs for MC to be used by its children. */
+	if (!sc->msi_allocated) {
+		error = intr_alloc_msi(mcdev, child, dpaa2_mc_get_xref(mcdev,
+		    child), DPAA2_MC_MSI_COUNT, DPAA2_MC_MSI_COUNT, msi_irqs);
+		if (error) {
+			device_printf(mcdev, "failed to pre-allocate %d MSIs: "
+			    "error=%d\n", DPAA2_MC_MSI_COUNT, error);
+			return (error);
+		}
+
+		mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+		mtx_lock(&sc->msi_lock);
+		for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+			sc->msi[i].child = NULL;
+			sc->msi[i].irq = msi_irqs[i];
+		}
+		sc->msi_owner = child;
+		sc->msi_allocated = true;
+		mtx_unlock(&sc->msi_lock);
+	}
+
+	error = ENOENT;
+
+	/* Find the first free MSIs from the pre-allocated pool. */
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child != NULL)
+			continue;
+		error = 0;
+		for (int j = 0; j < count; j++) {
+			if (i + j >= DPAA2_MC_MSI_COUNT) {
+				device_printf(dev, "requested %d MSIs exceed "
+				    "limit of %d available\n", count,
+				    DPAA2_MC_MSI_COUNT);
+				error = E2BIG;
+				break;
+			}
+			sc->msi[i + j].child = child;
+			irqs[j] = sc->msi[i + j].irq;
+		}
+		break;
+	}
+	mtx_unlock(&sc->msi_lock);
+
+	return (error);
+}
+
+/**
+ * @internal
+ * @brief Marks IRQs as free in the pre-allocated pool of MSIs.
+ *
+ * NOTE: This function is a part of fallback solution when IOMMU isn't available.
+ *	 Total number of IRQs is limited to 32.
+ * NOTE: MSI is kept allocated in the kernel as a part of the pool.
+ */
+static int
+release_msi(device_t mcdev, device_t child, int count, int *irqs)
+{
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child != child)
+			continue;
+		for (int j = 0; j < count; j++) {
+			if (sc->msi[i].irq == irqs[j]) {
+				sc->msi[i].child = NULL;
+				break;
+			}
+		}
+	}
+	mtx_unlock(&sc->msi_lock);
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Provides address to write to and data according to the given MSI from
+ * the pre-allocated pool.
+ *
+ * NOTE: This function is a part of fallback solution when IOMMU isn't available.
+ *	 Total number of IRQs is limited to 32.
+ */
+static int
+map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr, uint32_t *data)
+{
+	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
+	int error = EINVAL;
+
+	mtx_assert(&sc->msi_lock, MA_NOTOWNED);
+	mtx_lock(&sc->msi_lock);
+	for (int i = 0; i < DPAA2_MC_MSI_COUNT; i++) {
+		if (sc->msi[i].child == child && sc->msi[i].irq == irq) {
+			error = 0;
+			break;
+		}
+	}
+	mtx_unlock(&sc->msi_lock);
+	if (error)
+		return (error);
+
+	return (intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
+	    sc->msi_owner), irq, addr, data));
+}
+
+#endif /* defined(INTRNG) && !defined(IOMMU) */
 
 static device_method_t dpaa2_mc_methods[] = {
 	DEVMETHOD_END
