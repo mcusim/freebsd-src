@@ -45,7 +45,9 @@
 /* Name of the DPAA2 network interface. */
 #define DPAA2_NI_IFNAME		"dpaa2ni"
 
-#define DPAA2_NI_MAX_RESOURCES	34  /* resources per DPNI */
+/* Maximum resources per DPNI: 16 DPIOs + 16 DPCONs + 1 DPBP + 1 DPMCP. */
+#define DPAA2_NI_MAX_RESOURCES	34
+
 #define DPAA2_NI_MSI_COUNT	1  /* MSIs per DPNI */
 #define DPAA2_NI_MAX_CHANNELS	16 /* to distribute ingress traffic to cores */
 #define DPAA2_NI_MAX_TCS	8  /* traffic classes per DPNI */
