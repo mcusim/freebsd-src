@@ -47,8 +47,8 @@
 #include "dpaa2_mac.h"
 #include "dpaa2_con.h"
 
-/* Maximum number of MSIs supported by the MC. */
-#define DPAA2_MC_MSI_COUNT	32
+/* Maximum number of MSIs supported by the MC for its children. */
+#define DPAA2_MC_MSI_COUNT	 32
 
 /* Flags for DPAA2 devices as resources. */
 #define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to manage by DPAA2-specific rman */
@@ -57,13 +57,6 @@
 
 struct dpaa2_mc_devinfo; /* Info about managed DPAA2 device. */
 
-struct dpaa2_mc_msi {
-	device_t	child;
-	uint64_t	addr;
-	uint32_t	data;
-	int		irq;
-};
-
 /**
  * @brief Software context for the DPAA2 Management Complex (MC) driver.
  *
@@ -71,9 +64,11 @@ struct dpaa2_mc_msi {
  * rcdev:	Child device associated with the root resource container.
  * acpi_based:	Attached using ACPI (true) or FDT (false).
  * ofw_node:	FDT node of the Management Complex (acpi_based == false).
+ *
  * res:		Unmapped MC command portal and control registers resources.
  * map:		Mapped MC command portal and control registers resources.
- * dpni_rman:	Data Path I/O objects resource manager.
+ *
+ * dpio_rman:	Data Path I/O objects resource manager.
  * dpbp_rman:	Data Path Buffer Pools resource manager.
  * dpcon_rman:	Data Path Concentrators resource manager.
  */
@@ -95,10 +90,15 @@ struct dpaa2_mc_softc {
 	struct mtx		 mdev_lock;
 	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
 
+#ifndef IOMMU
 	struct mtx		 msi_lock;
-	struct dpaa2_mc_msi	 msi[DPAA2_MC_MSI_COUNT];
+	struct {
+		device_t	 child;
+		int		 irq;
+	} msi[DPAA2_MC_MSI_COUNT];
 	device_t		 msi_owner;
 	bool			 msi_allocated;
+#endif
 };
 
 /**
