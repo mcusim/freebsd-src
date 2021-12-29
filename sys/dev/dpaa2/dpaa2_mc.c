@@ -116,6 +116,7 @@ dpaa2_mc_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	sc->msi_allocated = 0;
+	sc->msi_owner = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
 	if (error) {
@@ -372,8 +373,11 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 	    ("cannot allocate more MSIs: allocated=%d, requested=%d",
 	    sc->msi_allocated, count));
 
-	error = intr_alloc_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev, child),
-	    count, maxcount, irqs);
+	if (sc->msi_owner == NULL)
+		sc->msi_owner = child;
+
+	error = intr_alloc_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
+	    msi_owner), count, maxcount, irqs);
 	if (!error)
 		sc->msi_allocated += count;
 	return (error);
@@ -389,8 +393,11 @@ dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	int error;
 
-	error = intr_release_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev,
-	    child), count, irqs);
+	KASSERT(sc->msi_owner != NULL, ("MSI owner is NULL (MSI was not "
+	    "allocated?)"));
+
+	error = intr_release_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
+	    sc->msi_owner), count, irqs);
 	if (!error)
 		sc->msi_allocated -= count;
 	return (error);
@@ -409,8 +416,11 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	uint32_t d = 0;
 	int error;
 
-	error = intr_map_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev, child),
-	    irq, &a, &d);
+	KASSERT(sc->msi_owner != NULL, ("MSI owner is NULL (MSI was not "
+	    "allocated?)"));
+
+	error = intr_map_msi(mcdev, sc->msi_owner, dpaa2_mc_get_xref(mcdev,
+	    sc->msi_owner), irq, &a, &d);
 
 	*addr = a;
 	*data = d;

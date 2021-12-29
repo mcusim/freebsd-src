@@ -77,6 +77,7 @@ struct dpaa2_mc_softc {
 	device_t		 rcdev;
 	bool			 acpi_based;
 	phandle_t		 ofw_node;
+	device_t		 msi_owner;
 	uint32_t		 msi_allocated;
 
 	struct resource 	*res[2];
