@@ -372,8 +372,8 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
 	    ("cannot allocate more MSIs: allocated=%d, requested=%d",
 	    sc->msi_allocated, count));
 
-	error = intr_alloc_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev,
-	    sc->rcdev), count, maxcount, irqs);
+	error = intr_alloc_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev, child),
+	    count, maxcount, irqs);
 	if (!error)
 		sc->msi_allocated += count;
 	return (error);
@@ -390,7 +390,7 @@ dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 	int error;
 
 	error = intr_release_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev,
-	    sc->rcdev), count, irqs);
+	    child), count, irqs);
 	if (!error)
 		sc->msi_allocated -= count;
 	return (error);
@@ -409,8 +409,8 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
 	uint32_t d = 0;
 	int error;
 
-	error = intr_map_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev,
-	    sc->rcdev), irq, &a, &d);
+	error = intr_map_msi(mcdev, sc->rcdev, dpaa2_mc_get_xref(mcdev, child),
+	    irq, &a, &d);
 
 	*addr = a;
 	*data = d;
