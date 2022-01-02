@@ -415,28 +415,11 @@ dpio_msi_intr(void *arg)
 	uint32_t status = 0u;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
-	if (status == 0u) {
-		device_printf(sc->dev, "irq: status=0\n");
+	if (status == 0u)
 		return;
-	}
 
-	if (status & DPAA2_SWP_INTR_EQRI)
-		device_printf(sc->dev, "irq: EQCR ring\n");
-	if (status & DPAA2_SWP_INTR_EQDI)
-		device_printf(sc->dev, "irq: Enqueue command dispatched\n");
-	if (status & DPAA2_SWP_INTR_DQRI)
-		device_printf(sc->dev, "irq: DQRR non-empty\n");
-	if (status & DPAA2_SWP_INTR_RCRI)
-		device_printf(sc->dev, "irq: RCR ring\n");
-	if (status & DPAA2_SWP_INTR_RCDI)
-		device_printf(sc->dev, "irq: Release command dispatched\n");
-	if (status & DPAA2_SWP_INTR_VDCI)
-		device_printf(sc->dev, "irq: Volatile dequeue command\n");
-
-	if (!(status & DPAA2_SWP_INTR_DQRI)) {
-		dpaa2_swp_clear_intr_status(sc->swp, status);
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
-	}
+	dpaa2_swp_clear_intr_status(sc->swp, status);
+	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
