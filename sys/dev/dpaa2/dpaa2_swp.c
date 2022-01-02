@@ -298,7 +298,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
 	/* Initialize the software portal with a IRQ timeout period of 0us. */
-	dpaa2_swp_set_irq_coalescing(p, swp->dqrr.ring_size - 1, 0);
+	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 0);
 
 	*portal = p;
 
@@ -632,15 +632,15 @@ int dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t threshold,
 
 	if (threshold >= swp->dqrr.ring_size) {
 		threshold = swp->dqrr.ring_size - 1;
-		printf("%s: DQRR irq threshold must be < %u\n",
+		printf("%s: DQRR irq threshold must be < %u\n", __func__,
 		    swp->dqrr.ring_size - 1);
 	}
 
 	swp->dqrr.irq_threshold = threshold;
 	swp->dqrr.irq_itp = itp;
 
-	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_DQRR_ITR, threshold);
-	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_ITPR, itp);
+	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_DQRR_ITR, threshold);
+	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_ITPR, itp);
 
 	return 0;
 }
