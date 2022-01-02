@@ -641,7 +641,7 @@ dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx)
 {
 	struct resource_map *map;
 	dpaa2_swp_rsp_t rsp = (dpaa2_swp_rsp_t) dq;
-	uint32_t verb, resp_verb, offset, pi; /* producer index */
+	uint32_t verb, offset, pi; /* producer index */
 	uint16_t flags;
 
 	dpaa2_swp_lock(swp, &flags);
