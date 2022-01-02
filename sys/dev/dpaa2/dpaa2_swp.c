@@ -150,7 +150,7 @@ static int	exec_br_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 /* Management routines. */
 
 int
-dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc, uint16_t flags,
+dpaa2_swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc, uint16_t flags,
     bool atomic)
 {
 	const int mflags = flags & DPAA2_SWP_NOWAIT_ALLOC
@@ -683,13 +683,13 @@ dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx)
 		 *	 can burst and wrap-around between our snapshots of it).
 		 */
 		if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1))
-			s->dqrr.reset_bug = 0;
+			swp->dqrr.reset_bug = 0;
 	}
 
 	/* Read dequeue response message. */
-	for (i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
+	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
 		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
-	verb = dq->fdr.verb;
+	verb = dq->common.verb;
 
 	/*
 	 * If the valid-bit isn't of the expected polarity, nothing there. Note,
@@ -710,7 +710,7 @@ dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx)
 	 */
 	*dq_idx = swp->dqrr.next_idx;
 	swp->dqrr.next_idx++;
-	swp->dqrr.next_idx &= swp->dqrr.dqrr_size - 1; /* wrap around */
+	swp->dqrr.next_idx &= swp->dqrr.ring_size - 1; /* wrap around */
 	if (!swp->dqrr.next_idx)
 		swp->dqrr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 
