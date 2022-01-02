@@ -2320,7 +2320,7 @@ dpaa2_rc_io_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 		uint64_t	swp_ci_paddr;
 		uint32_t	swp_version;
 		uint32_t	_reserved1;
-		uint32_t	clk;
+		uint32_t	swp_clk;
 		uint32_t	_reserved2[5];
 	} *pattr;
 	int error;
@@ -2337,6 +2337,7 @@ dpaa2_rc_io_get_attributes(device_t rcdev, dpaa2_cmd_t cmd,
 		attr->swp_ce_paddr = pattr->swp_ce_paddr;
 		attr->swp_ci_paddr = pattr->swp_ci_paddr;
 		attr->swp_version = pattr->swp_version;
+		attr->swp_clk = pattr->swp_clk;
 		attr->id = pattr->id;
 		attr->swp_id = pattr->swp_id;
 		attr->priors_num = pattr->priors_num;

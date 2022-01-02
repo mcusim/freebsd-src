@@ -50,6 +50,7 @@ enum dpaa2_io_chan_mode {
  * swp_ce_paddr: Physical address of the software portal cache-enabled area.
  * swp_ci_paddr: Physical address of the software portal cache-inhibited area.
  * swp_version:	 Hardware IP version of the software portal.
+ * swp_clk:	 QBMAN clock frequency value in Hz.
  * id:		 DPIO object ID.
  * swp_id:	 Software portal ID.
  * priors_num:	 Number of priorities for the notification channel (1-8);
@@ -60,6 +61,7 @@ typedef struct {
 	uint64_t	swp_ce_paddr;
 	uint64_t	swp_ci_paddr;
 	uint32_t	swp_version;
+	uint32_t	swp_clk;
 	uint32_t	id;
 	uint16_t	swp_id;
 	uint8_t		priors_num;
