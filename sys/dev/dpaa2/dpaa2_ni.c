@@ -781,6 +781,7 @@ setup_channels(device_t dev)
 		ctx->cdan_en = true;
 		ctx->fq_chan_id = channel->id;
 		ctx->io_dev = channel->io_dev;
+		ctx->channel = channel;
 
 		/* Register the new notification context. */
 		error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
@@ -1862,8 +1863,11 @@ dpni_msi_intr(void *arg)
 static void
 dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
 {
-	/* TBD */
-	printf("%s: invoked\n", __func__);
+	dpaa2_ni_channel_t *channel = (dpaa2_ni_channel_t *) ctx->channel;
+	struct dpaa2_io_softc *iosc = device_get_softc(channel->io_dev);
+
+	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, channel->id,
+	    iosc->attr.swp_id, iosc->attr.id);
 }
 
 /**

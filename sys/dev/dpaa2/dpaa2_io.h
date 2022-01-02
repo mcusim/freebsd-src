@@ -75,10 +75,11 @@ typedef struct {
 typedef struct dpaa2_io_notif_ctx {
 	void (*cb)(struct dpaa2_io_notif_ctx *ctx);
 
-	device_t	io_dev;
-	uint64_t	qman_ctx;
-	uint16_t	fq_chan_id;
-	bool		cdan_en;
+	device_t		 io_dev;
+	void			*channel;
+	uint64_t		 qman_ctx;
+	uint16_t		 fq_chan_id;
+	bool			 cdan_en;
 } dpaa2_io_notif_ctx_t;
 
 /**
