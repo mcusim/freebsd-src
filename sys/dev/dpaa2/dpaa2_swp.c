@@ -100,6 +100,9 @@ __FBSDID("$FreeBSD$");
 /* Opaque token for static dequeues. */
 #define QMAN_SDQCR_TOKEN		0xBBu
 
+/* Maximum timeout period for the DQRR interrupt. */
+#define DQRR_MAX_ITP			4096
+
 /* Release Array Allocation register helpers. */
 #define RAR_IDX(rar)			((rar) & 0x7u)
 #define RAR_VB(rar)			((rar) & 0x80u)
@@ -239,18 +242,18 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 		    rman_get_size(p->cena_res) / 4);
 
 		reg = dpaa2_swp_set_cfg(
-		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */	/* DQRR_MF */
-		    1, /* writes enabled in the CINH memory only */		/* WN */
-		    1, /* EQCR_CI stashing threshold */				/* EST */
-		    3, /* RPM: RCR in array mode */				/* RPM */
-		    2, /* DCM: Discrete consumption ack */			/* DCM */
-		    0, /* EPM: EQCR in ring mode (FIFO) */			/* EPM */
+		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */					/* DQRR_MF */
+		    1, /* writes enabled in the CINH memory only */						/* WN */
+		    1, /* EQCR_CI stashing threshold */								/* EST */
+		    3, /* RPM: RCR in array mode */								/* RPM */
+		    2, /* DCM: Discrete consumption ack */							/* DCM */
+		    0, /* EPM: EQCR in ring mode (FIFO) */							/* EPM */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing drop enable */		/* SD */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing priority */			/* SP */
-		    0, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
+		    1, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
 		    1, /* Dequeue response ring (DQRR) entry stashing priority */				/* DP */
-		    0, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
-		    0  /* EQCR_CI stashing priority */				/* EP */
+		    1, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
+		    0  /* EQCR_CI stashing priority */								/* EP */
 		);
 		reg &= ~(1 << DPAA2_SWP_CFG_CPBS_SHIFT); /* QMan-backed mode */
 	}
@@ -295,8 +298,7 @@ swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
 	/* Initialize the software portal with a IRQ timeout period of 0us. */
-	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_DQRR_ITR, 0);
-	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_ITPR, 0);
+	dpaa2_swp_set_irq_coalescing(p, swp->dqrr.ring_size - 1, 0);
 
 	*portal = p;
 
@@ -605,6 +607,43 @@ dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
 	return (0);
 }
 
+/**
+ * @brief Set new IRQ coalescing values.
+ *
+ * swp:		The software portal object.
+ * threshold:	Threshold for DQRR interrupt generation. The DQRR interrupt
+ *		asserts when the ring contains greater than "threshold" entries.
+ * holdoff:	DQRR interrupt holdoff (timeout) period in us.
+ */
+int dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t threshold,
+    uint32_t holdoff)
+{
+	uint32_t itp;
+
+	/*
+	 * Convert irq_holdoff value from usecs to 256 QBMAN clock cycles
+	 * increments. This depends on the QBMAN internal frequency.
+	 */
+	itp = (holdoff * 1000) / swp->desc->swp_cycles_ratio;
+	if (itp > DQRR_MAX_ITP) {
+		itp = (swp->desc->swp_cycles_ratio * DQRR_MAX_ITP) / 1000;
+		printf("%s: DQRR irq holdoff must be <= %u\n", __func__, itp);
+	}
+
+	if (threshold >= swp->dqrr.ring_size) {
+		threshold = swp->dqrr.ring_size - 1;
+		printf("%s: DQRR irq threshold must be < %u\n",
+		    swp->dqrr.ring_size - 1);
+	}
+
+	swp->dqrr.irq_threshold = threshold;
+	swp->dqrr.irq_itp = itp;
+
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_DQRR_ITR, threshold);
+	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_ITPR, itp);
+
+	return 0;
+}
 
 /*
  * Internal functions.

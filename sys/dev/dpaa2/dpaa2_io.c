@@ -226,6 +226,7 @@ dpaa2_io_attach(device_t dev)
 	/* Prepare helper object to work with the QBMan software portal. */
 	sc->swp_desc.dpio_dev = dev;
 	sc->swp_desc.swp_version = sc->attr.swp_version;
+	sc->swp_desc.swp_clk = sc->attr.swp_clk;
 	sc->swp_desc.swp_id = sc->attr.swp_id;
 	sc->swp_desc.has_notif = sc->attr.priors_num ? true : false;
 	sc->swp_desc.has_8prio = sc->attr.priors_num == 8u ? true : false;
@@ -233,6 +234,15 @@ dpaa2_io_attach(device_t dev)
 	sc->swp_desc.cena_map = &sc->map[0];
 	sc->swp_desc.cinh_res = sc->res[1];
 	sc->swp_desc.cinh_map = &sc->map[1];
+	/*
+	 * Compute how many 256 QBMAN cycles fit into one ns. This is because
+	 * the interrupt timeout period register needs to be specified in QBMAN
+	 * clock cycles in increments of 256.
+	 */
+	sc->swp_desc.swp_cycles_ratio = 256000 /
+	    (sc->swp_desc.swp_clk / 1000000);
+
+	/* Initialize helper object to work with the QBMan software portal. */
 	error = dpaa2_swp_init_atomic(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
 	if (error) {
 		device_printf(dev, "Failed to initialize dpaa2_swp: error=%d\n",
@@ -360,6 +370,10 @@ setup_dpio_irqs(device_t dev)
 		return (ENXIO);
 	}
 
+	/*
+	 * Setup and enable Static Dequeue Command to receive CDANs from
+	 * channel 0.
+	 */
 	if (sc->swp_desc.has_notif)
 		dpaa2_swp_set_push_dequeue(sc->swp, 0, true);
 

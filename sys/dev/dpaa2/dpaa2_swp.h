@@ -214,17 +214,21 @@ typedef struct __packed {
 /**
  * @brief Descriptor of the QBMan software portal.
  *
- * cena_res:	Unmapped cache-enabled part of the portal's I/O memory.
- * cena_map:	Mapped cache-enabled part of the portal's I/O memory.
- * cinh_res:	Unmapped cache-inhibited part of the portal's I/O memory.
- * cinh_map:	Mapped cache-inhibited part of the portal's I/O memory.
+ * cena_res:		Unmapped cache-enabled part of the portal's I/O memory.
+ * cena_map:		Mapped cache-enabled part of the portal's I/O memory.
+ * cinh_res:		Unmapped cache-inhibited part of the portal's I/O memory.
+ * cinh_map:		Mapped cache-inhibited part of the portal's I/O memory.
  *
- * dpio_dev:	Device associated with the DPIO object to manage this portal.
- * swp_version:	Hardware IP version of the software portal.
- * swp_id:	Software portal ID.
- * has_notif:	True if the notification mode is used.
- * has_8prio:	True for a channel with 8 priority WQs. Ignored unless
- *		"has_notif" is true.
+ * dpio_dev:		Device associated with the DPIO object to manage this
+ *			portal.
+ * swp_version:		Hardware IP version of the software portal.
+ * swp_clk:		QBMAN clock frequency value in Hz.
+ * swp_cycles_ratio:	How many 256 QBMAN cycles fit into one ns.
+ * swp_id:		Software portal ID.
+ *
+ * has_notif:		True if the notification mode is used.
+ * has_8prio:		True for a channel with 8 priority WQs. Ignored unless
+ *			"has_notif" is true.
  */
 typedef struct {
 	struct resource 	*cena_res;
@@ -234,7 +238,10 @@ typedef struct {
 
 	device_t		 dpio_dev;
 	uint32_t		 swp_version;
+	uint32_t		 swp_clk;
+	uint32_t		 swp_cycles_ratio;
 	uint16_t		 swp_id;
+
 	bool			 has_notif;
 	bool			 has_8prio;
 } dpaa2_swp_desc_t;
@@ -291,7 +298,8 @@ struct dpaa2_swp {
 	const dpaa2_swp_desc_t	*desc;
 	uint16_t		 flags;
 
-	uint32_t		 sdq; /* Static Dequeue Command Register value */
+	/* Static Dequeue Command Register value (to obtain CDANs). */
+	uint32_t		 sdq;
 
 	struct {
 		bool		 atomic;
@@ -312,6 +320,8 @@ struct dpaa2_swp {
 		uint32_t	 valid_bit;
 		uint8_t		 ring_size;
 		bool		 reset_bug; /* dqrr reset workaround */
+		uint32_t	 irq_threshold;
+		uint32_t	 irq_itp;
 	} dqrr;
 
 	struct {
@@ -354,6 +364,7 @@ uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
 uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
 void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
 void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
+int	 dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t th, uint32_t to);
 
 /* Software portal commands. */
 
