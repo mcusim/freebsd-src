@@ -243,7 +243,8 @@ dpaa2_io_attach(device_t dev)
 	    (sc->swp_desc.swp_clk / 1000000);
 
 	/* Initialize helper object to work with the QBMan software portal. */
-	error = dpaa2_swp_init_atomic(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF);
+	error = dpaa2_swp_init_portal(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF,
+	    true);
 	if (error) {
 		device_printf(dev, "Failed to initialize dpaa2_swp: error=%d\n",
 		    error);
@@ -412,31 +413,32 @@ static void
 dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
-	uint32_t status = 0u;
+	dpaa2_io_notif_ctx_t *ctx;
+	dpaa2_dq_t dq;
+	uint32_t status = 0u, dq_idx;
+	int error, dq_cnt = 0;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
-	if (status == 0u) {
-		device_printf(sc->dev, "irq: status=0\n");
+	if (status == 0u)
 		return;
+
+	while (dpaa2_swp_dqrr_next(sc->swp, &dq, &dq_idx) == 0) {
+		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
+		    DPAA2_DQRR_RESULT_CDAN) {
+			ctx = (dpaa2_io_notif_ctx_t *)(uintptr_t) dq.scn.ctx;
+			ctx->cb(ctx);
+		} else {
+			device_printf(sc->dev, "irq: unrecognised DQRR entry\n");
+		}
+
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, dq_idx & 0x7u);
+		dq_cnt++;
+		if (dq_cnt > 32)
+			break;
 	}
 
-	if (status & DPAA2_SWP_INTR_EQRI)
-		device_printf(sc->dev, "irq: EQCR ring\n");
-	if (status & DPAA2_SWP_INTR_EQDI)
-		device_printf(sc->dev, "irq: Enqueue command dispatched\n");
-	if (status & DPAA2_SWP_INTR_DQRI)
-		device_printf(sc->dev, "irq: DQRR non-empty\n");
-	if (status & DPAA2_SWP_INTR_RCRI)
-		device_printf(sc->dev, "irq: RCR ring\n");
-	if (status & DPAA2_SWP_INTR_RCDI)
-		device_printf(sc->dev, "irq: Release command dispatched\n");
-	if (status & DPAA2_SWP_INTR_VDCI)
-		device_printf(sc->dev, "irq: Volatile dequeue command\n");
-
-	if (!(status & DPAA2_SWP_INTR_DQRI)) {
-		dpaa2_swp_clear_intr_status(sc->swp, status);
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
-	}
+	dpaa2_swp_clear_intr_status(sc->swp, status);
+	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 static device_method_t dpaa2_io_methods[] = {

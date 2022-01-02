@@ -102,6 +102,7 @@ __FBSDID("$FreeBSD$");
 
 /* Maximum timeout period for the DQRR interrupt. */
 #define DQRR_MAX_ITP			4096
+#define DQRR_PI_MASK			0x0Fu
 
 /* Release Array Allocation register helpers. */
 #define RAR_IDX(rar)			((rar) & 0x7u)
@@ -149,22 +150,8 @@ static int	exec_br_command(dpaa2_swp_t swp, dpaa2_swp_cmd_t cmd,
 /* Management routines. */
 
 int
-dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-    const uint16_t flags)
-{
-	return (swp_init_portal(swp, desc, flags, false));
-}
-
-int
-dpaa2_swp_init_atomic(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-    const uint16_t flags)
-{
-	return (swp_init_portal(swp, desc, flags, true));
-}
-
-static int
-swp_init_portal(dpaa2_swp_t *portal, dpaa2_swp_desc_t *desc,
-    const uint16_t flags, const bool atomic)
+dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc, uint16_t flags,
+    bool atomic)
 {
 	const int mflags = flags & DPAA2_SWP_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
@@ -527,6 +514,48 @@ dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en)
 }
 
 /**
+ * @brief Set new IRQ coalescing values.
+ *
+ * swp:		The software portal object.
+ * threshold:	Threshold for DQRR interrupt generation. The DQRR interrupt
+ *		asserts when the ring contains greater than "threshold" entries.
+ * holdoff:	DQRR interrupt holdoff (timeout) period in us.
+ */
+int dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t threshold,
+    uint32_t holdoff)
+{
+	uint32_t itp;
+
+	/*
+	 * Convert irq_holdoff value from usecs to 256 QBMAN clock cycles
+	 * increments. This depends on the QBMAN internal frequency.
+	 */
+	itp = (holdoff * 1000) / swp->desc->swp_cycles_ratio;
+	if (itp > DQRR_MAX_ITP) {
+		itp = (swp->desc->swp_cycles_ratio * DQRR_MAX_ITP) / 1000;
+		printf("%s: DQRR irq holdoff must be <= %u\n", __func__, itp);
+	}
+
+	if (threshold >= swp->dqrr.ring_size) {
+		threshold = swp->dqrr.ring_size - 1;
+		printf("%s: DQRR irq threshold must be < %u\n", __func__,
+		    swp->dqrr.ring_size - 1);
+	}
+
+	swp->dqrr.irq_threshold = threshold;
+	swp->dqrr.irq_itp = itp;
+
+	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_DQRR_ITR, threshold);
+	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_ITPR, itp);
+
+	return 0;
+}
+
+/*
+ * Software portal commands.
+ */
+
+/**
  * @brief Configure the channel data availability notification (CDAN)
  * in a particular WQ channel.
  */
@@ -607,42 +636,97 @@ dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
 	return (0);
 }
 
-/**
- * @brief Set new IRQ coalescing values.
- *
- * swp:		The software portal object.
- * threshold:	Threshold for DQRR interrupt generation. The DQRR interrupt
- *		asserts when the ring contains greater than "threshold" entries.
- * holdoff:	DQRR interrupt holdoff (timeout) period in us.
- */
-int dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t threshold,
-    uint32_t holdoff)
+int
+dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx)
 {
-	uint32_t itp;
+	struct resource_map *map;
+	dpaa2_swp_rsp_t rsp = (dpaa2_swp_rsp_t) dq;
+	uint32_t verb, resp_verb, offset, pi; /* producer index */
+	uint16_t flags;
+
+	dpaa2_swp_lock(swp, &flags);
+
+	map = swp->cena_map;
+	offset = swp->cfg.mem_backed
+	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
+	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
 
 	/*
-	 * Convert irq_holdoff value from usecs to 256 QBMAN clock cycles
-	 * increments. This depends on the QBMAN internal frequency.
+	 * Before using valid-bit to detect if something is there, we have to
+	 * handle the case of the DQRR reset bug...
 	 */
-	itp = (holdoff * 1000) / swp->desc->swp_cycles_ratio;
-	if (itp > DQRR_MAX_ITP) {
-		itp = (swp->desc->swp_cycles_ratio * DQRR_MAX_ITP) / 1000;
-		printf("%s: DQRR irq holdoff must be <= %u\n", __func__, itp);
+	if (swp->dqrr.reset_bug) {
+		/*
+		 * We pick up new entries by cache-inhibited producer index,
+		 * which means that a non-coherent mapping would require us to
+		 * invalidate and read *only* once that PI has indicated that
+		 * there's an entry here. The first trip around the DQRR ring
+		 * will be much less efficient than all subsequent trips around
+		 * it...
+		 */
+		pi = dpaa2_swp_read_reg(swp, DPAA2_SWP_CINH_DQPI) & DQRR_PI_MASK;
+
+		/* There are new entries if pi != next_idx */
+		if (pi == swp->dqrr.next_idx) {
+			dpaa2_swp_unlock(swp);
+			return (ENOENT);
+		}
+
+		/*
+		 * If next_idx is/was the last ring index, and 'pi' is
+		 * different, we can disable the workaround as all the ring
+		 * entries have now been DMA'd to so valid-bit checking is
+		 * repaired.
+		 *
+		 * NOTE: This logic needs to be based on next_idx (which
+		 *	 increments one at a time), rather than on pi (which
+		 *	 can burst and wrap-around between our snapshots of it).
+		 */
+		if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1))
+			s->dqrr.reset_bug = 0;
 	}
 
-	if (threshold >= swp->dqrr.ring_size) {
-		threshold = swp->dqrr.ring_size - 1;
-		printf("%s: DQRR irq threshold must be < %u\n", __func__,
-		    swp->dqrr.ring_size - 1);
+	/* Read dequeue response message. */
+	for (i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
+		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
+	verb = dq->fdr.verb;
+
+	/*
+	 * If the valid-bit isn't of the expected polarity, nothing there. Note,
+	 * in the DQRR reset bug workaround, we shouldn't need to skip these
+	 * check, because we've already determined that a new entry is available
+	 * and we've invalidated the cacheline before reading it, so the
+	 * valid-bit behaviour is repaired and should tell us what we already
+	 * knew from reading PI.
+	 */
+	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) {
+		dpaa2_swp_unlock(swp);
+		return (ENOENT);
 	}
 
-	swp->dqrr.irq_threshold = threshold;
-	swp->dqrr.irq_itp = itp;
+	/*
+	 * There's something there. Move "next_idx" attention to the next ring
+	 * entry before returning what we found.
+	 */
+	*dq_idx = swp->dqrr.next_idx;
+	swp->dqrr.next_idx++;
+	swp->dqrr.next_idx &= swp->dqrr.dqrr_size - 1; /* wrap around */
+	if (!swp->dqrr.next_idx)
+		swp->dqrr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 
-	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_DQRR_ITR, threshold);
-	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_ITPR, itp);
+	/*
+	 * If this is the final response to a volatile dequeue command
+	 * indicate that the vdq is available
+	 */
+	/* flags = dq->fdr.stat; */
+	/* resp_verb = verb & QBMAN_RESULT_MASK; */
+	/* if ((response_verb == QBMAN_RESULT_DQ) && */
+	/*     (flags & DPAA2_DQ_STAT_VOLATILE) && */
+	/*     (flags & DPAA2_DQ_STAT_EXPIRED)) */
+	/* 	atomic_inc(&s->vdq.available); */
 
-	return 0;
+	dpaa2_swp_unlock(swp);
+	return (0);
 }
 
 /*
