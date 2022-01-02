@@ -415,8 +415,7 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	dpaa2_io_notif_ctx_t *ctx;
 	dpaa2_dq_t dq;
-	uint32_t status = 0u, dq_idx;
-	int error, dq_cnt = 0;
+	uint32_t status = 0u, dq_idx, dq_cnt = 0;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	if (status == 0u)
@@ -433,7 +432,7 @@ dpio_msi_intr(void *arg)
 
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, dq_idx & 0x7u);
 		dq_cnt++;
-		if (dq_cnt > 32)
+		if (dq_cnt > 32u)
 			break;
 	}
 
