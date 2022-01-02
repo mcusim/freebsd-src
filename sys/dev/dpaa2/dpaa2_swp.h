@@ -64,9 +64,9 @@
 #define DPAA2_SWP_CINH_VDQCR_RT		0x940 /* VDQCR Read Trigger */
 #define DPAA2_SWP_CINH_EQCR_AM_RT	0x980
 #define DPAA2_SWP_CINH_RCR_AM_RT	0x9C0
-#define DPAA2_SWP_CINH_DQPI		0xA00
-#define DPAA2_SWP_CINH_DQRR_ITR		0xA80
-#define DPAA2_SWP_CINH_DCAP		0xAC0
+#define DPAA2_SWP_CINH_DQPI		0xA00 /* DQRR Producer Index reg. */
+#define DPAA2_SWP_CINH_DQRR_ITR		0xA80 /* DQRR interrupt timeout reg. */
+#define DPAA2_SWP_CINH_DCAP		0xAC0 /* DQRR Consumption Ack. reg. */
 #define DPAA2_SWP_CINH_SDQCR		0xB00 /* Static Dequeue Command reg. */
 #define DPAA2_SWP_CINH_EQCR_AM_RT2	0xB40
 #define DPAA2_SWP_CINH_RCR_PI		0xC00 /* Release Ring, Producer Index */
@@ -144,6 +144,19 @@
 #define DPAA2_WQCHAN_WE_ICD		(0x2u) /* Interrupt Coalescing Disable */
 #define DPAA2_WQCHAN_WE_CTX		(0x4u)
 
+/* Definitions for parsing DQRR entries. */
+#define DPAA2_DQRR_RESULT_MASK		(0x7Fu)
+#define DPAA2_DQRR_RESULT_DQ		(0x60u)
+#define DPAA2_DQRR_RESULT_FQRN		(0x21u)
+#define DPAA2_DQRR_RESULT_FQRNI		(0x22u)
+#define DPAA2_DQRR_RESULT_FQPN		(0x24u)
+#define DPAA2_DQRR_RESULT_FQDAN		(0x25u)
+#define DPAA2_DQRR_RESULT_CDAN		(0x26u)
+#define DPAA2_DQRR_RESULT_CSCN_MEM	(0x27u)
+#define DPAA2_DQRR_RESULT_CGCU		(0x28u)
+#define DPAA2_DQRR_RESULT_BPSCN		(0x29u)
+#define DPAA2_DQRR_RESULT_CSCN_WQ	(0x2au)
+
 /*
  * Portal flags.
  *
@@ -175,16 +188,49 @@ typedef struct __packed {
 	uint8_t		dca;
 	uint16_t	seqnum;
 	uint16_t	orpid;
-	uint16_t	reserved;
+	uint16_t	_reserved;
 	uint32_t	tgtid;
 	uint32_t	tag;
 	uint16_t	qdbin;
 	uint8_t		qpri;
-	uint8_t		reserved1[3];
+	uint8_t		_reserved1[3];
 	uint8_t		wae;
 	uint8_t		rspid;
 	uint64_t	rsp_addr;
 } dpaa2_eq_desc_t;
+
+/**
+ * @brief Frame Dequeue Response (FDR) descriptor.
+ *
+ * NOTE: 32 bytes.
+ */
+typedef struct __packed {
+	uint8_t		verb;
+	uint8_t		stat;
+	uint16_t	seqnum;
+	uint16_t	oprid;
+	uint8_t		_reserved;
+	uint8_t		tok;
+	uint32_t	fqid;
+	uint32_t	_reserved1;
+	uint32_t	fq_byte_cnt;
+	uint32_t	fq_frm_cnt;
+	uint64_t	fqd_ctx;
+} dpaa2_fdr_desc_t;
+
+/**
+ * @brief State Change Notification Message (SCNM).
+ *
+ * NOTE: 16 bytes.
+ */
+typedef struct __packed {
+	uint8_t		verb;
+	uint8_t		stat;
+	uint8_t		state;
+	uint8_t		_reserved;
+	uint32_t	rid_tok;
+	uint64_t	ctx;
+} dpaa2_scn_t;
 
 /**
  * @brief DPAA2 frame descriptor.
@@ -210,6 +256,32 @@ typedef struct __packed {
 	uint32_t	ctrl;
 	uint64_t	flow_ctx;
 } dpaa2_fd_t;
+
+/**
+ * @brief Frame Dequeue Response (FDR).
+ *
+ * NOTE: 64 bytes.
+ */
+typedef struct __packed {
+	dpaa2_fdr_desc_t desc;
+	dpaa2_fd_t fd;
+} dpaa2_fdr_t;
+
+/**
+ * @brief Dequeue Response Message.
+ *
+ * NOTE: 64 bytes.
+ */
+typedef struct __packed {
+	union {
+		struct {
+			uint8_t	verb;
+			uint8_t	_reserved[63];
+		} common;
+		dpaa2_fdr_t fdr;
+		dpaa2_scn_t scn;
+	};
+} dpaa2_dq_t;
 
 /**
  * @brief Descriptor of the QBMan software portal.
@@ -339,9 +411,7 @@ struct dpaa2_swp {
 /* Management routines. */
 
 int	 dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-	     const uint16_t flags);
-int	 dpaa2_swp_init_atomic(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-	     const uint16_t flags);
+	     uint16_t flags, bool atomic);
 void	 dpaa2_swp_free_portal(dpaa2_swp_t swp);
 void	 dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags);
 void	 dpaa2_swp_unlock(dpaa2_swp_t swp);
@@ -372,5 +442,6 @@ int	 dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id,
 	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
 int	 dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
 	     uint32_t buf_num);
+int	 dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx);
 
 #endif /* _DPAA2_SWP_H */
