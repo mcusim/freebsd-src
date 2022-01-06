@@ -84,7 +84,7 @@ dpaa2_bp_attach(device_t dev)
 	struct dpaa2_bp_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
-	dpaa2_cmd_t cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t rc_token, bp_token;
 	int error;
 
