@@ -203,7 +203,7 @@ static int
 setup_dpmac_irqs(device_t dev)
 {
 	struct dpaa2_mac_softc *sc = device_get_softc(dev);
-	dpaa2_cmd_t cmd = sc->cmd;
+	struct dpaa2_cmd *cmd = sc->cmd;
 	uint16_t mac_token = sc->mac_token;
 	uint32_t irq_mask;
 	int error;
