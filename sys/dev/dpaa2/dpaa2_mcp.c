@@ -65,7 +65,7 @@ dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
 	struct dpaa2_mcp *p;
 
-	if (!portal || !res || !map)
+	if (!mcp || !res || !map)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
