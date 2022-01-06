@@ -3092,7 +3092,7 @@ add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 {
 	device_t rcdev, dev;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
-	dpaa2_rc_obj_region_t reg;
+	struct dpaa2_rc_obj_region reg;
 	const char *devclass;
 	uint64_t start, end, count;
 	uint32_t flags = 0;
@@ -3254,8 +3254,8 @@ configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
  * @brief General implementation of the MC command to enable IRQ.
  */
 static int
-set_irq_enable(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint8_t enable, uint16_t cmdid)
+set_irq_enable(struct dpaa2_mcp *mcp, struct dpaa2_cmd *cmd, uint8_t irq_idx,
+    bool enable, uint16_t cmdid)
 {
 	struct __packed set_irq_enable_args {
 		uint8_t		enable;
@@ -3267,14 +3267,14 @@ set_irq_enable(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint8_t irq_idx,
 		uint64_t	_reserved5[6];
 	} *args;
 
-	if (!portal || !cmd)
+	if (!mcp || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct set_irq_enable_args *) &cmd->params[0];
 	args->irq_idx = irq_idx;
 	args->enable = enable == 0u ? 0u : 1u;
 
-	return (exec_command(portal, cmd, cmdid));
+	return (exec_command(mcp, cmd, cmdid));
 }
 
 /**
@@ -3282,13 +3282,13 @@ set_irq_enable(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint8_t irq_idx,
  * @brief Sends a command to MC and waits for response.
  */
 static int
-exec_command(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint16_t cmdid)
+exec_command(struct dpaa2_mcp *mcp, struct dpaa2_cmd *cmd, uint16_t cmdid)
 {
 	struct dpaa2_cmd_header *hdr;
 	uint16_t flags;
 	int error;
 
-	if (!portal || !cmd)
+	if (!mcp || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
 	/* Prepare a command for the MC hardware. */
@@ -3296,25 +3296,25 @@ exec_command(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint16_t cmdid)
 	hdr->cmdid = cmdid;
 	hdr->status = DPAA2_CMD_STAT_READY;
 
-	dpaa2_mcp_lock(portal, &flags);
+	dpaa2_mcp_lock(mcp, &flags);
 	if (flags & DPAA2_PORTAL_DESTROYED) {
 		/* Terminate operation if portal is destroyed. */
-		dpaa2_mcp_unlock(portal);
+		dpaa2_mcp_unlock(mcp);
 		return (DPAA2_CMD_STAT_INVALID_STATE);
 	}
 
 	/* Send a command to MC and wait for the result. */
-	send_command(portal, cmd);
-	error = wait_for_command(portal, cmd);
+	send_command(mcp, cmd);
+	error = wait_for_command(mcp, cmd);
 	if (error) {
-		dpaa2_mcp_unlock(portal);
+		dpaa2_mcp_unlock(mcp);
 		return (DPAA2_CMD_STAT_ERR);
 	}
 	if (hdr->status != DPAA2_CMD_STAT_OK) {
-		dpaa2_mcp_unlock(portal);
+		dpaa2_mcp_unlock(mcp);
 		return (int)(hdr->status);
 	}
-	dpaa2_mcp_unlock(portal);
+	dpaa2_mcp_unlock(mcp);
 
 	return (DPAA2_CMD_STAT_OK);
 }
@@ -3323,18 +3323,18 @@ exec_command(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd, uint16_t cmdid)
  * @internal
  * @brief Writes a command to the MC command portal.
  */
-static void
-send_command(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd)
+static int
+send_command(struct dpaa2_mcp *mcp, struct dpaa2_cmd *cmd)
 {
 	/* Write command parameters. */
 	for (uint32_t i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
-		bus_write_8(portal->map, sizeof(uint64_t) * i, cmd->params[i-1]);
+		bus_write_8(mcp->map, sizeof(uint64_t) * i, cmd->params[i-1]);
 
-	bus_barrier(portal->map, 0, sizeof(struct dpaa2_cmd),
+	bus_barrier(mcp->map, 0, sizeof(struct dpaa2_cmd),
 	    BUS_SPACE_BARRIER_WRITE);
 
 	/* Write command header to trigger execution. */
-	bus_write_8(portal->map, 0, cmd->header);
+	bus_write_8(mcp->map, 0, cmd->header);
 }
 
 /**
@@ -3343,11 +3343,10 @@ send_command(struct dpaa2_mcp *portal, struct dpaa2_cmd *cmd)
  *        command execution.
  */
 static int
-wait_for_command(strcut dpaa2_mcp *portal, struct dpaa2_cmd *cmd)
+wait_for_command(struct dpaa2_mcp *mcp, struct dpaa2_cmd *cmd)
 {
-	const uint8_t atomic_portal = portal->atomic;
-	const uint32_t attempts = atomic_portal ? CMD_SPIN_ATTEMPTS
-	    : CMD_SLEEP_ATTEMPTS;
+	const uint32_t attempts = mcp->atomic
+	    ? CMD_SPIN_ATTEMPTS : CMD_SLEEP_ATTEMPTS;
 	struct dpaa2_cmd_header *hdr;
 	uint64_t val;
 	uint32_t i;
@@ -3355,12 +3354,12 @@ wait_for_command(strcut dpaa2_mcp *portal, struct dpaa2_cmd *cmd)
 
 	/* Wait for a command execution result from the MC hardware. */
 	for (i = 1; i <= attempts; i++) {
-		val = bus_read_8(portal->map, 0);
+		val = bus_read_8(mcp->map, 0);
 		hdr = (struct dpaa2_cmd_header *) &val;
 		if (hdr->status != DPAA2_CMD_STAT_READY)
 			break;
 
-		if (atomic_portal)
+		if (mcp->atomic)
 			DELAY(CMD_SPIN_TIMEOUT);
 		else
 			pause("dpaa2", CMD_SLEEP_TIMEOUT);
@@ -3372,7 +3371,7 @@ wait_for_command(strcut dpaa2_mcp *portal, struct dpaa2_cmd *cmd)
 	/* Read command response. */
 	cmd->header = val;
 	for (i = 1; i <= DPAA2_CMD_PARAMS_N; i++)
-		cmd->params[i-1] = bus_read_8(portal->map, i * sizeof(uint64_t));
+		cmd->params[i-1] = bus_read_8(mcp->map, i * sizeof(uint64_t));
 
 	return (rc);
 }
@@ -3475,12 +3474,14 @@ print_dpaa2_type(struct resource_list *rl, enum dpaa2_dev_type type)
 /**
  * @internal
  */
-static void
+static int
 reset_cmd_params(struct dpaa2_cmd *cmd)
 {
-	if (!cmd)
-		return;
-	memset(cmd->params, 0, sizeof(cmd->params[0]) * DPAA2_CMD_PARAMS_N);
+	if (cmd != NULL) {
+		memset(cmd->params, 0, sizeof(cmd->params[0]) *
+		    DPAA2_CMD_PARAMS_N);
+	}
+	return (0);
 }
 
 static device_method_t dpaa2_rc_methods[] = {
