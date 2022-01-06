@@ -296,7 +296,7 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
 	struct dpaa2_eq_desc ed;
 	uint32_t flags = 0;
 
-	memset(ed, 0, sizeof(*ed));
+	memset(&ed, 0, sizeof(ed));
 
 	/* Setup enqueue descriptor. */
 	dpaa2_swp_set_ed_norp(&ed, false);
@@ -414,8 +414,8 @@ static void
 dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
-	struct dpaa2_io_notif_ctx **ctx;
-	struct dpaa2_dq *dq;
+	struct dpaa2_io_notif_ctx *ctx;
+	struct dpaa2_dq dq;
 	uint32_t idx, cnt = 0;
 	uint32_t status = 0u;
 
