@@ -3335,6 +3335,8 @@ send_command(struct dpaa2_mcp *mcp, struct dpaa2_cmd *cmd)
 
 	/* Write command header to trigger execution. */
 	bus_write_8(mcp->map, 0, cmd->header);
+
+	return (0);
 }
 
 /**
