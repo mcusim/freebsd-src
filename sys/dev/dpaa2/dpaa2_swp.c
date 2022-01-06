@@ -153,7 +153,7 @@ static int	exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 /* Management routines. */
 
 int
-dpaa2_swp_init_portal(struct dpaa2_swp *swp, struct dpaa2_swp_desc *desc,
+dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
     uint16_t flags, bool atomic)
 {
 	struct dpaa2_swp *p;

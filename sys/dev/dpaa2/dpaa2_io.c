@@ -292,8 +292,8 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
     struct dpaa2_fd *fd, int frames_n)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
-	dpaa2_swp_t swp = sc->swp;
-	dpaa2_eq_desc_t ed;
+	struct dpaa2_swp *swp = sc->swp;
+	struct dpaa2_eq_desc ed;
 	uint32_t flags = 0;
 
 	memset(ed, 0, sizeof(*ed));
