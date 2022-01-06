@@ -159,7 +159,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	struct dpaa2_swp *p;
 	uint32_t reg, mask_size, eqcr_pi; /* EQCR producer index */
 
-	if (!portal || !desc)
+	if (!swp || !desc)
 		return (DPAA2_SWP_STAT_EINVAL);
 
 	p = malloc(sizeof(struct dpaa2_swp), M_DPAA2_SWP,
@@ -823,7 +823,7 @@ swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 		return (EINVAL);
 
 	dpaa2_swp_lock(swp, &swp_flags);
-	if (flags & DPAA2_SWP_DESTROYED) {
+	if (swp_flags & DPAA2_SWP_DESTROYED) {
 		/* Terminate operation if portal is destroyed. */
 		dpaa2_swp_unlock(swp);
 		return (ENOENT);

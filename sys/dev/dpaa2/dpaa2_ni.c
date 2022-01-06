@@ -757,7 +757,7 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
-		channel = malloc(sizeof(dpaa2_ni_channel_t), M_DPAA2_NI,
+		channel = malloc(sizeof(struct dpaa2_ni_channel), M_DPAA2_NI,
 		    M_WAITOK | M_ZERO);
 		if (!channel) {
 			device_printf(dev, "Failed to allocate a channel\n");
@@ -1857,7 +1857,7 @@ static void
 dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
-	struct dpaa2_io_softc *iosc = device_get_softc(channel->io_dev);
+	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 
 	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, chan->id,
 	    iosc->attr.swp_id, iosc->attr.id);
@@ -1967,7 +1967,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
 		/* Allocate enough buffers to release in one QBMan command. */
 		for (int j = bufn = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
-			buf = &channel->buf[i + j];
+			buf = &chan->buf[i + j];
 
 			error = bus_dmamem_alloc(sc->bp_dtag, &buf->vaddr,
 			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
@@ -1991,7 +1991,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 		}
 
 		/* Release buffer to QBMan buffer pool. */
-		error = DPAA2_SWP_RELEASE_BUFS(channel->io_dev, bpsc->attr.bpid,
+		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    paddr, bufn);
 		if (error) {
 			device_printf(sc->dev, "Failed to release buffers to "
