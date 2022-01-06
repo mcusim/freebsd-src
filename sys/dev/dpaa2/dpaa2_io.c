@@ -289,7 +289,7 @@ err_exit:
  */
 static int
 dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
-    const dpaa2_fd_t *fd, int frames_n)
+    struct dpaa2_fd *fd, int frames_n)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 	dpaa2_swp_t swp = sc->swp;
@@ -310,7 +310,7 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
  * in a particular WQ channel paired with DPIO.
  */
 static int
-dpaa2_io_conf_wq_channel(device_t iodev, dpaa2_io_notif_ctx_t *ctx)
+dpaa2_io_conf_wq_channel(device_t iodev, struct dpaa2_io_notif_ctx *ctx)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(iodev);
 
