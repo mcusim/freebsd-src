@@ -57,7 +57,7 @@ struct dpaa2_con_softc {
 	struct dpaa2_con_attr	 attr;
 
 	/* Help to send commands to MC. */
-	dpaa2_cmd_t		 cmd;
+	struct dpaa2_cmd	*cmd;
 	uint16_t		 rc_token;
 	uint16_t		 con_token;
 };

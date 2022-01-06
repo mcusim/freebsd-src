@@ -87,13 +87,12 @@ struct dpaa2_io_notif_ctx {
  */
 struct dpaa2_io_softc {
 	device_t		 dev;
-	dpaa2_swp_desc_t	 swp_desc;
-	dpaa2_swp_t		 swp;
-
+	struct dpaa2_swp_desc	 swp_desc;
+	struct dpaa2_swp	 swp;
 	struct dpaa2_io_attr	 attr;
 
 	/* Help to send commands to MC. */
-	dpaa2_cmd_t		 cmd;
+	struct dpaa2_cmd	*cmd;
 	uint16_t		 rc_token;
 	uint16_t		 io_token;
 
