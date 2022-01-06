@@ -51,8 +51,8 @@ CODE {
 	}
 
 	static int
-	bypass_mng_get_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *major,
-		uint32_t *minor, uint32_t *rev)
+	bypass_mng_get_version(device_t dev, struct dpaa2_cmd *cmd,
+		uint32_t *major, uint32_t *minor, uint32_t *rev)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -61,8 +61,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mng_get_soc_version(device_t dev, dpaa2_cmd_t cmd, uint32_t *pvr,
-		uint32_t *svr)
+	bypass_mng_get_soc_version(device_t dev, struct dpaa2_cmd *cmd,
+		uint32_t *pvr, uint32_t *svr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -71,7 +71,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mng_get_container_id(device_t dev, dpaa2_cmd_t cmd,
+	bypass_mng_get_container_id(device_t dev, struct dpaa2_cmd *cmd,
 		uint32_t *cont_id)
 	{
 		panic_on_mc(dev);
@@ -81,7 +81,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_open(device_t dev, dpaa2_cmd_t cmd, uint32_t cont_id,
+	bypass_rc_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t cont_id,
 		uint16_t *token)
 	{
 		panic_on_mc(dev);
@@ -91,7 +91,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_rc_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -100,7 +100,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_obj_count(device_t dev, dpaa2_cmd_t cmd,
+	bypass_rc_get_obj_count(device_t dev, struct dpaa2_cmd *cmd,
 		uint32_t *obj_count)
 	{
 		panic_on_mc(dev);
@@ -110,8 +110,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_obj(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_idx,
-		dpaa2_obj_t *obj)
+	bypass_rc_get_obj(device_t dev, struct dpaa2_cmd *cmd, uint32_t obj_idx,
+		struct dpaa2_obj *obj)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -120,8 +120,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_obj_descriptor(device_t dev, dpaa2_cmd_t cmd,
-		uint32_t obj_id, enum dpaa2_dev_type type, dpaa2_obj_t *obj)
+	bypass_rc_get_obj_descriptor(device_t dev, struct dpaa2_cmd *cmd,
+		uint32_t obj_id, enum dpaa2_dev_type type, struct dpaa2_obj *obj)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -130,8 +130,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_rc_attr_t *attr)
+	bypass_rc_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_rc_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -140,9 +140,9 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_obj_region(device_t dev, dpaa2_cmd_t cmd, uint32_t obj_id,
-		uint8_t reg_idx, enum dpaa2_dev_type type,
-		dpaa2_rc_obj_region_t *reg)
+	bypass_rc_get_obj_region(device_t dev, struct dpaa2_cmd *cmd,
+		uint32_t obj_id, uint8_t reg_idx, enum dpaa2_dev_type type,
+		struct dpaa2_rc_obj_region *reg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -152,7 +152,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_api_version(device_t dev, dpaa2_cmd_t cmd,
+	bypass_rc_get_api_version(device_t dev, struct dpaa2_cmd *cmd,
 		uint16_t *major, uint16_t *minor)
 	{
 		panic_on_mc(dev);
@@ -162,8 +162,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint8_t enable)
+	bypass_rc_set_irq_enable(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint8_t enable)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -172,9 +172,9 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_set_obj_irq(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
-		enum dpaa2_dev_type type)
+	bypass_rc_set_obj_irq(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint64_t addr, uint32_t data, uint32_t irq_usr,
+		uint32_t obj_id, enum dpaa2_dev_type type)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -184,8 +184,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_rc_get_conn(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ep_desc_t *ep1_desc, dpaa2_ep_desc_t *ep2_desc,
+	bypass_rc_get_conn(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ep_desc *ep1_desc, struct dpaa2_ep_desc *ep2_desc,
 		uint32_t *link_stat)
 	{
 		panic_on_mc(dev);
@@ -197,7 +197,7 @@ CODE {
 	}
 
 	static int
-	bypass_ni_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpni_id,
+	bypass_ni_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t dpni_id,
 		uint16_t *token)
 	{
 		panic_on_mc(dev);
@@ -207,7 +207,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_ni_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -216,7 +216,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_enable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_ni_enable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -225,7 +225,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_disable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_ni_disable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -234,7 +234,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_api_version(device_t dev, dpaa2_cmd_t cmd,
+	bypass_ni_get_api_version(device_t dev, struct dpaa2_cmd *cmd,
 		uint16_t *major, uint16_t *minor)
 	{
 		panic_on_mc(dev);
@@ -244,7 +244,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_reset(device_t dev, dpaa2_cmd_t cmd)
+	bypass_ni_reset(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -253,8 +253,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_attr_t *attr)
+	bypass_ni_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -263,8 +263,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_buf_layout(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_buf_layout_t *bl)
+	bypass_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_buf_layout *bl)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -273,7 +273,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_tx_data_off(device_t dev, dpaa2_cmd_t cmd,
+	bypass_ni_get_tx_data_off(device_t dev, struct dpaa2_cmd *cmd,
 		uint16_t *offset)
 	{
 		panic_on_mc(dev);
@@ -283,8 +283,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_link_cfg(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_link_cfg_t *cfg)
+	bypass_ni_set_link_cfg(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_link_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -293,8 +293,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_link_cfg(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_link_cfg_t *cfg)
+	bypass_ni_get_link_cfg(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_link_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -303,8 +303,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_link_state(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_link_state_t *state)
+	bypass_ni_get_link_state(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_link_state *state)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -313,7 +313,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_port_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
+	bypass_ni_get_port_mac_addr(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t *mac)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -322,7 +323,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_prim_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
+	bypass_ni_set_prim_mac_addr(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t *mac)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -331,7 +333,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_prim_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
+	bypass_ni_get_prim_mac_addr(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t *mac)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -340,8 +343,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_qos_table(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_qos_table_t *tbl)
+	bypass_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_qos_table *tbl)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -350,7 +353,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_clear_qos_table(device_t dev, dpaa2_cmd_t cmd)
+	bypass_ni_clear_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -359,8 +362,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_pools(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_pools_cfg_t *cfg)
+	bypass_ni_set_pools(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_pools_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -369,8 +372,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_err_behavior(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_err_cfg_t *cfg)
+	bypass_ni_set_err_behavior(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_err_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -379,8 +382,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_queue(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_queue_cfg_t *cfg)
+	bypass_ni_get_queue(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_queue_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -389,8 +392,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_queue(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_ni_queue_cfg_t *cfg)
+	bypass_ni_set_queue(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_ni_queue_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -399,7 +402,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_qdid(device_t dev, dpaa2_cmd_t cmd,
+	bypass_ni_get_qdid(device_t dev, struct dpaa2_cmd *cmd,
 		enum dpaa2_ni_queue_type type, uint16_t *qdid)
 	{
 		panic_on_mc(dev);
@@ -409,7 +412,9 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_add_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac) {
+	bypass_ni_add_mac_addr(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t *mac)
+	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_NI_ADD_MAC_ADDR(
@@ -417,8 +422,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_clear_mac_filters(device_t dev, dpaa2_cmd_t cmd, bool rm_uni,
-		bool rm_multi)
+	bypass_ni_clear_mac_filters(device_t dev, struct dpaa2_cmd *cmd,
+		bool rm_uni, bool rm_multi)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -427,7 +432,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_mfl(device_t dev, dpaa2_cmd_t cmd, uint16_t length) {
+	bypass_ni_set_mfl(device_t dev, struct dpaa2_cmd *cmd, uint16_t length)
+	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_NI_SET_MFL(
@@ -435,7 +441,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_offload(device_t dev, dpaa2_cmd_t cmd,
+	bypass_ni_set_offload(device_t dev, struct dpaa2_cmd *cmd,
 		enum dpaa2_ni_ofl_type ofl_type, bool en)
 	{
 		panic_on_mc(dev);
@@ -445,8 +451,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_irq_mask(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t mask)
+	bypass_ni_set_irq_mask(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t mask)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -455,8 +461,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		bool en)
+	bypass_ni_set_irq_enable(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -465,8 +471,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t *status)
+	bypass_ni_get_irq_status(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t *status)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -475,7 +481,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_uni_promisc(device_t dev, dpaa2_cmd_t cmd, bool en)
+	bypass_ni_set_uni_promisc(device_t dev, struct dpaa2_cmd *cmd, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -484,7 +490,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_multi_promisc(device_t dev, dpaa2_cmd_t cmd, bool en)
+	bypass_ni_set_multi_promisc(device_t dev, struct dpaa2_cmd *cmd, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -493,8 +499,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_get_statistics(device_t dev, dpaa2_cmd_t cmd, uint8_t page,
-		uint16_t param, uint64_t *cnt)
+	bypass_ni_get_statistics(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t page, uint16_t param, uint64_t *cnt)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -503,7 +509,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_ni_set_rx_tc_dist(device_t dev, dpaa2_cmd_t cmd,
+	bypass_ni_set_rx_tc_dist(device_t dev, struct dpaa2_cmd *cmd,
 		uint16_t dist_size, uint8_t tc, enum dpaa2_ni_dist_mode dist_mode,
 		bus_addr_t key_cfg_buf)
 	{
@@ -516,7 +522,7 @@ CODE {
 	}
 
 	static int
-	bypass_io_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpio_id,
+	bypass_io_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t dpio_id,
 		uint16_t *token)
 	{
 		panic_on_mc(dev);
@@ -526,7 +532,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_io_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -535,7 +541,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_enable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_io_enable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -544,7 +550,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_disable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_io_disable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -553,7 +559,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_reset(device_t dev, dpaa2_cmd_t cmd)
+	bypass_io_reset(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -562,8 +568,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_io_attr_t *attr)
+	bypass_io_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_io_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -572,8 +578,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_set_irq_mask(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t mask)
+	bypass_io_set_irq_mask(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t mask)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -582,8 +588,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t *status)
+	bypass_io_get_irq_status(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t *status)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -592,8 +598,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		bool en)
+	bypass_io_set_irq_enable(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -602,7 +608,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_io_add_static_dq_chan(device_t dev, dpaa2_cmd_t cmd,
+	bypass_io_add_static_dq_chan(device_t dev, struct dpaa2_cmd *cmd,
 		uint32_t dpcon_id, uint8_t *chan_idx)
 	{
 		panic_on_mc(dev);
@@ -613,7 +619,7 @@ CODE {
 	}
 
 	static int
-	bypass_bp_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpbp_id,
+	bypass_bp_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t dpbp_id,
 		uint16_t *token)
 	{
 		panic_on_mc(dev);
@@ -623,7 +629,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_bp_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_bp_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -632,7 +638,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_bp_enable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_bp_enable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -641,7 +647,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_bp_disable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_bp_disable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -650,7 +656,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_bp_reset(device_t dev, dpaa2_cmd_t cmd)
+	bypass_bp_reset(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -659,8 +665,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_bp_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_bp_attr_t *attr)
+	bypass_bp_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_bp_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -670,8 +676,8 @@ CODE {
 	}
 
 	static int
-	bypass_mac_open(device_t dev, dpaa2_cmd_t cmd,
-		const uint32_t dpmac_id, uint16_t *token)
+	bypass_mac_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t dpmac_id,
+		uint16_t *token)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -680,7 +686,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_mac_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -689,7 +695,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_reset(device_t dev, dpaa2_cmd_t cmd)
+	bypass_mac_reset(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -698,7 +704,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_mdio_read(device_t dev, dpaa2_cmd_t cmd, uint8_t phy,
+	bypass_mac_mdio_read(device_t dev, struct dpaa2_cmd *cmd, uint8_t phy,
 		uint16_t reg, uint16_t *val)
 	{
 		panic_on_mc(dev);
@@ -708,7 +714,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_mdio_write(device_t dev, dpaa2_cmd_t cmd, uint8_t phy,
+	bypass_mac_mdio_write(device_t dev, struct dpaa2_cmd *cmd, uint8_t phy,
 		uint16_t reg, uint16_t val)
 	{
 		panic_on_mc(dev);
@@ -718,7 +724,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_get_addr(device_t dev, dpaa2_cmd_t cmd, uint8_t *mac)
+	bypass_mac_get_addr(device_t dev, struct dpaa2_cmd *cmd, uint8_t *mac)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -727,8 +733,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_mac_attr_t *attr)
+	bypass_mac_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_mac_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -737,8 +743,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_set_link_state(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_mac_link_state_t *state)
+	bypass_mac_set_link_state(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_mac_link_state *state)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -747,8 +753,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_set_irq_mask(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t mask)
+	bypass_mac_set_irq_mask(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t mask)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -757,8 +763,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_set_irq_enable(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		bool en)
+	bypass_mac_set_irq_enable(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, bool en)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -767,8 +773,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_mac_get_irq_status(device_t dev, dpaa2_cmd_t cmd, uint8_t irq_idx,
-		uint32_t *status)
+	bypass_mac_get_irq_status(device_t dev, struct dpaa2_cmd *cmd,
+		uint8_t irq_idx, uint32_t *status)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -778,7 +784,7 @@ CODE {
 	}
 
 	static int
-	bypass_con_open(device_t dev, dpaa2_cmd_t cmd, const uint32_t dpcon_id,
+	bypass_con_open(device_t dev, struct dpaa2_cmd *cmd, uint32_t dpcon_id,
 		uint16_t *token)
 	{
 		panic_on_mc(dev);
@@ -788,7 +794,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_close(device_t dev, dpaa2_cmd_t cmd)
+	bypass_con_close(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -797,7 +803,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_reset(device_t dev, dpaa2_cmd_t cmd)
+	bypass_con_reset(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -806,7 +812,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_enable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_con_enable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -815,7 +821,7 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_disable(device_t dev, dpaa2_cmd_t cmd)
+	bypass_con_disable(device_t dev, struct dpaa2_cmd *cmd)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -824,8 +830,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_get_attributes(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_con_attr_t *attr)
+	bypass_con_get_attributes(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_con_attr *attr)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -834,8 +840,8 @@ CODE {
 		return (ENXIO);
 	}
 	static int
-	bypass_con_set_notif(device_t dev, dpaa2_cmd_t cmd,
-		dpaa2_con_notif_cfg_t *cfg)
+	bypass_con_set_notif(device_t dev, struct dpaa2_cmd *cmd,
+		struct dpaa2_con_notif_cfg *cfg)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
@@ -852,7 +858,7 @@ CODE {
 
 METHOD int mng_get_version {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	*major;
 	uint32_t	*minor;
 	uint32_t	*rev;
@@ -860,14 +866,14 @@ METHOD int mng_get_version {
 
 METHOD int mng_get_soc_version {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	*pvr;
 	uint32_t	*svr;
 } DEFAULT bypass_mng_get_soc_version;
 
 METHOD int mng_get_container_id {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	*cont_id;
 } DEFAULT bypass_mng_get_container_id;
 
@@ -877,69 +883,69 @@ METHOD int mng_get_container_id {
 
 METHOD int rc_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	 cont_id;
 	uint16_t	*token;
 } DEFAULT bypass_rc_open;
 
 METHOD int rc_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_rc_close;
 
 METHOD int rc_get_obj_count {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	*obj_count;
 } DEFAULT bypass_rc_get_obj_count;
 
 METHOD int rc_get_obj {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	 obj_idx;
-	dpaa2_obj_t	*obj;
+	struct dpaa2_obj *obj;
 } DEFAULT bypass_rc_get_obj;
 
 METHOD int rc_get_obj_descriptor {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	 obj_id;
 	enum dpaa2_dev_type type;
-	dpaa2_obj_t	*obj;
+	struct dpaa2_obj *obj;
 } DEFAULT bypass_rc_get_obj_descriptor;
 
 METHOD int rc_get_attributes {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_rc_attr_t	*attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_rc_attr *attr;
 } DEFAULT bypass_rc_get_attributes;
 
 METHOD int rc_get_obj_region {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	 obj_id;
 	uint8_t		 reg_idx;
 	enum dpaa2_dev_type type;
-	dpaa2_rc_obj_region_t *reg;
+	struct dpaa2_rc_obj_region *reg;
 } DEFAULT bypass_rc_get_obj_region;
 
 METHOD int rc_get_api_version {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t	*major;
 	uint16_t	*minor;
 } DEFAULT bypass_rc_get_api_version;
 
 METHOD int rc_set_irq_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint8_t		 enable;
 } DEFAULT bypass_rc_set_irq_enable;
 
 METHOD int rc_set_obj_irq {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint64_t	 addr;
 	uint32_t	 data;
@@ -950,9 +956,9 @@ METHOD int rc_set_obj_irq {
 
 METHOD int rc_get_conn {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ep_desc_t *ep1_desc;
-	dpaa2_ep_desc_t *ep2_desc;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ep_desc *ep1_desc;
+	struct dpaa2_ep_desc *ep2_desc;
 	uint32_t	*link_stat;
 } DEFAULT bypass_rc_get_conn;
 
@@ -962,196 +968,196 @@ METHOD int rc_get_conn {
 
 METHOD int ni_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	const uint32_t	 dpni_id;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpni_id;
 	uint16_t	*token;
 } DEFAULT bypass_ni_open;
 
 METHOD int ni_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_ni_close;
 
 METHOD int ni_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_ni_enable;
 
 METHOD int ni_disable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_ni_disable;
 
 METHOD int ni_get_api_version {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t	*major;
 	uint16_t	*minor;
 } DEFAULT bypass_ni_get_api_version;
 
 METHOD int ni_reset {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_ni_reset;
 
 METHOD int ni_get_attributes {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_attr_t	*attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_attr *attr;
 } DEFAULT bypass_ni_get_attributes;
 
 METHOD int ni_set_buf_layout {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_buf_layout_t *bl;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_buf_layout *bl;
 } DEFAULT bypass_ni_set_buf_layout;
 
 METHOD int ni_get_tx_data_off {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t	*offset;
 } DEFAULT bypass_ni_get_tx_data_off;
 
 METHOD int ni_set_link_cfg {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_link_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_link_cfg *cfg;
 } DEFAULT bypass_ni_set_link_cfg;
 
 METHOD int ni_get_link_cfg {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_link_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_link_cfg *cfg;
 } DEFAULT bypass_ni_get_link_cfg;
 
 METHOD int ni_get_link_state {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_link_state_t *state;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_link_state *state;
 } DEFAULT bypass_ni_get_link_state;
 
 METHOD int ni_get_port_mac_addr {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_get_port_mac_addr;
 
 METHOD int ni_set_prim_mac_addr {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_set_prim_mac_addr;
 
 METHOD int ni_get_prim_mac_addr {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_get_prim_mac_addr;
 
 METHOD int ni_set_qos_table {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_qos_table_t *tbl;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_qos_table *tbl;
 } DEFAULT bypass_ni_set_qos_table;
 
 METHOD int ni_clear_qos_table {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_ni_clear_qos_table;
 
 METHOD int ni_set_pools {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_pools_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_pools_cfg *cfg;
 } DEFAULT bypass_ni_set_pools;
 
 METHOD int ni_set_err_behavior {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_err_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_err_cfg *cfg;
 } DEFAULT bypass_ni_set_err_behavior;
 
 METHOD int ni_get_queue {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_queue_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_queue_cfg *cfg;
 } DEFAULT bypass_ni_get_queue;
 
 METHOD int ni_set_queue {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_ni_queue_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_ni_queue_cfg *cfg;
 } DEFAULT bypass_ni_set_queue;
 
 METHOD int ni_get_qdid {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	enum dpaa2_ni_queue_type type;
 	uint16_t	*qdid;
 } DEFAULT bypass_ni_get_qdid;
 
 METHOD int ni_add_mac_addr {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_add_mac_addr;
 
 METHOD int ni_clear_mac_filters {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	bool		 rm_uni;
 	bool		 rm_multi;
 } DEFAULT bypass_ni_clear_mac_filters;
 
 METHOD int ni_set_mfl {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t	 length;
 } DEFAULT bypass_ni_set_mfl;
 
 METHOD int ni_set_offload {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	enum dpaa2_ni_ofl_type ofl_type;
 	bool		 en;
 } DEFAULT bypass_ni_set_offload;
 
 METHOD int ni_set_irq_mask {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	 mask;
 } DEFAULT bypass_ni_set_irq_mask;
 
 METHOD int ni_set_irq_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_ni_set_irq_enable;
 
 METHOD int ni_get_irq_status {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	*status;
 } DEFAULT bypass_ni_get_irq_status;
 
 METHOD int ni_set_uni_promisc {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	bool		 en;
 } DEFAULT bypass_ni_set_uni_promisc;
 
 METHOD int ni_set_multi_promisc {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	bool		 en;
 } DEFAULT bypass_ni_set_multi_promisc;
 
 METHOD int ni_get_statistics {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 page;
 	uint16_t	 param;
 	uint64_t	*cnt;
@@ -1159,7 +1165,7 @@ METHOD int ni_get_statistics {
 
 METHOD int ni_set_rx_tc_dist {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint16_t	 dist_size;
 	uint8_t		 tc;
 	enum dpaa2_ni_dist_mode dist_mode;
@@ -1172,61 +1178,61 @@ METHOD int ni_set_rx_tc_dist {
 
 METHOD int io_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	const uint32_t	 dpio_id;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpio_id;
 	uint16_t	*token;
 } DEFAULT bypass_io_open;
 
 METHOD int io_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_io_close;
 
 METHOD int io_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_io_enable;
 
 METHOD int io_disable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_io_disable;
 
 METHOD int io_reset {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_io_reset;
 
 METHOD int io_get_attributes {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_io_attr_t	*attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_io_attr *attr;
 } DEFAULT bypass_io_get_attributes;
 
 METHOD int io_set_irq_mask {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	 mask;
 } DEFAULT bypass_io_set_irq_mask;
 
 METHOD int io_get_irq_status {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	*status;
 } DEFAULT bypass_io_get_irq_status;
 
 METHOD int io_set_irq_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_io_set_irq_enable;
 
 METHOD int io_add_static_dq_chan {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint32_t	 dpcon_id;
 	uint8_t		*chan_idx;
 } DEFAULT bypass_io_add_static_dq_chan;
@@ -1237,35 +1243,35 @@ METHOD int io_add_static_dq_chan {
 
 METHOD int bp_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	const uint32_t	 dpbp_id;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpbp_id;
 	uint16_t	*token;
 } DEFAULT bypass_bp_open;
 
 METHOD int bp_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_bp_close;
 
 METHOD int bp_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_bp_enable;
 
 METHOD int bp_disable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_bp_disable;
 
 METHOD int bp_reset {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_bp_reset;
 
 METHOD int bp_get_attributes {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	dpaa2_bp_attr_t	*attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_bp_attr *attr;
 } DEFAULT bypass_bp_get_attributes;
 
 /**
@@ -1274,24 +1280,24 @@ METHOD int bp_get_attributes {
 
 METHOD int mac_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	const uint32_t	 dpmac_id;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpmac_id;
 	uint16_t	*token;
 } DEFAULT bypass_mac_open;
 
 METHOD int mac_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_mac_close;
 
 METHOD int mac_reset {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_mac_reset;
 
 METHOD int mac_mdio_read {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 phy;
 	uint16_t	 reg;
 	uint16_t	*val;
@@ -1299,7 +1305,7 @@ METHOD int mac_mdio_read {
 
 METHOD int mac_mdio_write {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 phy;
 	uint16_t	 reg;
 	uint16_t	 val;
@@ -1307,39 +1313,39 @@ METHOD int mac_mdio_write {
 
 METHOD int mac_get_addr {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_mac_get_addr;
 
 METHOD int mac_get_attributes {
 	device_t	  dev;
-	dpaa2_cmd_t	  cmd;
-	dpaa2_mac_attr_t *attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_mac_attr *attr;
 } DEFAULT bypass_mac_get_attributes;
 
 METHOD int mac_set_link_state {
 	device_t	  dev;
-	dpaa2_cmd_t	  cmd;
-	dpaa2_mac_link_state_t *state;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_mac_link_state *state;
 } DEFAULT bypass_mac_set_link_state;
 
 METHOD int mac_set_irq_mask {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	 mask;
 } DEFAULT bypass_mac_set_irq_mask;
 
 METHOD int mac_set_irq_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	bool		 en;
 } DEFAULT bypass_mac_set_irq_enable;
 
 METHOD int mac_get_irq_status {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 	uint8_t		 irq_idx;
 	uint32_t	*status;
 } DEFAULT bypass_mac_get_irq_status;
@@ -1350,39 +1356,39 @@ METHOD int mac_get_irq_status {
 
 METHOD int con_open {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
-	const uint32_t	 dpcon_id;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpcon_id;
 	uint16_t	*token;
 } DEFAULT bypass_con_open;
 
 METHOD int con_close {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_con_close;
 
 METHOD int con_reset {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_con_reset;
 
 METHOD int con_enable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_con_enable;
 
 METHOD int con_disable {
 	device_t	 dev;
-	dpaa2_cmd_t	 cmd;
+	struct dpaa2_cmd *cmd;
 } DEFAULT bypass_con_disable;
 
 METHOD int con_get_attributes {
 	device_t	  dev;
-	dpaa2_cmd_t	  cmd;
-	dpaa2_con_attr_t *attr;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_con_attr *attr;
 } DEFAULT bypass_con_get_attributes;
 
 METHOD int con_set_notif {
 	device_t	  dev;
-	dpaa2_cmd_t	  cmd;
-	dpaa2_con_notif_cfg_t *cfg;
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_con_notif_cfg *cfg;
 } DEFAULT bypass_con_set_notif;

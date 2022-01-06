@@ -326,59 +326,58 @@ static const struct dpaa2_eth_dist_fields dist_fields[] = {
 
 /* Forward declarations. */
 
-static int	setup_dpni(device_t dev);
-static int	setup_channels(device_t dev);
-static int	setup_frame_queues(device_t dev);
-static int	setup_dpni_binding(device_t dev);
-static int	setup_dpni_irqs(device_t dev);
-static int	setup_rx_distribution(device_t dev);
-static int	setup_rx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
-static int	setup_tx_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
-static int	setup_rx_err_flow(device_t, dpaa2_cmd_t, dpaa2_ni_fq_t *);
-static int	setup_msi(struct dpaa2_ni_softc *);
-static int	setup_if_caps(struct dpaa2_ni_softc *);
-static int	setup_if_flags(struct dpaa2_ni_softc *);
+static int setup_dpni(device_t);
+static int setup_channels(device_t);
+static int setup_frame_queues(device_t);
+static int setup_dpni_binding(device_t);
+static int setup_dpni_irqs(device_t);
+static int setup_rx_distribution(device_t);
+static int setup_rx_flow(device_t, struct dpaa2_cmd *, struct dpaa2_ni_fq *);
+static int setup_tx_flow(device_t, struct dpaa2_cmd *, struct dpaa2_ni_fq *);
+static int setup_rx_err_flow(device_t, struct dpaa2_cmd *, struct dpaa2_ni_fq *);
+static int setup_msi(struct dpaa2_ni_softc *);
+static int setup_if_caps(struct dpaa2_ni_softc *);
+static int setup_if_flags(struct dpaa2_ni_softc *);
 
-static int	set_buf_layout(device_t, dpaa2_cmd_t);
-static int	set_pause_frame(device_t, dpaa2_cmd_t);
-static int	set_qos_table(device_t, dpaa2_cmd_t);
-static int	set_mac_addr(device_t, dpaa2_cmd_t, uint16_t, uint16_t);
+static int set_buf_layout(device_t, struct dpaa2_cmd *);
+static int set_pause_frame(device_t, struct dpaa2_cmd *);
+static int set_qos_table(device_t, struct dpaa2_cmd *);
+static int set_mac_addr(device_t, struct dpaa2_cmd *, uint16_t, uint16_t);
 
-static uint8_t	calc_channels_num(struct dpaa2_ni_softc *sc);
-static int	cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major,
-		    uint16_t minor);
-static void	print_statistics(struct dpaa2_ni_softc *);
-static int	seed_buf_pool(struct dpaa2_ni_softc *, dpaa2_ni_channel_t *);
-static int	dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg,
-		    uint8_t *key_cfg_buf);
-static int	dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags);
-static int	dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc,
-		    enum dpaa2_ni_dist_mode type, uint64_t flags);
+static int calc_channels_num(struct dpaa2_ni_softc *);
+static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
+static int print_statistics(struct dpaa2_ni_softc *);
+
+static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
+
+static int dpni_prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
+static int dpaa2_eth_set_hash(struct dpaa2_ni_softc *, uint64_t);
+static int dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *,
+    enum dpaa2_ni_dist_mode, uint64_t);
 
 /* Callbacks. */
 
-static void	dpni_if_init(void *arg);
-static void	dpni_if_start(struct ifnet *ifp);
-static int	dpni_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data);
+static void dpni_if_init(void *);
+static void dpni_if_start(struct ifnet *);
+static int  dpni_if_ioctl(struct ifnet *, u_long, caddr_t);
 
-static int	dpni_ifmedia_change(struct ifnet *ifp);
-static void	dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr);
-static void	dpni_ifmedia_tick(void *arg);
+static int  dpni_ifmedia_change(struct ifnet *);
+static void dpni_ifmedia_status(struct ifnet *, struct ifmediareq *);
+static void dpni_ifmedia_tick(void *);
 
-static void	dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx);
-static void	dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs,
-		    int nseg, int error);
+static void dpni_cdan_cb(struct dpaa2_io_notif_ctx *);
+static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
-static void	dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
-		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
-static void	dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
-		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
-static void	dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
-		    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
+static void dpni_consume_tx_conf(device_t, struct dpaa2_ni_channel *,
+    struct dpaa2_ni_fq *, struct dpaa2_fd *);
+static void dpni_consume_rx(device_t, struct dpaa2_ni_channel *,
+    struct dpaa2_ni_fq *, struct dpaa2_fd *);
+static void dpni_consume_rx_err(device_t, struct dpaa2_ni_channel *,
+    struct dpaa2_ni_fq *fq, struct dpaa2_fd *);
 
 /* ISRs */
 
-static void	dpni_msi_intr(void *arg);
+static void dpni_msi_intr(void *);
 
 /*
  * Device interface.
@@ -546,9 +545,9 @@ setup_dpni(device_t dev)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	dpaa2_ep_desc_t ep1_desc, ep2_desc;
-	uint8_t eth_bca[ETHER_ADDR_LEN];
-	dpaa2_cmd_t cmd = sc->cmd;
+	struct dpaa2_ep_desc ep1_desc, ep2_desc;
+	struct dpaa2_cmd *cmd = sc->cmd;
+	uint8_t eth_bca[ETHER_ADDR_LEN]; /* broadcast physical address */
 	uint16_t rc_token = sc->rc_token;
 	uint16_t ni_token = sc->ni_token;
 	uint32_t link;
@@ -703,20 +702,18 @@ setup_dpni(device_t dev)
 static int
 setup_channels(device_t dev)
 {
-	device_t io_dev, con_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_io_softc *iosc;
 	struct dpaa2_con_softc *consc;
 	struct dpaa2_devinfo *io_info, *con_info;
-	dpaa2_ni_channel_t *channel;
-	dpaa2_io_notif_ctx_t *ctx;
-	dpaa2_con_notif_cfg_t notif_cfg;
+	device_t io_dev, con_dev;
+	struct dpaa2_ni_channel *channel;
+	struct dpaa2_io_notif_ctx *ctx;
+	struct dpaa2_con_notif_cfg notif_cfg;
 	int error;
 
 	/* Calculate a number of channels based on the allocated resources. */
 	sc->num_chan = calc_channels_num(sc);
-
-	/* Setup no more channels than DPNI queues. */
 	sc->num_chan = sc->num_chan > sc->attr.num.queues
 	    ? sc->attr.num.queues : sc->num_chan;
 
@@ -889,10 +886,10 @@ setup_dpni_binding(device_t dev)
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *bp_info;
-	dpaa2_cmd_t cmd = sc->cmd;
+	struct dpaa2_cmd *cmd = sc->cmd;
+	struct dpaa2_ni_pools_cfg pools_cfg;
+	struct dpaa2_ni_err_cfg err_cfg;
 	uint16_t ni_token = sc->ni_token;
-	dpaa2_ni_pools_cfg_t pools_cfg;
-	dpaa2_ni_err_cfg_t err_cfg;
 	int error;
 
 	/* Select buffer pool (only one available at the moment). */
@@ -1006,10 +1003,10 @@ setup_rx_distribution(device_t dev)
  * @internal
  */
 static int
-setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
+setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
 	struct dpaa2_devinfo *con_info;
-	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	struct dpaa2_ni_queue_cfg queue_cfg = {0};
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
@@ -1052,11 +1049,11 @@ setup_rx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
  * @internal
  */
 static int
-setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
+setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *con_info;
-	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	struct dpaa2_ni_queue_cfg queue_cfg = {0};
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
@@ -1076,9 +1073,9 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
 		fq->tx_fqid[i] = queue_cfg.fqid;
 
 		if (bootverbose)
-			device_printf(dev, "Tx queue: tc=%d, flowid=%d, fqid=%d, "
-			    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
-			    queue_cfg.fqid, con_info->id);
+			device_printf(dev, "Tx queue: tc=%d, flowid=%d, "
+			    "fqid=%d, dpcon_id=%d\n", queue_cfg.tc,
+			    queue_cfg.idx, queue_cfg.fqid, con_info->id);
 	}
 
 	/* All Tx queues which belong to the same flowid have the same qdbin. */
@@ -1123,10 +1120,10 @@ setup_tx_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
  * @internal
  */
 static int
-setup_rx_err_flow(device_t dev, dpaa2_cmd_t cmd, dpaa2_ni_fq_t *fq)
+setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
 	struct dpaa2_devinfo *con_info;
-	dpaa2_ni_queue_cfg_t queue_cfg = {0};
+	struct dpaa2_ni_queue_cfg queue_cfg = {0};
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
@@ -1173,7 +1170,7 @@ static int
 setup_dpni_irqs(device_t dev)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	dpaa2_cmd_t cmd = sc->cmd;
+	struct dpaa2_cmd *cmd = sc->cmd;
 	uint16_t ni_token = sc->ni_token;
 	int error;
 
@@ -1295,11 +1292,6 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 	device_t dev = sc->dev;
 	int error;
 
-	if (bootverbose)
-		device_printf(sc->dev, "promisc=%s, allmulti=%s\n",
-		    en_promisc ? "TRUE" : "FALSE",
-		    en_allmulti ? "TRUE" : "FALSE");
-
 	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), en_promisc ? true : en_allmulti);
 	if (error) {
@@ -1323,10 +1315,10 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
-set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
+set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	dpaa2_ni_buf_layout_t buf_layout = {0};
+	struct dpaa2_ni_buf_layout buf_layout = {0};
 	int error;
 
 	/*
@@ -1424,10 +1416,10 @@ set_buf_layout(device_t dev, dpaa2_cmd_t cmd)
  *       itself generates pause frames (Tx frame).
  */
 static int
-set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
+set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	dpaa2_ni_link_cfg_t link_cfg = {0};
+	struct dpaa2_ni_link_cfg link_cfg = {0};
 	int error;
 
 	error = DPAA2_CMD_NI_GET_LINK_CFG(dev, cmd, &link_cfg);
@@ -1459,10 +1451,10 @@ set_pause_frame(device_t dev, dpaa2_cmd_t cmd)
  * frame.
  */
 static int
-set_qos_table(device_t dev, dpaa2_cmd_t cmd)
+set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	dpaa2_ni_qos_table_t tbl;
+	struct dpaa2_ni_qos_table tbl;
 	int error;
 
 	if (sc->attr.num.rx_tcs == 1 ||
@@ -1532,7 +1524,8 @@ set_qos_table(device_t dev, dpaa2_cmd_t cmd)
 }
 
 static int
-set_mac_addr(device_t dev, dpaa2_cmd_t cmd, uint16_t rc_token, uint16_t ni_token)
+set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
+    uint16_t ni_token)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct ifnet *ifp = sc->ifp;
@@ -1620,7 +1613,7 @@ static void
 dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	dpaa2_mac_link_state_t mac_link = {0};
+	struct dpaa2_mac_link_state mac_link = {0};
 	uint16_t mac_token;
 	int link_state = ifp->if_link_state;
 	int error;
@@ -1861,24 +1854,23 @@ dpni_msi_intr(void *arg)
  * @brief Channel data availability notification (CDAN) callback.
  */
 static void
-dpni_cdan_cb(dpaa2_io_notif_ctx_t *ctx)
+dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 {
-	dpaa2_ni_channel_t *channel = (dpaa2_ni_channel_t *) ctx->channel;
+	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
 	struct dpaa2_io_softc *iosc = device_get_softc(channel->io_dev);
 
-	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, channel->id,
+	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, chan->id,
 	    iosc->attr.swp_id, iosc->attr.id);
 }
 
 /**
  * @internal
- * @brief Callback to obtain a physical address of the only DMA mapped segment.
+ * @brief Callback to obtain a physical address of the only DMA segment mapped.
  */
 static void
-dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
-    int error)
+dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 {
-	if (error)
+	if (err)
 		return;
 	*(bus_addr_t *) arg = segs[0].ds_addr;
 }
@@ -1887,40 +1879,41 @@ dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg,
  * @internal
  */
 static void
-dpni_consume_tx_conf(device_t dev, dpaa2_ni_channel_t *channel,
-    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+dpni_consume_tx_conf(device_t dev, struct dpaa2_ni_channel *chan,
+    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
 {
 	/* TBD */
-	printf("%s: invoked\n", __func__);
+	device_printf(dev, "invoked\n");
 }
 
 /**
  * @internal
  */
 static void
-dpni_consume_rx(device_t dev, dpaa2_ni_channel_t *channel,
-    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+dpni_consume_rx(device_t dev, struct dpaa2_ni_channel *chan,
+    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
 {
 	/* TBD */
-	printf("%s: invoked\n", __func__);
+	device_printf(dev, "invoked\n");
 }
 
 /**
  * @internal
  */
 static void
-dpni_consume_rx_err(device_t dev, dpaa2_ni_channel_t *channel,
-    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd)
+dpni_consume_rx_err(device_t dev, struct dpaa2_ni_channel *chan,
+    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
 {
 	/* TBD */
-	printf("%s: invoked\n", __func__);
+	device_printf(dev, "invoked\n");
 }
 
 /**
  * @internal
+ * @brief Compare versions of the DPAA2 network interface API.
  */
 static int
-cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
+cmp_api_version(struct dpaa2_ni_softc *sc, uint16_t major, uint16_t minor)
 {
 	if (sc->api_major == major)
 		return sc->api_minor - minor;
@@ -1929,9 +1922,9 @@ cmp_api_version(struct dpaa2_ni_softc *sc, const uint16_t major, uint16_t minor)
 
 /**
  * @internal
- * @brief
+ * @brief Calculate number of channels based on the allocated resources.
  */
-static uint8_t
+static int
 calc_channels_num(struct dpaa2_ni_softc *sc)
 {
 	uint8_t i, num_chan;
@@ -1959,15 +1952,15 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
  * NOTE: DMA tag for the given channel should be created.
  */
 static int
-seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
+seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 {
 	device_t bp_dev;
 	struct dpaa2_bp_softc *bpsc;
-	dpaa2_ni_buf_t *buf;
+	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
 
-	/* There's only one buffer pool for now. */
+	/* There's only one buffers pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
 
@@ -2014,7 +2007,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, dpaa2_ni_channel_t *channel)
  * @internal
  * @brief Print statistics of the network interface.
  */
-static void
+static int
 print_statistics(struct dpaa2_ni_softc *sc)
 {
 	device_t dev = sc->dev;
@@ -2034,23 +2027,30 @@ print_statistics(struct dpaa2_ni_softc *sc)
 		case 0:
 			device_printf(dev, "INGRESS_ALL_FRAMES=%lu\n", cnt[0]);
 			device_printf(dev, "INGRESS_ALL_BYTES=%lu\n", cnt[1]);
-			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%lu\n", cnt[2]);
+			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%lu\n",
+			    cnt[2]);
 			break;
 		case 1:
 			device_printf(dev, "EGRESS_ALL_FRAMES=%lu\n", cnt[0]);
 			device_printf(dev, "EGRESS_ALL_BYTES=%lu\n", cnt[1]);
-			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%lu\n", cnt[2]);
+			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%lu\n",
+			    cnt[2]);
 			break;
 		case 2:
-			device_printf(dev, "INGRESS_FILTERED_FRAMES=%lu\n", cnt[0]);
-			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%lu\n", cnt[1]);
-			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%lu\n", cnt[2]);
+			device_printf(dev, "INGRESS_FILTERED_FRAMES=%lu\n",
+			    cnt[0]);
+			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%lu\n",
+			    cnt[1]);
+			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%lu\n",
+			    cnt[2]);
 			break;
 		default:
 			/* Other pages aren't interesting at the moment. */
 			break;
 		}
 	}
+
+	return (0);
 }
 
 /**
@@ -2083,6 +2083,7 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
 {
 	device_t dev = sc->dev;
 	struct dpkg_profile_cfg cls_cfg;
+	struct dpkg_extract *key;
 	uint32_t rx_hash_fields = 0;
 	int i, err = 0;
 
@@ -2090,8 +2091,7 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
 
 	/* Configure extracts according to the given flags. */
 	for (i = 0; i < ARRAY_SIZE(dist_fields); i++) {
-		struct dpkg_extract *key =
-		    &cls_cfg.extracts[cls_cfg.num_extracts];
+		key = &cls_cfg.extracts[cls_cfg.num_extracts];
 
 		if (!(flags & dist_fields[i].id))
 			continue;
@@ -2159,7 +2159,7 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
  * Return:	'0' on Success; Error code otherwise.
  */
 static int
-dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
+dpni_prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 {
 	struct dpni_ext_set_rx_tc_dist *dpni_ext;
 	struct dpni_dist_extract *extr;
@@ -2168,7 +2168,7 @@ dpni_prepare_key_cfg(const struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 	if (cfg->num_extracts > DPKG_MAX_NUM_OF_EXTRACTS)
 		return (EINVAL);
 
-	dpni_ext = (struct dpni_ext_set_rx_tc_dist *)key_cfg_buf;
+	dpni_ext = (struct dpni_ext_set_rx_tc_dist *) key_cfg_buf;
 	dpni_ext->num_extracts = cfg->num_extracts;
 
 	for (i = 0; i < cfg->num_extracts; i++) {

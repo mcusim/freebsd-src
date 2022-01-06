@@ -85,6 +85,155 @@
 #define DPAA2_CMD_PARAMS_N		7u
 #define DPAA2_LABEL_SZ			16
 
+/* ------------------------- MNG command IDs -------------------------------- */
+#define CMD_MNG_BASE_VERSION	1
+#define CMD_MNG_ID_OFFSET	4
+
+#define CMD_MNG(id)	(((id) << CMD_MNG_ID_OFFSET) | CMD_MNG_BASE_VERSION)
+
+#define CMDID_MNG_GET_VER			CMD_MNG(0x831)
+#define CMDID_MNG_GET_SOC_VER			CMD_MNG(0x832)
+#define CMDID_MNG_GET_CONT_ID			CMD_MNG(0x830)
+
+/* ------------------------- DPRC command IDs ------------------------------- */
+#define CMD_RC_BASE_VERSION	1
+#define CMD_RC_2ND_VERSION	2
+#define CMD_RC_3RD_VERSION	3
+#define CMD_RC_ID_OFFSET	4
+
+#define CMD_RC(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_BASE_VERSION)
+#define CMD_RC_V2(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_2ND_VERSION)
+#define CMD_RC_V3(id)	(((id) << CMD_RC_ID_OFFSET) | CMD_RC_3RD_VERSION)
+
+#define CMDID_RC_OPEN				CMD_RC(0x805)
+#define CMDID_RC_CLOSE				CMD_RC(0x800)
+#define CMDID_RC_GET_API_VERSION		CMD_RC(0xA05)
+#define CMDID_RC_GET_ATTR			CMD_RC(0x004)
+#define CMDID_RC_RESET_CONT			CMD_RC(0x005)
+#define CMDID_RC_RESET_CONT_V2			CMD_RC_V2(0x005)
+#define CMDID_RC_SET_IRQ			CMD_RC(0x010)
+#define CMDID_RC_SET_IRQ_ENABLE			CMD_RC(0x012)
+#define CMDID_RC_SET_IRQ_MASK			CMD_RC(0x014)
+#define CMDID_RC_GET_IRQ_STATUS			CMD_RC(0x016)
+#define CMDID_RC_CLEAR_IRQ_STATUS		CMD_RC(0x017)
+#define CMDID_RC_GET_CONT_ID			CMD_RC(0x830)
+#define CMDID_RC_GET_OBJ_COUNT			CMD_RC(0x159)
+#define CMDID_RC_GET_OBJ			CMD_RC(0x15A)
+#define CMDID_RC_GET_OBJ_DESC			CMD_RC(0x162)
+#define CMDID_RC_GET_OBJ_REG			CMD_RC(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V2			CMD_RC_V2(0x15E)
+#define CMDID_RC_GET_OBJ_REG_V3			CMD_RC_V3(0x15E)
+#define CMDID_RC_SET_OBJ_IRQ			CMD_RC(0x15F)
+#define CMDID_RC_GET_CONN			CMD_RC(0x16C)
+
+/* ------------------------- DPIO command IDs ------------------------------- */
+#define CMD_IO_BASE_VERSION	1
+#define CMD_IO_ID_OFFSET	4
+
+#define CMD_IO(id)	(((id) << CMD_IO_ID_OFFSET) | CMD_IO_BASE_VERSION)
+
+#define CMDID_IO_OPEN				CMD_IO(0x803)
+#define CMDID_IO_CLOSE				CMD_IO(0x800)
+#define CMDID_IO_ENABLE				CMD_IO(0x002)
+#define CMDID_IO_DISABLE			CMD_IO(0x003)
+#define CMDID_IO_GET_ATTR			CMD_IO(0x004)
+#define CMDID_IO_RESET				CMD_IO(0x005)
+#define CMDID_IO_SET_IRQ_ENABLE			CMD_IO(0x012)
+#define CMDID_IO_SET_IRQ_MASK			CMD_IO(0x014)
+#define CMDID_IO_GET_IRQ_STATUS			CMD_IO(0x016)
+#define CMDID_IO_ADD_STATIC_DQ_CHAN		CMD_IO(0x122)
+
+/* ------------------------- DPNI command IDs ------------------------------- */
+#define CMD_NI_BASE_VERSION	1
+#define CMD_NI_2ND_VERSION	2
+#define CMD_NI_4TH_VERSION	4
+#define CMD_NI_ID_OFFSET	4
+
+#define CMD_NI(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_BASE_VERSION)
+#define CMD_NI_V2(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_2ND_VERSION)
+#define CMD_NI_V4(id)	(((id) << CMD_NI_ID_OFFSET) | CMD_NI_4TH_VERSION)
+
+#define CMDID_NI_OPEN				CMD_NI(0x801)
+#define CMDID_NI_CLOSE				CMD_NI(0x800)
+#define CMDID_NI_ENABLE				CMD_NI(0x002)
+#define CMDID_NI_DISABLE			CMD_NI(0x003)
+#define CMDID_NI_GET_API_VER			CMD_NI(0xA01)
+#define CMDID_NI_RESET				CMD_NI(0x005)
+#define CMDID_NI_GET_ATTR			CMD_NI(0x004)
+#define CMDID_NI_SET_BUF_LAYOUT			CMD_NI(0x265)
+#define CMDID_NI_GET_TX_DATA_OFF		CMD_NI(0x212)
+#define CMDID_NI_GET_PORT_MAC_ADDR		CMD_NI(0x263)
+#define CMDID_NI_SET_PRIM_MAC_ADDR		CMD_NI(0x224)
+#define CMDID_NI_GET_PRIM_MAC_ADDR		CMD_NI(0x225)
+#define CMDID_NI_SET_LINK_CFG			CMD_NI(0x21A)
+#define CMDID_NI_GET_LINK_CFG			CMD_NI(0x278)
+#define CMDID_NI_GET_LINK_STATE			CMD_NI(0x215)
+#define CMDID_NI_SET_QOS_TABLE			CMD_NI(0x240)
+#define CMDID_NI_CLEAR_QOS_TABLE		CMD_NI(0x243)
+#define CMDID_NI_SET_POOLS			CMD_NI(0x200)
+#define CMDID_NI_SET_ERR_BEHAVIOR		CMD_NI(0x20B)
+#define CMDID_NI_GET_QUEUE			CMD_NI(0x25F)
+#define CMDID_NI_SET_QUEUE			CMD_NI(0x260)
+#define CMDID_NI_GET_QDID			CMD_NI(0x210)
+#define CMDID_NI_ADD_MAC_ADDR			CMD_NI(0x226)
+#define CMDID_NI_CLEAR_MAC_FILTERS		CMD_NI(0x228)
+#define CMDID_NI_SET_MFL			CMD_NI(0x216)
+#define CMDID_NI_SET_OFFLOAD			CMD_NI(0x26C)
+#define CMDID_NI_SET_IRQ_MASK			CMD_NI(0x014)
+#define CMDID_NI_SET_IRQ_ENABLE			CMD_NI(0x012)
+#define CMDID_NI_GET_IRQ_STATUS			CMD_NI(0x016)
+#define CMDID_NI_SET_UNI_PROMISC		CMD_NI(0x222)
+#define CMDID_NI_SET_MULTI_PROMISC		CMD_NI(0x220)
+#define CMDID_NI_GET_STATISTICS			CMD_NI(0x25D)
+#define CMDID_NI_SET_RX_TC_DIST			CMD_NI(0x235)
+
+/* ------------------------- DPBP command IDs ------------------------------- */
+#define CMD_BP_BASE_VERSION	1
+#define CMD_BP_ID_OFFSET	4
+
+#define CMD_BP(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_BP_OPEN				CMD_BP(0x804)
+#define CMDID_BP_CLOSE				CMD_BP(0x800)
+#define CMDID_BP_ENABLE				CMD_BP(0x002)
+#define CMDID_BP_DISABLE			CMD_BP(0x003)
+#define CMDID_BP_GET_ATTR			CMD_BP(0x004)
+#define CMDID_BP_RESET				CMD_BP(0x005)
+
+/* ------------------------- DPMAC command IDs ------------------------------ */
+#define CMD_MAC_BASE_VERSION	1
+#define CMD_MAC_2ND_VERSION	2
+#define CMD_MAC_ID_OFFSET	4
+
+#define CMD_MAC(id)	(((id) << CMD_MAC_ID_OFFSET) | CMD_MAC_BASE_VERSION)
+#define CMD_MAC_V2(id)	(((id) << CMD_MAC_ID_OFFSET) | CMD_MAC_2ND_VERSION)
+
+#define CMDID_MAC_OPEN				CMD_MAC(0x80C)
+#define CMDID_MAC_CLOSE				CMD_MAC(0x800)
+#define CMDID_MAC_RESET				CMD_MAC(0x005)
+#define CMDID_MAC_MDIO_READ			CMD_MAC(0x0C0)
+#define CMDID_MAC_MDIO_WRITE			CMD_MAC(0x0C1)
+#define CMDID_MAC_GET_ADDR			CMD_MAC(0x0C5)
+#define CMDID_MAC_GET_ATTR			CMD_MAC(0x004)
+#define CMDID_MAC_SET_LINK_STATE		CMD_MAC_V2(0x0C3)
+#define CMDID_MAC_SET_IRQ_MASK			CMD_MAC(0x014)
+#define CMDID_MAC_SET_IRQ_ENABLE		CMD_MAC(0x012)
+#define CMDID_MAC_GET_IRQ_STATUS		CMD_MAC(0x016)
+
+/* ------------------------- DPCON command IDs ------------------------------ */
+#define CMD_CON_BASE_VERSION	1
+#define CMD_CON_ID_OFFSET	4
+
+#define CMD_CON(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+
+#define CMDID_CON_OPEN				CMD_CON(0x808)
+#define CMDID_CON_CLOSE				CMD_CON(0x800)
+#define CMDID_CON_ENABLE			CMD_CON(0x002)
+#define CMDID_CON_DISABLE			CMD_CON(0x003)
+#define CMDID_CON_GET_ATTR			CMD_CON(0x004)
+#define CMDID_CON_RESET				CMD_CON(0x005)
+#define CMDID_CON_SET_NOTIF			CMD_CON(0x100)
+
 /*
  * Public types.
  */
@@ -115,7 +264,7 @@ struct dpaa2_mcp {
 	uint16_t	flags;
 	uint16_t	rc_api_major;
 	uint16_t	rc_api_minor;
-	uint8_t		atomic;
+	bool		atomic;
 };
 
 /**
@@ -124,6 +273,8 @@ struct dpaa2_mcp {
  * header:	8 least significant bytes of the MC portal.
  * params:	Parameters to pass together with the command to MC. Might keep
  *		command execution results.
+ *
+ * NOTE: 64 bytes.
  */
 struct dpaa2_cmd {
 	uint64_t	header;
@@ -143,15 +294,17 @@ struct dpaa2_cmd {
  * flags_sw:	...
  * token:	...
  * cmdid:	...
+ *
+ * NOTE: 8 bytes.
  */
-struct __packed dpaa2_cmd_header {
+struct dpaa2_cmd_header {
 	uint8_t		srcid;
 	uint8_t		flags_hw;
 	uint8_t		status;
 	uint8_t		flags_sw;
 	uint16_t	token;
 	uint16_t	cmdid;
-};
+} __packed;
 
 /**
  * @brief Information about DPAA2 object.
@@ -167,7 +320,7 @@ struct __packed dpaa2_cmd_header {
  * type:	...
  * label:	...
  */
-typedef struct {
+struct dpaa2_obj {
 	uint32_t	id;
 	uint16_t	vendor;
 	uint8_t		irq_count;
@@ -178,7 +331,7 @@ typedef struct {
 	uint16_t	flags;
 	uint8_t		label[DPAA2_LABEL_SZ];
 	enum dpaa2_dev_type type;
-} dpaa2_obj_t;
+};
 
 /**
  * @brief Attributes of the DPRC object.
@@ -188,12 +341,12 @@ typedef struct {
  * options:	Container's options as set at container's creation.
  * icid:	Container's isolation context ID.
  */
-typedef struct {
+struct dpaa2_rc_attr {
 	uint32_t	cont_id;
 	uint32_t	portal_id;
 	uint32_t	options;
 	uint16_t	icid;
-} dpaa2_rc_attr_t;
+};
 
 /**
  * @brief Description of the object's memory region.
@@ -204,13 +357,13 @@ typedef struct {
  * flags:	Region flags (cacheable, etc.)
  * type:	Type of a software portal this region belongs to.
  */
-typedef struct {
+struct dpaa2_rc_obj_region {
 	uint64_t	base_paddr;
 	uint64_t	base_offset;
 	uint32_t	size;
 	uint32_t	flags;
 	enum dpaa2_rc_region_type type;
-} dpaa2_rc_obj_region_t;
+};
 
 /**
  * @brief Attributes of the DPBP object.
@@ -219,10 +372,10 @@ typedef struct {
  * bpid:	 Hardware buffer pool ID; should be used as an argument in
  *		 acquire/release operations on buffers.
  */
-typedef struct {
+struct dpaa2_bp_attr {
 	uint32_t	id;
 	uint16_t	bpid;
-} dpaa2_bp_attr_t;
+};
 
 /**
  * @brief DPAA2 endpoint descriptor.
@@ -232,11 +385,11 @@ typedef struct {
  *		(DPSW, DPDMUX), 0 - otherwise.
  * type:	Endpoint object type, null-terminated string.
  */
-typedef struct {
+struct dpaa2_ep_desc {
 	uint32_t	obj_id;
 	uint32_t	if_id;
 	enum dpaa2_dev_type type;
-} dpaa2_ep_desc_t;
+};
 
 /**
  * @brief Configuration of the channel data availability notification (CDAN).
@@ -246,28 +399,23 @@ typedef struct {
  * prior:	Priority selection within the DPIO channel; valid values
  *		are 0-7, depending on the number of priorities in that channel.
  */
-typedef struct {
+struct dpaa2_con_notif_cfg {
 	uint64_t	qman_ctx;
 	uint32_t	dpio_id;
 	uint8_t		prior;
-} dpaa2_con_notif_cfg_t;
+};
 
-typedef struct dpaa2_mcp *dpaa2_mcp_t;
-typedef struct dpaa2_cmd *dpaa2_cmd_t;
-
-int	dpaa2_mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
-	    struct resource_map *map, const uint16_t flags);
-int	dpaa2_mcp_init_atomic(dpaa2_mcp_t *portal, struct resource *res,
-	    struct resource_map *map, const uint16_t flags);
-int	dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags);
-void	dpaa2_mcp_free_portal(dpaa2_mcp_t portal);
-void	dpaa2_mcp_free_command(dpaa2_cmd_t cmd);
-void	dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags);
-void	dpaa2_mcp_unlock(dpaa2_mcp_t portal);
+int	dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
+	    struct resource_map *map, uint16_t flags, bool atomic);
+int	dpaa2_mcp_init_command(struct dpaa2_cmd **cmd, uint16_t flags);
+void	dpaa2_mcp_free_portal(struct dpaa2_mcp *mcp);
+void	dpaa2_mcp_free_command(struct dpaa2_cmd *cmd);
+void	dpaa2_mcp_lock(struct dpaa2_mcp *mcp, uint16_t *flags);
+void	dpaa2_mcp_unlock(struct dpaa2_mcp *mcp);
 
 /* to quickly update command token */
-dpaa2_cmd_t dpaa2_mcp_tk(dpaa2_cmd_t cmd, const uint16_t token);
+struct dpaa2_cmd *dpaa2_mcp_tk(struct dpaa2_cmd *cmd, uint16_t token);
 /* to quickly update command flags */
-dpaa2_cmd_t dpaa2_mcp_f(dpaa2_cmd_t cmd, const uint16_t flags);
+struct dpaa2_cmd *dpaa2_mcp_f(struct dpaa2_cmd *cmd, uint16_t flags);
 
 #endif /* _DPAA2_MCP_H */

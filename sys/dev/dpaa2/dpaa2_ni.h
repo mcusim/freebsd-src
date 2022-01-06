@@ -164,7 +164,7 @@ enum dpaa2_ni_err_action {
  * options:	 ...
  * wriop_ver:	 Revision of the underlying WRIOP hardware block.
  */
-typedef struct {
+struct dpaa2_ni_attr {
 	uint32_t		 options;
 	uint16_t		 wriop_ver;
 	struct {
@@ -184,35 +184,35 @@ typedef struct {
 		uint8_t		 fs;
 		uint8_t		 qos;
 	} key_size;
-} dpaa2_ni_attr_t;
+};
 
 /**
  * @brief Buffer for a buffer pool (visible to QBman).
  */
-typedef struct {
+struct dpaa2_ni_buf {
 	bus_dmamap_t		 dmap;
 	bus_addr_t		 paddr;
 	void			*vaddr;
-} dpaa2_ni_buf_t;
+};
 
 /**
  * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
  *
- * NOTE: Several WQs are organized into a single QBMan channel.
+ * NOTE: Several WQs are organized into a single WQ Channel.
  */
-typedef struct {
-	dpaa2_io_notif_ctx_t	 ctx;
+struct dpaa2_ni_channel {
+	struct dpaa2_io_notif_ctx ctx;
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
 
 	/* Buffers for buffer pool. */
 	uint32_t		 buf_num;
-	dpaa2_ni_buf_t		 buf[DPAA2_NI_BUFS_PER_CHAN];
-} dpaa2_ni_channel_t;
+	struct dpaa2_ni_buf	 buf[DPAA2_NI_BUFS_PER_CHAN];
+};
 
 /**
- * @brief A frame queue is the basic queuing structure used by the QMan.
+ * @brief A Frame Queue is the basic queuing structure used by the QMan.
  * It comprises a list of FDs, so it can be thought of as a queue of frames.
  *
  * NOTE: When frames on a FQ are ready to be processed, the FQ is enqueued
@@ -227,8 +227,8 @@ typedef struct {
  *		operation based on QDID, QDBIN and QPRI. Note that all Tx queues
  *		with the same flowid have the same destination bin.
  */
-typedef struct dpaa2_ni_fq {
-	dpaa2_ni_channel_t	*channel;
+struct dpaa2_ni_fq {
+	struct dpaa2_ni_channel	*channel;
 	uint32_t		 fqid;
 	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
 	uint32_t		 tx_qdbin;
@@ -236,9 +236,9 @@ typedef struct dpaa2_ni_fq {
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 
-	void (*consume)(device_t dev, dpaa2_ni_channel_t *channel,
-	    struct dpaa2_ni_fq *fq, const dpaa2_fd_t *fd);
-} dpaa2_ni_fq_t;
+	void (*consume)(device_t dev, struct dpaa2_ni_channel *channel,
+	    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd);
+};
 
 /**
  * @brief Configuration of the network interface queue.
@@ -293,7 +293,7 @@ typedef struct dpaa2_ni_fq {
  *		on multiple CPUs, but the queue is also more likely to be trapped
  *		in one DPIO, especially when congested.
  */
-typedef struct dpaa2_ni_queue_cfg {
+struct dpaa2_ni_queue_cfg {
 	uint64_t		 user_ctx;
 	uint64_t		 flow_ctx;
 	uint32_t		 dest_id;
@@ -311,7 +311,7 @@ typedef struct dpaa2_ni_queue_cfg {
 	bool			 cgid_valid;
 	bool			 stash_control;
 	bool			 hold_active;
-} dpaa2_ni_queue_cfg_t;
+};
 
 /**
  * @brief Buffer layout attributes.
@@ -327,7 +327,7 @@ typedef struct dpaa2_ni_queue_cfg {
  * pass_sw_opaque:	SW annotation is activated.
  * queue_type:		Type of a queue this configuration applies to.
  */
-typedef struct {
+struct dpaa2_ni_buf_layout {
 	uint16_t	pd_size;
 	uint16_t	fd_align;
 	uint16_t	head_size;
@@ -338,19 +338,19 @@ typedef struct {
 	bool		pass_frame_status;
 	bool		pass_sw_opaque;
 	enum dpaa2_ni_queue_type queue_type;
-} dpaa2_ni_buf_layout_t;
+};
 
 /**
  * @brief Buffer pools configuration for a network interface.
  */
-typedef struct {
+struct dpaa2_ni_pools_cfg {
 	uint8_t		pools_num;
 	struct {
 		uint32_t bp_obj_id;
 		uint16_t buf_sz;
 		int	 backup_flag; /* 0 - regular pool, 1 - backup pool */
 	} pools[DPAA2_NI_MAX_POOLS];
-} dpaa2_ni_pools_cfg_t;
+};
 
 /**
  * @brief Errors behavior configuration for a network interface.
@@ -360,11 +360,11 @@ typedef struct {
  * set_err_fas:		Set to true to mark the errors in frame annotation
  * 			status (FAS); relevant for non-discard actions only.
  */
-typedef struct {
+struct dpaa2_ni_err_cfg {
 	uint32_t	err_mask;
 	enum dpaa2_ni_err_action action;
 	bool		set_err_fas;
-} dpaa2_ni_err_cfg_t;
+};
 
 /**
  * @brief Link configuration.
@@ -373,11 +373,11 @@ typedef struct {
  * adv_speeds:	Speeds that are advertised for autoneg.
  * rate:	Rate in Mbps.
  */
-typedef struct {
+struct dpaa2_ni_link_cfg {
 	uint64_t	options;
 	uint64_t	adv_speeds;
 	uint32_t	rate;
-} dpaa2_ni_link_cfg_t;
+};
 
 /**
  * @brief Link state.
@@ -389,14 +389,14 @@ typedef struct {
  * link_up:	Link state (true if link is up, false otherwise).
  * state_valid:	Ignore/Update the state of the link.
  */
-typedef struct {
+struct dpaa2_ni_link_state {
 	uint64_t	options;
 	uint64_t	adv_speeds;
 	uint64_t	sup_speeds;
 	uint32_t	rate;
 	bool		link_up;
 	bool		state_valid;
-} dpaa2_ni_link_state_t;
+};
 
 /**
  * @brief QoS table configuration.
@@ -411,12 +411,12 @@ typedef struct {
  *			option will work properly only for DPNI objects created
  *			with DPNI_OPT_HAS_KEY_MASKING option.
  */
-typedef struct {
+struct dpaa2_ni_qos_table {
 	uint64_t	kcfg_busaddr;
 	uint8_t		default_tc;
 	bool		discard_on_miss;
 	bool		keep_entries;
-} dpaa2_ni_qos_table_t;
+};
 
 struct dpaa2_eth_dist_fields {
 	uint64_t	rxnfc_field;
@@ -426,12 +426,12 @@ struct dpaa2_eth_dist_fields {
 	uint64_t	id;
 };
 
-struct __packed dpni_mask_cfg {
+struct dpni_mask_cfg {
 	uint8_t		mask;
 	uint8_t		offset;
-};
+} __packed;
 
-struct __packed dpni_dist_extract {
+struct dpni_dist_extract {
 	uint8_t		prot;
 	uint8_t		efh_type; /* EFH type is in the 4 LSBs. */
 	uint8_t		size;
@@ -444,13 +444,13 @@ struct __packed dpni_dist_extract {
 	uint8_t		extract_type; /* Extraction type is in the 4 LSBs */
 	uint8_t		_reserved[3];
 	struct dpni_mask_cfg masks[4];
-};
+} __packed;
 
-struct __packed dpni_ext_set_rx_tc_dist {
+struct dpni_ext_set_rx_tc_dist {
 	uint8_t		num_extracts;
 	uint8_t		_reserved[7];
 	struct dpni_dist_extract extracts[DPKG_MAX_NUM_OF_EXTRACTS];
-};
+} __packed;
 
 /**
  * @brief Software context for the DPAA2 Network Interface driver.
@@ -478,10 +478,10 @@ struct dpaa2_ni_softc {
 	int			 link_state;
 	uint64_t		 rx_hash_fields;
 
-	dpaa2_ni_attr_t		 attr;
+	struct dpaa2_ni_attr	 attr;
 
 	/* Help to send commands to MC. */
-	dpaa2_cmd_t		 cmd;
+	struct dpaa2_cmd	*cmd;
 	uint16_t		 rc_token;
 	uint16_t		 ni_token;
 
@@ -498,10 +498,10 @@ struct dpaa2_ni_softc {
 
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
-	dpaa2_ni_channel_t	*channel[DPAA2_NI_MAX_CHANNELS];
+	struct dpaa2_ni_channel	*channel[DPAA2_NI_MAX_CHANNELS];
  	/* Frame queues. */
 	uint32_t		 num_fqs;
-	dpaa2_ni_fq_t		 fq[DPAA2_NI_MAX_QUEUES];
+	struct dpaa2_ni_fq	 fq[DPAA2_NI_MAX_QUEUES];
 
 	/* Interrupts. */
 	int			 irq_rid[DPAA2_NI_MSI_COUNT];

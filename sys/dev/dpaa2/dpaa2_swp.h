@@ -35,10 +35,10 @@
  * QBMan software portal helper routines.
  */
 
-/* All QBMan command and result structures use this "valid bit" encoding */
-#define DPAA2_SWP_VALID_BIT		((uint32_t)0x80)
+/* All QBMan commands and result structures use this "valid bit" encoding. */
+#define DPAA2_SWP_VALID_BIT		((uint32_t) 0x80)
 
-#define DPAA2_SWP_TIMEOUT		100000	/* us */
+#define DPAA2_SWP_TIMEOUT		100000	/* in us */
 #define DPAA2_SWP_CMD_PARAMS_N		8u
 #define DPAA2_SWP_RSP_PARAMS_N		8u
 
@@ -56,7 +56,7 @@
 
 #define DPAA2_SWP_REV_MASK		0xFFFF0000
 
-/* Register offsets in the cache-inhibited area */
+/* Registers in the cache-inhibited area of the software portal. */
 #define DPAA2_SWP_CINH_CR		0x600 /* Management Command reg.*/
 #define DPAA2_SWP_CINH_EQCR_PI		0x800 /* Enqueue Ring, Producer Index */
 #define DPAA2_SWP_CINH_EQCR_CI		0x840 /* Enqueue Ring, Consumer Index */
@@ -78,7 +78,7 @@
 #define DPAA2_SWP_CINH_IIR		0xEC0
 #define DPAA2_SWP_CINH_ITPR		0xF40
 
-/* CENA register offsets */
+/* Registers in the cache-enabled area of the software portal. */
 #define DPAA2_SWP_CENA_EQCR(n)		(0x000 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_DQRR(n)		(0x200 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR(n)		(0x400 + ((uint32_t)(n) << 6))
@@ -87,7 +87,7 @@
 #define DPAA2_SWP_CENA_VDQCR		(0x780)
 #define DPAA2_SWP_CENA_EQCR_CI		(0x840)
 
-/* CENA register offsets in memory-backed mode */
+/* Registers in the cache-enabled area of the software portal (memory-backed). */
 #define DPAA2_SWP_CENA_DQRR_MEM(n)	(0x0800 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_RCR_MEM(n)	(0x1400 + ((uint32_t)(n) << 6))
 #define DPAA2_SWP_CENA_CR_MEM		(0x1600) /* Management Command reg. */
@@ -183,7 +183,7 @@
  *
  * NOTE: 32 bytes.
  */
-typedef struct __packed {
+struct dpaa2_eq_desc {
 	uint8_t		verb;
 	uint8_t		dca;
 	uint16_t	seqnum;
@@ -197,14 +197,14 @@ typedef struct __packed {
 	uint8_t		wae;
 	uint8_t		rspid;
 	uint64_t	rsp_addr;
-} dpaa2_eq_desc_t;
+} __packed;
 
 /**
  * @brief Frame Dequeue Response (FDR) descriptor.
  *
  * NOTE: 32 bytes.
  */
-typedef struct __packed {
+struct dpaa2_fdr_desc {
 	uint8_t		verb;
 	uint8_t		stat;
 	uint16_t	seqnum;
@@ -216,21 +216,21 @@ typedef struct __packed {
 	uint32_t	fq_byte_cnt;
 	uint32_t	fq_frm_cnt;
 	uint64_t	fqd_ctx;
-} dpaa2_fdr_desc_t;
+} __packed;
 
 /**
  * @brief State Change Notification Message (SCNM).
  *
  * NOTE: 16 bytes.
  */
-typedef struct __packed {
+struct dpaa2_scn {
 	uint8_t		verb;
 	uint8_t		stat;
 	uint8_t		state;
 	uint8_t		_reserved;
 	uint32_t	rid_tok;
 	uint64_t	ctx;
-} dpaa2_scn_t;
+} __packed;
 
 /**
  * @brief DPAA2 frame descriptor.
@@ -247,7 +247,7 @@ typedef struct __packed {
  *
  * NOTE: 32 bytes.
  */
-typedef struct __packed {
+struct dpaa2_fd {
 	uint64_t	addr;
 	uint32_t	length;
 	uint16_t	bpid;
@@ -255,33 +255,33 @@ typedef struct __packed {
 	uint32_t	frame_ctx;
 	uint32_t	ctrl;
 	uint64_t	flow_ctx;
-} dpaa2_fd_t;
+} __packed;
 
 /**
  * @brief Frame Dequeue Response (FDR).
  *
  * NOTE: 64 bytes.
  */
-typedef struct __packed {
-	dpaa2_fdr_desc_t desc;
-	dpaa2_fd_t fd;
-} dpaa2_fdr_t;
+struct dpaa2_fdr {
+	struct dpaa2_fdr_desc	 desc;
+	struct dpaa2_fd		 fd;
+} __packed;
 
 /**
  * @brief Dequeue Response Message.
  *
  * NOTE: 64 bytes.
  */
-typedef struct __packed {
+struct dpaa2_dq {
 	union {
 		struct {
-			uint8_t	verb;
-			uint8_t	_reserved[63];
+			uint8_t	 verb;
+			uint8_t	 _reserved[63];
 		} common;
-		dpaa2_fdr_t fdr;
-		dpaa2_scn_t scn;
+		struct dpaa2_fdr fdr; /* Frame Dequeue Response */
+		struct dpaa2_scn scn; /* State Change Notification */
 	};
-} dpaa2_dq_t;
+} __packed;
 
 /**
  * @brief Descriptor of the QBMan software portal.
@@ -302,8 +302,8 @@ typedef struct __packed {
  * has_8prio:		True for a channel with 8 priority WQs. Ignored unless
  *			"has_notif" is true.
  */
-typedef struct {
-	struct resource 	*cena_res;
+struct dpaa2_swp_desc {
+	struct resource		*cena_res;
 	struct resource_map	*cena_map;
 	struct resource		*cinh_res;
 	struct resource_map	*cinh_map;
@@ -316,7 +316,7 @@ typedef struct {
 
 	bool			 has_notif;
 	bool			 has_8prio;
-} dpaa2_swp_desc_t;
+};
 
 /**
  * @brief Command holds data to be written to the software portal.
@@ -331,10 +331,6 @@ struct dpaa2_swp_cmd {
 struct dpaa2_swp_rsp {
 	uint64_t	params[DPAA2_SWP_RSP_PARAMS_N];
 };
-
-typedef struct dpaa2_swp *dpaa2_swp_t;
-typedef struct dpaa2_swp_cmd *dpaa2_swp_cmd_t;
-typedef struct dpaa2_swp_rsp *dpaa2_swp_rsp_t;
 
 /**
  * @brief Helper object to interact with the QBMan software portal.
@@ -360,18 +356,24 @@ struct dpaa2_swp {
 	struct resource		*cinh_res;
 	struct resource_map	*cinh_map;
 
-	int (*enq)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	    const dpaa2_fd_t *fd);
-	int (*enq_mult)(dpaa2_swp_t swp, const dpaa2_eq_desc_t *ed,
-	    const dpaa2_fd_t *fd, uint32_t *flags, int frames_n);
+	int (*enq)(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+	    struct dpaa2_fd *fd);
+	int (*enq_mult)(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+	    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
 
 	struct mtx		 lock;
 	struct cv		 cv;
-	const dpaa2_swp_desc_t	*desc;
+	struct dpaa2_swp_desc	*desc;
 	uint16_t		 flags;
 
 	/* Static Dequeue Command Register value (to obtain CDANs). */
 	uint32_t		 sdq;
+
+	/* Volatile Dequeue Command (to obtain frames). */
+	struct {
+		uint32_t	 avail;
+		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+	} vdq;
 
 	struct {
 		bool		 atomic;
@@ -410,38 +412,40 @@ struct dpaa2_swp {
 
 /* Management routines. */
 
-int	 dpaa2_swp_init_portal(dpaa2_swp_t *swp, dpaa2_swp_desc_t *desc,
-	     uint16_t flags, bool atomic);
-void	 dpaa2_swp_free_portal(dpaa2_swp_t swp);
-void	 dpaa2_swp_lock(dpaa2_swp_t swp, uint16_t *flags);
-void	 dpaa2_swp_unlock(dpaa2_swp_t swp);
+int	 dpaa2_swp_init_portal(struct dpaa2_swp **swp,
+	     struct dpaa2_swp_desc *desc, uint16_t flags, bool atomic);
+void	 dpaa2_swp_free_portal(struct dpaa2_swp *swp);
+void	 dpaa2_swp_lock(struct dpaa2_swp *swp, uint16_t *flags);
+void	 dpaa2_swp_unlock(struct dpaa2_swp *swp);
 uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
 	     uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se,
 	     int dp, int de, int ep);
 
 /* Read/write registers of a software portal. */
 
-void	 dpaa2_swp_write_reg(dpaa2_swp_t swp, uint32_t offset, uint32_t val);
-uint32_t dpaa2_swp_read_reg(dpaa2_swp_t swp, uint32_t offset);
+void	 dpaa2_swp_write_reg(struct dpaa2_swp *swp, uint32_t o, uint32_t v);
+uint32_t dpaa2_swp_read_reg(struct dpaa2_swp *swp, uint32_t o);
 
 /* Helper routines. */
 
-void	 dpaa2_swp_clear_ed(dpaa2_eq_desc_t *ed);
-void	 dpaa2_swp_set_ed_norp(dpaa2_eq_desc_t *ed, int response_always);
-void	 dpaa2_swp_set_ed_fq(dpaa2_eq_desc_t *ed, uint32_t fqid);
-void	 dpaa2_swp_set_intr_trigger(dpaa2_swp_t swp, uint32_t mask);
-uint32_t dpaa2_swp_get_intr_trigger(dpaa2_swp_t swp);
-uint32_t dpaa2_swp_read_intr_status(dpaa2_swp_t swp);
-void	 dpaa2_swp_clear_intr_status(dpaa2_swp_t swp, uint32_t mask);
-void	 dpaa2_swp_set_push_dequeue(dpaa2_swp_t swp, uint8_t chan_idx, bool en);
-int	 dpaa2_swp_set_irq_coalescing(dpaa2_swp_t swp, uint32_t th, uint32_t to);
+void	 dpaa2_swp_set_ed_norp(struct dpaa2_eq_desc *ed, bool resp_always);
+void	 dpaa2_swp_set_ed_fq(struct dpaa2_eq_desc *ed, uint32_t fqid);
+void	 dpaa2_swp_set_intr_trigger(struct dpaa2_swp *swp, uint32_t mask);
+uint32_t dpaa2_swp_get_intr_trigger(struct dpaa2_swp *swp);
+uint32_t dpaa2_swp_read_intr_status(struct dpaa2_swp *swp);
+void	 dpaa2_swp_clear_intr_status(struct dpaa2_swp *swp, uint32_t mask);
+void	 dpaa2_swp_set_push_dequeue(struct dpaa2_swp *swp, uint8_t chan_idx,
+	     bool en);
+int	 dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
+	     uint32_t holdoff);
 
 /* Software portal commands. */
 
-int	 dpaa2_swp_conf_wq_channel(dpaa2_swp_t swp, uint16_t chan_id,
+int	 dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
 	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
-int	 dpaa2_swp_release_bufs(dpaa2_swp_t swp, uint16_t bpid, bus_addr_t *buf,
-	     uint32_t buf_num);
-int	 dpaa2_swp_dqrr_next(dpaa2_swp_t swp, dpaa2_dq_t *dq, uint32_t *dq_idx);
+int	 dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid,
+	     bus_addr_t *buf, uint32_t buf_num);
+int	 dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
+	     uint32_t *idx);
 
 #endif /* _DPAA2_SWP_H */

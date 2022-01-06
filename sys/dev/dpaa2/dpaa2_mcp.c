@@ -55,24 +55,21 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
 
-#define PORTAL_DEF		0x00
-#define PORTAL_ATOMIC		0xFF
-
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp", "DPAA2 Management Complex Portal");
 
-static int
-mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
-    struct resource_map *map, const uint16_t flags, const uint8_t atomic)
+int
+dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
+    struct resource_map *map, uint16_t flags, bool atomic)
 {
 	const int mflags = flags & DPAA2_PORTAL_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
-	dpaa2_mcp_t p;
+	struct dpaa2_mcp *p;
 
 	if (!portal || !res || !map)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	p = malloc(sizeof(struct dpaa2_mcp), M_DPAA2_MCP, mflags);
-	if (!p)
+	if (p == NULL)
 		return (DPAA2_CMD_STAT_NO_MEMORY);
 
 	if (atomic) {
@@ -89,72 +86,56 @@ mcp_init_portal(dpaa2_mcp_t *portal, struct resource *res,
 	p->res = res;
 	p->map = map;
 	p->flags = flags;
-	/* Reset DPRC API version to cache later. */
-	p->rc_api_major = 0;
+	p->rc_api_major = 0; /* DPRC API version to be cached later. */
 	p->rc_api_minor = 0;
 	p->atomic = atomic;
 
-	*portal = p;
+	*mcp = p;
 
 	return (0);
 }
 
-int
-dpaa2_mcp_init_portal(dpaa2_mcp_t *mcp, struct resource *res,
-    struct resource_map *map, const uint16_t flags)
-{
-	return (mcp_init_portal(mcp, res, map, flags, PORTAL_DEF));
-}
-
-int
-dpaa2_mcp_init_atomic(dpaa2_mcp_t *mcp, struct resource *res,
-    struct resource_map *map, const uint16_t flags)
-{
-	return (mcp_init_portal(mcp, res, map, flags, PORTAL_ATOMIC));
-}
-
 void
-dpaa2_mcp_free_portal(dpaa2_mcp_t portal)
+dpaa2_mcp_free_portal(struct dpaa2_mcp *mcp)
 {
 	uint16_t flags;
 
-	if (portal) {
-		if (portal->atomic) {
-			dpaa2_mcp_lock(portal, &flags);
-			portal->flags |= DPAA2_PORTAL_DESTROYED;
-			dpaa2_mcp_unlock(portal);
+	if (mcp != NULL) {
+		if (mcp->atomic) {
+			dpaa2_mcp_lock(mcp, &flags);
+			mcp->flags |= DPAA2_PORTAL_DESTROYED;
+			dpaa2_mcp_unlock(mcp);
 
 			/* Let threads stop using this portal. */
 			DELAY(DPAA2_PORTAL_TIMEOUT);
 
-			mtx_destroy(&portal->lock);
-			free(portal, M_DPAA2_MCP);
+			mtx_destroy(&mcp->lock);
 		} else {
 			/*
 			 * Signal all threads sleeping on portal's cv that it's
 			 * going to be destroyed.
 			 */
-			dpaa2_mcp_lock(portal, &flags);
-			portal->flags |= DPAA2_PORTAL_DESTROYED;
-			cv_signal(&portal->cv);
-			dpaa2_mcp_unlock(portal);
+			dpaa2_mcp_lock(mcp, &flags);
+			mcp->flags |= DPAA2_PORTAL_DESTROYED;
+			cv_signal(&mcp->cv);
+			dpaa2_mcp_unlock(mcp);
 
 			/* Let threads stop using this portal. */
 			DELAY(DPAA2_PORTAL_TIMEOUT);
 
-			mtx_destroy(&portal->lock);
-			cv_destroy(&portal->cv);
-			free(portal, M_DPAA2_MCP);
+			mtx_destroy(&mcp->lock);
+			cv_destroy(&mcp->cv);
 		}
+		free(mcp, M_DPAA2_MCP);
 	}
 }
 
 int
-dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
+dpaa2_mcp_init_command(struct dpaa2_cmd **cmd, uint16_t flags)
 {
 	const int mflags = flags & DPAA2_CMD_NOWAIT_ALLOC
 	    ? (M_NOWAIT | M_ZERO) : (M_WAITOK | M_ZERO);
-	dpaa2_cmd_t c;
+	struct dpaa2_cmd *c;
 	struct dpaa2_cmd_header *hdr;
 
 	if (!cmd)
@@ -183,25 +164,25 @@ dpaa2_mcp_init_command(dpaa2_cmd_t *cmd, const uint16_t flags)
 }
 
 void
-dpaa2_mcp_free_command(dpaa2_cmd_t cmd)
+dpaa2_mcp_free_command(struct dpaa2_cmd *cmd)
 {
-	if (cmd)
+	if (cmd != NULL)
 		free(cmd, M_DPAA2_MCP);
 }
 
-dpaa2_cmd_t
-dpaa2_mcp_tk(dpaa2_cmd_t cmd, const uint16_t token)
+struct dpaa2_cmd *
+dpaa2_mcp_tk(struct dpaa2_cmd *cmd, uint16_t token)
 {
 	struct dpaa2_cmd_header *hdr;
-	if (cmd) {
+	if (cmd != NULL) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		hdr->token = token;
 	}
 	return (cmd);
 }
 
-dpaa2_cmd_t
-dpaa2_mcp_f(dpaa2_cmd_t cmd, const uint16_t flags)
+struct dpaa2_cmd *
+dpaa2_mcp_f(struct dpaa2_cmd *cmd, uint16_t flags)
 {
 	struct dpaa2_cmd_header *hdr;
 	if (cmd) {
@@ -218,34 +199,38 @@ dpaa2_mcp_f(dpaa2_cmd_t cmd, const uint16_t flags)
 }
 
 void
-dpaa2_mcp_lock(dpaa2_mcp_t portal, uint16_t *flags)
+dpaa2_mcp_lock(struct dpaa2_mcp *mcp, uint16_t *flags)
 {
-	mtx_assert(&portal->lock, MA_NOTOWNED);
+	if (mcp != NULL && flags != NULL) {
+		mtx_assert(&mcp->lock, MA_NOTOWNED);
 
-	if (portal->atomic) {
-		mtx_lock_spin(&portal->lock);
-		*flags = portal->flags;
-		portal->flags |= DPAA2_PORTAL_LOCKED;
-	} else {
-		mtx_lock(&portal->lock);
-		while (portal->flags & DPAA2_PORTAL_LOCKED)
-			cv_wait(&portal->cv, &portal->lock);
-		*flags = portal->flags;
-		portal->flags |= DPAA2_PORTAL_LOCKED;
-		mtx_unlock(&portal->lock);
+		if (mcp->atomic) {
+			mtx_lock_spin(&mcp->lock);
+			*flags = mcp->flags;
+			mcp->flags |= DPAA2_PORTAL_LOCKED;
+		} else {
+			mtx_lock(&mcp->lock);
+			while (mcp->flags & DPAA2_PORTAL_LOCKED)
+				cv_wait(&mcp->cv, &mcp->lock);
+			*flags = mcp->flags;
+			mcp->flags |= DPAA2_PORTAL_LOCKED;
+			mtx_unlock(&mcp->lock);
+		}
 	}
 }
 
 void
-dpaa2_mcp_unlock(dpaa2_mcp_t portal)
+dpaa2_mcp_unlock(struct dpaa2_mcp *mcp)
 {
-	if (portal->atomic) {
-		portal->flags &= ~DPAA2_PORTAL_LOCKED;
-		mtx_unlock_spin(&portal->lock);
-	} else {
-		mtx_lock(&portal->lock);
-		portal->flags &= ~DPAA2_PORTAL_LOCKED;
-		cv_signal(&portal->cv);
-		mtx_unlock(&portal->lock);
+	if (mcp != NULL) {
+		if (mcp->atomic) {
+			mcp->flags &= ~DPAA2_PORTAL_LOCKED;
+			mtx_unlock_spin(&mcp->lock);
+		} else {
+			mtx_lock(&mcp->lock);
+			mcp->flags &= ~DPAA2_PORTAL_LOCKED;
+			cv_signal(&mcp->cv);
+			mtx_unlock(&mcp->lock);
+		}
 	}
 }

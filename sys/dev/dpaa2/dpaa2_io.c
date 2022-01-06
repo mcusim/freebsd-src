@@ -296,9 +296,10 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
 	dpaa2_eq_desc_t ed;
 	uint32_t flags = 0;
 
+	memset(ed, 0, sizeof(*ed));
+
 	/* Setup enqueue descriptor. */
-	dpaa2_swp_clear_ed(&ed);
-	dpaa2_swp_set_ed_norp(&ed, 0);
+	dpaa2_swp_set_ed_norp(&ed, false);
 	dpaa2_swp_set_ed_fq(&ed, fqid);
 
 	return (swp->enq_mult(swp, &ed, fd, &flags, frames_n));
@@ -413,15 +414,16 @@ static void
 dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
-	dpaa2_io_notif_ctx_t *ctx;
-	dpaa2_dq_t dq;
-	uint32_t status = 0u, dq_idx, dq_cnt = 0;
+	struct dpaa2_io_notif_ctx **ctx;
+	struct dpaa2_dq *dq;
+	uint32_t idx, cnt = 0;
+	uint32_t status = 0u;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	if (status == 0u)
 		return;
 
-	while (dpaa2_swp_dqrr_next(sc->swp, &dq, &dq_idx) == 0) {
+	while (cnt <= 32u && dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx = (dpaa2_io_notif_ctx_t *)(uintptr_t) dq.scn.ctx;
@@ -430,10 +432,8 @@ dpio_msi_intr(void *arg)
 			device_printf(sc->dev, "irq: unrecognised DQRR entry\n");
 		}
 
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, dq_idx & 0x7u);
-		dq_cnt++;
-		if (dq_cnt > 32u)
-			break;
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx & 0x7u);
+		cnt++;
 	}
 
 	dpaa2_swp_clear_intr_status(sc->swp, status);
