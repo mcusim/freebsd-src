@@ -51,7 +51,7 @@ INTERFACE dpaa2_swp;
 METHOD int enq_multiple_fq {
 	device_t		 dev;
 	uint32_t		 fqid;
-	const dpaa2_fd_t	*fd;
+	struct dpaa2_fd		*fd;
 	int			 frames_n;
 }
 
@@ -64,7 +64,7 @@ METHOD int enq_multiple_fq {
  */
 METHOD int conf_wq_channel {
 	device_t		 dev;
-	dpaa2_io_notif_ctx_t	*ctx;
+	struct dpaa2_io_notif_ctx *ctx;
 };
 
 /**
