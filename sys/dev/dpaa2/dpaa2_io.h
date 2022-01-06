@@ -57,22 +57,22 @@ enum dpaa2_io_chan_mode {
  *		 relevant only if channel mode is "local channel".
  * chan_mode:	 Notification channel mode.
  */
-typedef struct {
-	uint64_t	swp_ce_paddr;
-	uint64_t	swp_ci_paddr;
-	uint32_t	swp_version;
-	uint32_t	swp_clk;
-	uint32_t	id;
-	uint16_t	swp_id;
-	uint8_t		priors_num;
-	enum dpaa2_io_chan_mode chan_mode;
-} dpaa2_io_attr_t;
+struct dpaa2_io_attr {
+	uint64_t		 swp_ce_paddr;
+	uint64_t		 swp_ci_paddr;
+	uint32_t		 swp_version;
+	uint32_t		 swp_clk;
+	uint32_t		 id;
+	uint16_t		 swp_id;
+	uint8_t			 priors_num;
+	enum dpaa2_io_chan_mode	 chan_mode;
+};
 
 /**
  * @brief Context used by DPIO to configure data availability notifications
  * (CDAN) on a particular WQ channel.
  */
-typedef struct dpaa2_io_notif_ctx {
+struct dpaa2_io_notif_ctx {
 	void (*cb)(struct dpaa2_io_notif_ctx *ctx);
 
 	device_t		 io_dev;
@@ -80,7 +80,7 @@ typedef struct dpaa2_io_notif_ctx {
 	uint64_t		 qman_ctx;
 	uint16_t		 fq_chan_id;
 	bool			 cdan_en;
-} dpaa2_io_notif_ctx_t;
+};
 
 /**
  * @brief Software context for the DPAA2 I/O driver.
@@ -90,7 +90,7 @@ struct dpaa2_io_softc {
 	dpaa2_swp_desc_t	 swp_desc;
 	dpaa2_swp_t		 swp;
 
-	dpaa2_io_attr_t		 attr;
+	struct dpaa2_io_attr	 attr;
 
 	/* Help to send commands to MC. */
 	dpaa2_cmd_t		 cmd;

@@ -76,24 +76,24 @@ enum dpaa2_mac_link_type {
  * eth_if:	Type of the Ethernet interface.
  * link_type:	Type of the link.
  */
-typedef struct {
+struct dpaa2_mac_attr {
 	uint32_t		 id;
 	uint32_t		 max_rate;
 	enum dpaa2_mac_eth_if	 eth_if;
 	enum dpaa2_mac_link_type link_type;
-} dpaa2_mac_attr_t;
+};
 
 /**
  * @brief Link state of the DPMAC object.
  */
-typedef struct {
+struct dpaa2_mac_link_state {
 	uint64_t		 options;
 	uint64_t		 supported;
 	uint64_t		 advert;
 	uint32_t		 rate;
 	bool			 up;
 	bool			 state_valid;
-} dpaa2_mac_link_state_t;
+};
 
 /**
  * @brief Software context for the DPAA2 MAC driver.
@@ -105,7 +105,7 @@ typedef struct {
 struct dpaa2_mac_softc {
 	device_t		 dev;
 	uint8_t			 addr[ETHER_ADDR_LEN];
-	dpaa2_mac_attr_t	 attr;
+	struct dpaa2_mac_attr	 attr;
 
 	/* Help to send commands to MC. */
 	dpaa2_cmd_t		 cmd;

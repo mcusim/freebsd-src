@@ -47,7 +47,11 @@
 #include "dpaa2_mac.h"
 #include "dpaa2_con.h"
 
-/* Maximum number of MSIs supported by the MC for its children. */
+/*
+ * Maximum number of MSIs supported by the MC for its children without IOMMU.
+ *
+ * TODO: Should be much more with IOMMU translation.
+ */
 #define DPAA2_MC_MSI_COUNT	 32
 
 /* Flags for DPAA2 devices as resources. */
@@ -90,14 +94,15 @@ struct dpaa2_mc_softc {
 	struct mtx		 mdev_lock;
 	STAILQ_HEAD(, dpaa2_mc_devinfo) mdev_list;
 
+	/* NOTE: Workaround in case of no IOMMU available. */
 #ifndef IOMMU
+	device_t		 msi_owner;
+	bool			 msi_allocated;
 	struct mtx		 msi_lock;
 	struct {
 		device_t	 child;
 		int		 irq;
 	} msi[DPAA2_MC_MSI_COUNT];
-	device_t		 msi_owner;
-	bool			 msi_allocated;
 #endif
 };
 
@@ -111,7 +116,7 @@ struct dpaa2_mc_softc {
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
-	dpaa2_mcp_t		 portal;
+	struct dpaa2_mcp	*portal;
 	int			 unit;
 	uint32_t		 cont_id;
 };
@@ -121,7 +126,7 @@ struct dpaa2_rc_softc {
  */
 struct dpaa2_bp_softc {
 	device_t		 dev;
-	dpaa2_bp_attr_t		 attr;
+	struct dpaa2_bp_attr	 attr;
 };
 
 /**

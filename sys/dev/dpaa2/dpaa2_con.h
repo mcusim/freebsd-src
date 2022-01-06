@@ -43,18 +43,18 @@
  * chan_id:	QBMan channel ID to be used for dequeue operations.
  * prior_num:	Number of priorities for the DPCON channel (1-8).
  */
-typedef struct {
+struct dpaa2_con_attr {
 	uint32_t		 id;
 	uint16_t		 chan_id;
 	uint8_t			 prior_num;
-} dpaa2_con_attr_t;
+};
 
 /**
  * @brief Software context for the DPAA2 Concentrator driver.
  */
 struct dpaa2_con_softc {
 	device_t		 dev;
-	dpaa2_con_attr_t	 attr;
+	struct dpaa2_con_attr	 attr;
 
 	/* Help to send commands to MC. */
 	dpaa2_cmd_t		 cmd;

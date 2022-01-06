@@ -835,7 +835,7 @@ alloc_msi(device_t mcdev, device_t child, int count, int maxcount, int *irqs)
  *
  * NOTE: This function is a part of fallback solution when IOMMU isn't available.
  *	 Total number of IRQs is limited to 32.
- * NOTE: MSI is kept allocated in the kernel as a part of the pool.
+ * NOTE: MSIs are kept allocated in the kernel as a part of the pool.
  */
 static int
 release_msi(device_t mcdev, device_t child, int count, int *irqs)
