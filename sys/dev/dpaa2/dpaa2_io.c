@@ -426,7 +426,7 @@ dpio_msi_intr(void *arg)
 	while (cnt <= 32u && dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
-			ctx = (dpaa2_io_notif_ctx_t *)(uintptr_t) dq.scn.ctx;
+			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
 			ctx->cb(ctx);
 		} else {
 			device_printf(sc->dev, "irq: unrecognised DQRR entry\n");
