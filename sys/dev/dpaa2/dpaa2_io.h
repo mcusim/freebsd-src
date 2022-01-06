@@ -88,7 +88,7 @@ struct dpaa2_io_notif_ctx {
 struct dpaa2_io_softc {
 	device_t		 dev;
 	struct dpaa2_swp_desc	 swp_desc;
-	struct dpaa2_swp	 swp;
+	struct dpaa2_swp	*swp;
 	struct dpaa2_io_attr	 attr;
 
 	/* Help to send commands to MC. */
