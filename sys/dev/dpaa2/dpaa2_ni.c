@@ -97,17 +97,17 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
+/* Index of the only DPNI IRQ. */
+#define DPNI_IRQ_INDEX		0
+
 /* Maximum acceptable frame length and MTU. */
 #define DPAA2_ETH_MFL		(10 * 1024)
 #define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
 #define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
 
-/* Index of the only DPNI IRQ. */
-#define DPNI_IRQ_INDEX		0
-
 /* DPNI IRQ statuses. */
-#define DPNI_IRQ_LINK_CHANGED	0x00000001 /* link state changed */
-#define DPNI_IRQ_EP_CHANGED	0x00000002 /* DPAA2 endpoint dis/connected */
+#define DPNI_IRQ_LINK_CHANGED	0x1 /* link state changed */
+#define DPNI_IRQ_EP_CHANGED	0x2 /* DPAA2 endpoint dis/connected */
 
 /* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
@@ -134,41 +134,45 @@ __FBSDID("$FreeBSD$");
 /* Required by struct dpni_rx_tc_dist_cfg::key_cfg_iova */
 #define DPAA2_CLASSIFIER_DMA_SIZE 256
 
+#define ETH_STORAGE_MAX_FRAMES	16
+#define ETH_STORAGE_SIZE	(ETH_STORE_MAX_FRAMES * sizeof(struct dpaa2_dq))
+#define ETH_STORAGE_ALIGN	64
+
 /* Buffers layout options. */
-#define DPNI_BUF_LAYOUT_OPT_TIMESTAMP		0x00000001
-#define DPNI_BUF_LAYOUT_OPT_PARSER_RESULT	0x00000002
-#define DPNI_BUF_LAYOUT_OPT_FRAME_STATUS	0x00000004
-#define DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE	0x00000008
-#define DPNI_BUF_LAYOUT_OPT_DATA_ALIGN		0x00000010
-#define DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM	0x00000020
-#define DPNI_BUF_LAYOUT_OPT_DATA_TAIL_ROOM	0x00000040
+#define BUF_LOPT_TIMESTAMP	0x1
+#define BUF_LOPT_PARSER_RESULT	0x2
+#define BUF_LOPT_FRAME_STATUS	0x4
+#define BUF_LOPT_PRIV_DATA_SZ	0x8
+#define BUF_LOPT_DATA_ALIGN	0x10
+#define BUF_LOPT_DATA_HEAD_ROOM	0x20
+#define BUF_LOPT_DATA_TAIL_ROOM	0x40
 
 /* Enables TCAM for Flow Steering and QoS look-ups. */
-#define DPNI_OPT_HAS_KEY_MASKING		0x000010
+#define DPNI_OPT_HAS_KEY_MASKING 0x10
 
-/* Unique IDs for the supported Rx classification header fields */
-#define DPAA2_ETH_DIST_ETHDST			BIT(0)
-#define DPAA2_ETH_DIST_ETHSRC			BIT(1)
-#define DPAA2_ETH_DIST_ETHTYPE			BIT(2)
-#define DPAA2_ETH_DIST_VLAN			BIT(3)
-#define DPAA2_ETH_DIST_IPSRC			BIT(4)
-#define DPAA2_ETH_DIST_IPDST			BIT(5)
-#define DPAA2_ETH_DIST_IPPROTO			BIT(6)
-#define DPAA2_ETH_DIST_L4SRC			BIT(7)
-#define DPAA2_ETH_DIST_L4DST			BIT(8)
-#define DPAA2_ETH_DIST_ALL			(~0ULL)
+/* Unique IDs for the supported Rx classification header fields. */
+#define DPAA2_ETH_DIST_ETHDST	BIT(0)
+#define DPAA2_ETH_DIST_ETHSRC	BIT(1)
+#define DPAA2_ETH_DIST_ETHTYPE	BIT(2)
+#define DPAA2_ETH_DIST_VLAN	BIT(3)
+#define DPAA2_ETH_DIST_IPSRC	BIT(4)
+#define DPAA2_ETH_DIST_IPDST	BIT(5)
+#define DPAA2_ETH_DIST_IPPROTO	BIT(6)
+#define DPAA2_ETH_DIST_L4SRC	BIT(7)
+#define DPAA2_ETH_DIST_L4DST	BIT(8)
+#define DPAA2_ETH_DIST_ALL	(~0ULL)
 
-/* L3-L4 network traffic flow hash options */
-#define	RXH_L2DA	(1 << 1)
-#define	RXH_VLAN	(1 << 2)
-#define	RXH_L3_PROTO	(1 << 3)
-#define	RXH_IP_SRC	(1 << 4)
-#define	RXH_IP_DST	(1 << 5)
-#define	RXH_L4_B_0_1	(1 << 6) /* src port in case of TCP/UDP/SCTP */
-#define	RXH_L4_B_2_3	(1 << 7) /* dst port in case of TCP/UDP/SCTP */
-#define	RXH_DISCARD	(1 << 31)
+/* L3-L4 network traffic flow hash options. */
+#define	RXH_L2DA		(1 << 1)
+#define	RXH_VLAN		(1 << 2)
+#define	RXH_L3_PROTO		(1 << 3)
+#define	RXH_IP_SRC		(1 << 4)
+#define	RXH_IP_DST		(1 << 5)
+#define	RXH_L4_B_0_1		(1 << 6) /* src port in case of TCP/UDP/SCTP */
+#define	RXH_L4_B_2_3		(1 << 7) /* dst port in case of TCP/UDP/SCTP */
+#define	RXH_DISCARD		(1 << 31)
 
-/* Default Rx hash options, set during attaching */
+/* Default Rx hash options, set during attaching. */
 #define DPAA2_RXH_DEFAULT	(RXH_L3_PROTO | RXH_IP_SRC | RXH_IP_DST | \
 				 RXH_L4_B_0_1 | RXH_L4_B_2_3)
 
@@ -349,6 +353,7 @@ static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
 static int print_statistics(struct dpaa2_ni_softc *);
 
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
+static int seed_chan_storage(struct dpaa2_ni_soft *, struct dpaa2_ni_channel *);
 
 static int dpni_prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
 static int dpaa2_eth_set_hash(struct dpaa2_ni_softc *, uint64_t);
@@ -731,7 +736,25 @@ setup_channels(device_t dev)
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->bp_dtag);
 	if (error) {
-		device_printf(dev, "Failed to create buffer pool DMA tag\n");
+		device_printf(dev, "Failed to create a DMA tag for buffer "
+		    "pool\n");
+		return (error);
+	}
+
+	/* DMA tag to allocate channel storage. */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    ETH_STORAGE_ALIGN, 0,	/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    ETH_STORAGE_SIZE, 1,	/* maxsize, nsegments */
+	    ETH_STORAGE_SIZE, 0,	/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->st_dtag);
+	if (error) {
+		device_printf(dev, "Failed to create a DMA tag for channel "
+		    "storage\n");
 		return (error);
 	}
 
@@ -804,6 +827,13 @@ setup_channels(device_t dev)
 		error = seed_buf_pool(sc, channel);
 		if (error) {
 			device_printf(dev, "Failed to seed buffer pool\n");
+			return (error);
+		}
+
+		/* Allocate channel storage. */
+		error = seed_chan_storage(sc, channel);
+		if (error) {
+			device_printf(dev, "Failed to seed channel storage\n");
 			return (error);
 		}
 
@@ -1345,9 +1375,9 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	buf_layout.pass_timestamp = true;
 	buf_layout.pass_frame_status = true;
 	buf_layout.options =
-	    DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
-	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP |
-	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
+	    BUF_LOPT_PRIV_DATA_SZ |
+	    BUF_LOPT_TIMESTAMP |
+	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "Failed to set TX buffer layout\n");
@@ -1357,8 +1387,8 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	/* TX-confirmation buffer layout */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX_CONF;
 	buf_layout.options =
-	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP |
-	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS;
+	    BUF_LOPT_TIMESTAMP |
+	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "Failed to set TX_CONF buffer layout\n");
@@ -1394,11 +1424,11 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	buf_layout.pass_timestamp = true;
 	buf_layout.pd_size = 0;
 	buf_layout.options =
-	    DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM |
-	    DPNI_BUF_LAYOUT_OPT_DATA_ALIGN |
-	    DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
-	    DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
-	    DPNI_BUF_LAYOUT_OPT_TIMESTAMP;
+	    BUF_LOPT_DATA_HEAD_ROOM |
+	    BUF_LOPT_DATA_ALIGN |
+	    BUF_LOPT_FRAME_STATUS |
+	    BUF_LOPT_PARSER_RESULT |
+	    BUF_LOPT_TIMESTAMP;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "Failed to set RX buffer layout\n");
@@ -1960,7 +1990,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
 
-	/* There's only one buffers pool for now. */
+	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
 
@@ -1998,6 +2028,36 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			    "the buffer pool\n");
 			return (error);
 		}
+	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Allocate channel storage visible to QBMan.
+ *
+ * NOTE: DMA tag for the given channel should be created.
+ */
+static int
+seed_chan_storage(struct dpaa2_ni_soft *sc, struct dpaa2_ni_channel *chan)
+{
+	struct dpaa2_ni_buf *storage = chan->storage;
+	int error;
+
+	error = bus_dmamem_alloc(sc->st_dtag, &storage->vaddr,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &storage->dmap);
+	if (error) {
+		device_printf(sc->dev, "Failed to allocate channel storage\n");
+		return (error);
+	}
+
+	error = bus_dmamap_load(sc->st_dtag, storage->dmap, storage->vaddr,
+	    ETH_STORAGE_SIZE, dpni_single_seg_dmamap_cb, &storage->paddr,
+	    BUS_DMA_NOWAIT);
+	if (error) {
+		device_printf(sc->dev, "Failed to map channel storage\n");
+		return (error);
 	}
 
 	return (0);

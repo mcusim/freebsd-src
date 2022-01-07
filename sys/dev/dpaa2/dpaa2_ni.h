@@ -187,7 +187,7 @@ struct dpaa2_ni_attr {
 };
 
 /**
- * @brief Buffer for a buffer pool (visible to QBman).
+ * @brief DMA-mapped buffer (for buffer pool, channel storage, etc.).
  */
 struct dpaa2_ni_buf {
 	bus_dmamap_t		 dmap;
@@ -209,6 +209,9 @@ struct dpaa2_ni_channel {
 	/* Buffers for buffer pool. */
 	uint32_t		 buf_num;
 	struct dpaa2_ni_buf	 buf[DPAA2_NI_BUFS_PER_CHAN];
+
+	/* Channel storage (to keep frames got by Volatile Dequeue Command). */
+	struct dpaa2_ni_buf	 storage;
 };
 
 /**
@@ -495,6 +498,8 @@ struct dpaa2_ni_softc {
 
 	/* DMA tag to allocate buffers for a buffer pool. */
 	bus_dma_tag_t		 bp_dtag;
+	/* DMA tag to allocate channel's storage to pull frames to. */
+	bus_dma_tag_t		 st_dtag;
 
 	/* Channels for ingress traffic (Rx, Tx confirmation). */
 	uint8_t			 num_chan;
