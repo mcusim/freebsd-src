@@ -134,8 +134,9 @@ __FBSDID("$FreeBSD$");
 /* Required by struct dpni_rx_tc_dist_cfg::key_cfg_iova */
 #define DPAA2_CLASSIFIER_DMA_SIZE 256
 
-#define ETH_STORAGE_MAX_FRAMES	16
-#define ETH_STORAGE_SIZE	(ETH_STORE_MAX_FRAMES * sizeof(struct dpaa2_dq))
+/* Channel storage buffer configuration. */
+#define ETH_STORAGE_FRAMES	16
+#define ETH_STORAGE_SIZE	(ETH_STORAGE_FRAMES * sizeof(struct dpaa2_dq))
 #define ETH_STORAGE_ALIGN	64
 
 /* Buffers layout options. */
@@ -353,7 +354,7 @@ static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
 static int print_statistics(struct dpaa2_ni_softc *);
 
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
-static int seed_chan_storage(struct dpaa2_ni_soft *, struct dpaa2_ni_channel *);
+static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 
 static int dpni_prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
 static int dpaa2_eth_set_hash(struct dpaa2_ni_softc *, uint64_t);
@@ -1979,7 +1980,7 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
  * @internal
  * @brief Allocate buffers visible to QBMan and release them to the buffer pool.
  *
- * NOTE: DMA tag for the given channel should be created.
+ * NOTE: DMA tag (for buffer pool) for the given channel should be created.
  */
 static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
@@ -2037,12 +2038,12 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
  * @internal
  * @brief Allocate channel storage visible to QBMan.
  *
- * NOTE: DMA tag for the given channel should be created.
+ * NOTE: DMA tag (for storage) for the given channel should be created.
  */
 static int
-seed_chan_storage(struct dpaa2_ni_soft *sc, struct dpaa2_ni_channel *chan)
+seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 {
-	struct dpaa2_ni_buf *storage = chan->storage;
+	struct dpaa2_ni_buf *storage = &chan->storage;
 	int error;
 
 	error = bus_dmamem_alloc(sc->st_dtag, &storage->vaddr,
