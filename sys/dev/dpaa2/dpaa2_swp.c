@@ -111,16 +111,6 @@ __FBSDID("$FreeBSD$");
 #define DQRR_MAX_ITP			4096u
 #define DQRR_PI_MASK			0x0Fu
 
-/*
- * Number of times to retry DPIO portal operations while waiting for portal to
- * finish executing current command and become available.
- *
- * We want to avoid being stuck in a while loop in case hardware becomes
- * unresponsive, but not give up too easily if the portal really is busy for
- * valid reasons.
- */
-#define SWP_BUSY_RETRIES		1000
-
 /* Release Array Allocation register helpers. */
 #define RAR_IDX(rar)			((rar) & 0x7u)
 #define RAR_VB(rar)			((rar) & 0x80u)
@@ -804,7 +794,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 		error = exec_vdc_command(swp, (struct dpaa2_swp_cmd *) &cmd);
 		dequeues++;
 		cpu_spinwait();
-	} while (error == EBUSY && dequeues < SWP_BUSY_RETRIES);
+	} while (error == EBUSY && dequeues < DPAA2_SWP_BUSY_RETRIES);
 
 	if (error) {
 		device_printf(swp->desc->dpio_dev, "volatile dequeue command "

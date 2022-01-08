@@ -48,6 +48,16 @@
  */
 #define DPAA2_SWP_BUFS_PER_CMD		7u
 
+/*
+ * Number of times to retry DPIO portal operations while waiting for portal to
+ * finish executing current command and become available.
+ *
+ * We want to avoid being stuck in a while loop in case hardware becomes
+ * unresponsive, but not give up too easily if the portal really is busy for
+ * valid reasons.
+ */
+#define DPAA2_SWP_BUSY_RETRIES		1000
+
 /* Versions of the QBMan software portals. */
 #define DPAA2_SWP_REV_4000		0x04000000
 #define DPAA2_SWP_REV_4100		0x04010000
