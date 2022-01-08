@@ -1889,9 +1889,20 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
+	struct dpaa2_swp *swp = iosc->swp;
+	int error;
 
 	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, chan->id,
 	    iosc->attr.swp_id, iosc->attr.id);
+
+	error = dpaa2_swp_pull(swp, chan->id, chan->storage.paddr,
+	    ETH_STORE_FRAMES);
+
+	/* Pretend that frames are under processing for now. */
+	DELAY(5000); /* 5 ms */
+
+	/* Mark volatile dequeue command available again. */
+	atomic_fetchadd_int(&swp->vdq.avail.counter, 1);
 }
 
 /**
