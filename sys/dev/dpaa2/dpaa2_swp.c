@@ -786,7 +786,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 	} cmd = {0};
 	int error, dequeues = -1;
 
-	if (swp == NULL || buf == NULL || frames_n == 0u || frames_n > 16u)
+	if (swp == NULL || frames_n == 0u || frames_n > 16u)
 		return (EINVAL);
 
 	cmd.numf = frames_n - 1;
