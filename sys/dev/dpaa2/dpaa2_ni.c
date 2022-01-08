@@ -135,9 +135,9 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_CLASSIFIER_DMA_SIZE 256
 
 /* Channel storage buffer configuration. */
-#define ETH_STORAGE_FRAMES	16
-#define ETH_STORAGE_SIZE	(ETH_STORAGE_FRAMES * sizeof(struct dpaa2_dq))
-#define ETH_STORAGE_ALIGN	64
+#define ETH_STORE_FRAMES	16
+#define ETH_STORE_SIZE		(ETH_STORE_FRAMES * sizeof(struct dpaa2_dq) + 64)
+#define ETH_STORE_ALIGN		64
 
 /* Buffers layout options. */
 #define BUF_LOPT_TIMESTAMP	0x1
@@ -745,12 +745,12 @@ setup_channels(device_t dev)
 	/* DMA tag to allocate channel storage. */
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
-	    ETH_STORAGE_ALIGN, 0,	/* alignment, boundary */
+	    ETH_STORE_ALIGN, 0,		/* alignment, boundary */
 	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
 	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
-	    ETH_STORAGE_SIZE, 1,	/* maxsize, nsegments */
-	    ETH_STORAGE_SIZE, 0,	/* maxsegsize, flags */
+	    ETH_STORE_SIZE, 1,		/* maxsize, nsegments */
+	    ETH_STORE_SIZE, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->st_dtag);
 	if (error) {
@@ -2054,7 +2054,7 @@ seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	}
 
 	error = bus_dmamap_load(sc->st_dtag, storage->dmap, storage->vaddr,
-	    ETH_STORAGE_SIZE, dpni_single_seg_dmamap_cb, &storage->paddr,
+	    ETH_STORE_SIZE, dpni_single_seg_dmamap_cb, &storage->paddr,
 	    BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(sc->dev, "Failed to map channel storage\n");
