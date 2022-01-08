@@ -1891,7 +1891,7 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	device_t dev = chan->io_dev;
-	int error, dequeues = -1;
+	int error;
 
 #if 0
 	device_printf(dev, "CDAN: chan_id=%d, swp_id=%d\n", chan->id,
@@ -1905,17 +1905,14 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 		    "error=%d\n", error);
 
 	/* Pretend that frames are under processing for now. */
-	DELAY(50000); /* 50 ms */
+	DELAY(5000); /* 5 ms */
 
 	/* Mark volatile dequeue command available again. */
-	atomic_fetchadd_int(&swp->vdq.avail.counter, 1);
+	atomic_swap_int(&swp->vdq.avail.counter, 1);
 
 	/* Re-enable data availability notifications. */
-	do {
-		error = DPAA2_SWP_CONF_WQ_CHANNEL(dev, ctx);
-		dequeues++;
-		cpu_spinwait();
-	} while (error == EBUSY && dequeues < DPAA2_SWP_BUSY_RETRIES);
+	error = dpaa2_swp_conf_wq_channel(swp, ctx->fq_chan_id,
+	    DPAA2_WQCHAN_WE_EN, ctx->cdan_en, ctx->qman_ctx);
 	if (error)
 		device_printf(dev, "failed to re-arm channel: error=%d\n",
 		    error);
