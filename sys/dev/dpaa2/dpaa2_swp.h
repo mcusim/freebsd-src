@@ -451,7 +451,7 @@ int dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf
     uint32_t buf_num);
 int dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
     uint32_t *idx);
-int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t *buf,
+int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
     uint32_t frames_n);
 
 #endif /* _DPAA2_SWP_H */
