@@ -1892,11 +1892,13 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 	struct dpaa2_swp *swp = iosc->swp;
 	int error;
 
-	printf("%s: chan_id=%d, swp_id=%d, dpio_id=%d\n", __func__, chan->id,
-	    iosc->attr.swp_id, iosc->attr.id);
+	device_printf(iosc->dev, "CDAN: chan_id=%d, swp_id=%d\n", chan->id,
+	    iosc->attr.swp_id);
 
 	error = dpaa2_swp_pull(swp, chan->id, chan->storage.paddr,
 	    ETH_STORE_FRAMES);
+	if (error)
+		device_printf(iosc->dev, "failed to pull frames from channel\n");
 
 	/* Pretend that frames are under processing for now. */
 	DELAY(5000); /* 5 ms */
