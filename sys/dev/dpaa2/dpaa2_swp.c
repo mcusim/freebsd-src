@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <machine/atomic.h>
 
 #include "pcib_if.h"
 #include "pci_if.h"
@@ -97,9 +98,28 @@ __FBSDID("$FreeBSD$");
 /* Opaque token for static dequeues. */
 #define QMAN_SDQCR_TOKEN		0xBBu
 
+/* Shifts in the VERB byte of the volatile dequeue command. */
+#define QB_VDQCR_VERB_DCT_SHIFT		0
+#define QB_VDQCR_VERB_DT_SHIFT		2
+#define QB_VDQCR_VERB_RLS_SHIFT		4
+#define QB_VDQCR_VERB_WAE_SHIFT		5
+
+/* Opaque token for static dequeues. */
+#define QMAN_VDQCR_TOKEN		0xCCu
+
 /* Maximum timeout period for the DQRR interrupt. */
 #define DQRR_MAX_ITP			4096u
 #define DQRR_PI_MASK			0x0Fu
+
+/*
+ * Number of times to retry DPIO portal operations while waiting for portal to
+ * finish executing current command and become available.
+ *
+ * We want to avoid being stuck in a while loop in case hardware becomes
+ * unresponsive, but not give up too easily if the portal really is busy for
+ * valid reasons.
+ */
+#define SWP_BUSY_RETRIES		1000
 
 /* Release Array Allocation register helpers. */
 #define RAR_IDX(rar)			((rar) & 0x7u)
@@ -122,33 +142,42 @@ enum qbman_sdqcr_fc {
 
 /* Forward declarations. */
 
-static int	swp_enq_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-		    struct dpaa2_fd *fd);
-static int	swp_enq_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-		    struct dpaa2_fd *fd);
-static int	swp_enq_mult_direct(struct dpaa2_swp *swp,
-		    struct dpaa2_eq_desc *ed, struct dpaa2_fd *fd,
-		    uint32_t *flags, int frames_n);
-static int	swp_enq_mult_memback(struct dpaa2_swp *swp,
-		    struct dpaa2_eq_desc *ed, struct dpaa2_fd *fd,
-		    uint32_t *flags, int frames_n);
-static uint8_t	cyc_diff(const uint8_t ring_sz, const uint8_t first,
-		    const uint8_t last);
+static int swp_enq_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd);
+static int swp_enq_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd);
+static int swp_enq_mult_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
+static int swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
 
-/* Routines to execute Management Commands. */
+static int cyc_diff(uint8_t ring_sz, uint8_t first, uint8_t last);
 
-static int	exec_mgmt_command(struct dpaa2_swp *swp,
-		    struct dpaa2_swp_cmd *cmd, struct dpaa2_swp_rsp *rsp,
-		    const uint8_t cmdid);
-static void	send_mgmt_command(struct dpaa2_swp *swp,
-		    struct dpaa2_swp_cmd *cmd, const uint8_t cmdid);
-static int	wait_for_mgmt_response(struct dpaa2_swp *swp,
-		    struct dpaa2_swp_rsp *rsp);
+/* Routines to execute software portal commands. */
 
-/* Routines to execute Buffer Commands. */
+static int exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+    struct dpaa2_swp_rsp *rsp, uint8_t cmdid);
+static int exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+    uint32_t buf_num);
+static int exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd);
 
-static int	exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-		    const uint32_t buf_num);
+/* Management Commands helpers. */
+
+static int send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+    uint8_t cmdid);
+static int wait_for_mgmt_response(struct dpaa2_swp *swp,
+    struct dpaa2_swp_rsp *rsp);
+
+/* Atomic access routines. */
+
+#define	atomic_inc_and_test(v) (atomic_add_return(1, (v)) == 0)
+#define	atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
+
+static inline int atomic_add_return(int i, atomic_t *v);
+static inline int atomic_sub_return(int i, atomic_t *v);
+static inline int atomic_xchg(atomic_t *v, int i);
+static inline int atomic_inc(atomic_t *v);
+static inline int atomic_dec(atomic_t *v);
 
 /* Management routines. */
 
@@ -199,6 +228,10 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	p->sdq |= qbman_sdqcr_dct_prio_ics << QB_SDQCR_DCT_SHIFT;
 	p->sdq |= qbman_sdqcr_fc_up_to_3 << QB_SDQCR_FC_SHIFT;
 	p->sdq |= QMAN_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
+
+	/* Volatile Dequeue Command configuration. */
+	atomic_xchg(&p->vdq.avail, 1);
+	p->vdq.valid_bit = DPAA2_SWP_VALID_BIT;
 
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
@@ -737,6 +770,51 @@ dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq, uint32_t *idx)
 	return (0);
 }
 
+int
+dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t *buf,
+    uint32_t frames_n)
+{
+	/* NOTE: 64 bytes command. */
+	struct __packed {
+		uint8_t		verb;
+		uint8_t		numf;
+		uint8_t		tok;
+		uint8_t		_reserved;
+		uint32_t	dq_src;
+		uint64_t	rsp_addr;
+		uint64_t	_reserved1[6];
+	} cmd = {0};
+	int error, dequeues = -1;
+
+	if (swp == NULL || vdc == NULL || frames_n == 0u || frames_n > 16u)
+		return (EINVAL);
+
+	cmd.numf = frames_n - 1;
+	cmd.tok = QMAN_VDQCR_TOKEN;
+	cmd.dq_src = chan_id;
+	cmd.rsp_addr = (uint64_t) buf;
+
+	cmd.verb |= 1 << QB_VDQCR_VERB_RLS_SHIFT;
+	cmd.verb |= 1 << QB_VDQCR_VERB_WAE_SHIFT;
+	cmd.verb |= 1 << QB_VDQCR_VERB_DCT_SHIFT;
+	cmd.verb |= 0 << QB_VDQCR_VERB_DT_SHIFT; /* pull from channel */
+
+	/* Retry while portal is busy */
+	do {
+		error = exec_vdc_command(swp, (struct dpaa2_swp_cmd *) &cmd);
+		dequeues++;
+		cpu_spinwait();
+	} while (error == EBUSY && dequeues < SWP_BUSY_RETRIES);
+
+	if (error) {
+		device_printf(swp->desc->dpio_dev, "volatile dequeue command "
+		    "failed\n");
+		return (error);
+	}
+
+	return (0);
+}
+
 /*
  * Internal functions.
  */
@@ -912,8 +990,8 @@ swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 /**
  * @internal
  */
-static uint8_t
-cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
+static int
+cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
 {
 	/* 'first' is included, 'last' is excluded */
 	return ((first <= last)
@@ -926,7 +1004,7 @@ cyc_diff(const uint8_t ringsize, const uint8_t first, const uint8_t last)
  */
 static int
 exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    const uint32_t buf_num)
+    uint32_t buf_num)
 {
 	struct __packed with_verb {
 		uint8_t	verb;
@@ -985,11 +1063,82 @@ exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 
 /**
  * @internal
+ * @brief Execute Volatile Dequeue Command (VDC).
+ *
+ * This command will be executed by QBMan only once in order to deliver requested
+ * number of frames (1-16 or 1-32 depending on QBMan version) to the driver via
+ * DQRR or arbitrary DMA-mapped memory.
+ *
+ * NOTE: There is a counterpart to the volatile dequeue command called static
+ *	 dequeue command (SDQC) which is executed periodically all the time the
+ *	 command is present in the SDQCR register.
+ */
+static int
+exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
+{
+	struct __packed with_verb {
+		uint8_t	verb;
+		uint8_t	_reserved[63];
+	} *c;
+	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
+	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
+	struct resource_map *map;
+	uint32_t offset;
+	uint16_t flags;
+
+	if (!swp || !cmd)
+		return (EINVAL);
+
+	if (!atomic_dec_and_test(&swp->vdq.avail)) {
+		atomic_inc(&s->vdq.avail);
+		return (EBUSY);
+	}
+
+	dpaa2_swp_lock(swp, &flags);
+	if (flags & DPAA2_SWP_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
+		dpaa2_swp_unlock(swp);
+		return (ENOENT);
+	}
+
+	map = swp->cfg.writes_cinh ? swp->cinh_map : swp->cena_map;
+	offset = swp->cfg.mem_backed
+	    ? DPAA2_SWP_CENA_VDQCR_MEM
+	    : DPAA2_SWP_CENA_VDQCR;
+	c = (struct with_verb *) cmd;
+
+	/* Write command bytes (without VERB byte). */
+	for (uint32_t i = 1; i < DPAA2_SWP_CMD_PARAMS_N; i++)
+		bus_write_8(map, offset + sizeof(uint64_t) * i, cmd->params[i]);
+	bus_write_4(map, offset + 4, cmd_pdat32[1]);
+	for (uint32_t i = 1; i <= 3; i++)
+		bus_write_1(map, offset + i, cmd_pdat8[i]);
+
+	/* Write VERB byte and trigger command execution. */
+	if (swp->cfg.mem_backed) {
+		bus_write_1(map, offset, c->verb | swp->vdq.valid_bit);
+		swp->vdq.valid_bit ^= DPAA2_SWP_VALID_BIT;
+		wmb();
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_VDQCR_RT,
+		    DPAA2_SWP_RT_MODE);
+	} else {
+		wmb();
+		bus_write_1(map, offset, c->verb | swp->vdq.valid_bit);
+		swp->vdq.valid_bit ^= DPAA2_SWP_VALID_BIT;
+	}
+
+	dpaa2_swp_unlock(swp);
+
+	return (0);
+}
+
+/**
+ * @internal
  * @brief Execute a QBMan management command.
  */
 static int
 exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    struct dpaa2_swp_rsp *rsp, const uint8_t cmdid)
+    struct dpaa2_swp_rsp *rsp, uint8_t cmdid)
 {
 	struct __packed with_verb {
 		uint8_t	verb;
@@ -1031,9 +1180,9 @@ exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 /**
  * @internal
  */
-static void
+static int
 send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    const uint8_t cmdid)
+    uint8_t cmdid)
 {
 	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
 	const uint32_t *cmd_pdat32 = (const uint32_t *) cmd->params;
@@ -1060,6 +1209,8 @@ send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 		wmb();
 		bus_write_1(map, offset, cmdid | swp->mc.valid_bit);
 	}
+
+	return (0);
 }
 
 /**
@@ -1111,4 +1262,49 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
 
 	return (rc);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_add_return(int i, atomic_t *v)
+{
+	return i + atomic_fetchadd_int(&v->counter, i);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_sub_return(int i, atomic_t *v)
+{
+	return atomic_fetchadd_int(&v->counter, -i) - i;
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_xchg(atomic_t *v, int i)
+{
+	return (atomic_swap_int(&v->counter, i));
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_inc(atomic_t *v)
+{
+	return atomic_fetchadd_int(&v->counter, 1) + 1;
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_dec(atomic_t *v)
+{
+	return atomic_fetchadd_int(&v->counter, -1) - 1;
 }

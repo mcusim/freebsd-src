@@ -178,6 +178,10 @@
  * Public types.
  */
 
+typedef struct {
+	volatile int	counter;
+} atomic_t;
+
 /**
  * @brief Enqueue command descriptor.
  *
@@ -371,7 +375,7 @@ struct dpaa2_swp {
 
 	/* Volatile Dequeue Command (to obtain frames). */
 	struct {
-		uint32_t	 avail;
+		atomic_t	 avail;
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
 	} vdq;
 
@@ -441,11 +445,13 @@ int	 dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
 
 /* Software portal commands. */
 
-int	 dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
-	     uint8_t we_mask, bool cdan_en, uint64_t ctx);
-int	 dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid,
-	     bus_addr_t *buf, uint32_t buf_num);
-int	 dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
-	     uint32_t *idx);
+int dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
+    uint8_t we_mask, bool cdan_en, uint64_t ctx);
+int dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf,
+    uint32_t buf_num);
+int dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
+    uint32_t *idx);
+int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t *buf,
+    uint32_t frames_n);
 
 #endif /* _DPAA2_SWP_H */
