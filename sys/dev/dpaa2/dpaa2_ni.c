@@ -1893,10 +1893,8 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 	device_t dev = chan->io_dev;
 	int error;
 
-#if 0
 	device_printf(dev, "CDAN: chan_id=%d, swp_id=%d\n", chan->id,
 	    iosc->attr.swp_id);
-#endif
 
 	error = dpaa2_swp_pull(swp, chan->id, chan->storage.paddr,
 	    ETH_STORE_FRAMES);
@@ -1905,7 +1903,7 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 		    "error=%d\n", error);
 
 	/* Pretend that frames are under processing for now. */
-	DELAY(5000); /* 5 ms */
+	DELAY(50000); /* 50 ms */
 
 	/* Mark volatile dequeue command available again. */
 	atomic_swap_int(&swp->vdq.avail.counter, 1);

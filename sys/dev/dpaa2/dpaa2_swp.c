@@ -265,7 +265,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 		    1, /* Dequeued frame data, annotation, and FQ context stashing priority */			/* SP */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
 		    1, /* Dequeue response ring (DQRR) entry stashing priority */				/* DP */
-		    0, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
+		    1, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
 		    0  /* EQCR_CI stashing priority */								/* EP */
 		);
 		/* TODO: Switch to memory-backed mode. */
@@ -1246,13 +1246,6 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 			DELAY(CMD_SPIN_TIMEOUT);
 		else
 			pause("dpaa2", CMD_SLEEP_TIMEOUT);
-
-		/*
-		 * Let's have a data synchronization barrier for the whole
-		 * system to be sure that QBMan's command execution result is
-		 * transferred to memory.
-		 */
-		dsb(sy);
 	}
 	/* Return an error on expired timeout. */
 	rc = i > attempts ? ETIMEDOUT : 0;
