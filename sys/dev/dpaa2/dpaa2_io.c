@@ -423,7 +423,7 @@ dpio_msi_intr(void *arg)
 	if (status == 0u)
 		return;
 
-	while (cnt <= 32u && dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
+	while (cnt <= 64u && dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
