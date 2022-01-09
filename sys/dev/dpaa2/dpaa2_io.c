@@ -66,8 +66,8 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_cmd_if.h"
 #include "dpaa2_io.h"
 
-/* Index of the only DPIO IRQ. */
-#define DPIO_IRQ_INDEX		0
+#define DPIO_IRQ_INDEX		0 /* index of the only DPIO IRQ */
+#define DPIO_POLL_MAX		32
 
 /*
  * Memory:
@@ -416,20 +416,21 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx;
 	struct dpaa2_dq dq;
-	uint32_t idx, cnt = 0;
-	uint32_t status = 0u;
+	uint32_t idx, status = 0u;
+	int cnt = -1;
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	if (status == 0u)
 		return;
 
-	while (cnt <= 64u && dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
+	while (cnt < DPIO_POLL_MAX &&
+	    dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
 			ctx->cb(ctx);
 		} else {
-			device_printf(sc->dev, "irq: unrecognised DQRR entry\n");
+			device_printf(sc->dev, "unknown DQRR entry\n");
 		}
 
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx & 0x7u);

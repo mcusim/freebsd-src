@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sockio.h>
 #include <sys/sysctl.h>
 #include <sys/mbuf.h>
+#include <sys/taskqueue.h>
 
 #include <vm/vm.h>
 
@@ -179,23 +180,6 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
-/* for DPIO resources */
-#define IO_RID_OFF		(0u)
-#define IO_RID(rid)		((rid) + IO_RID_OFF)
-#define IO_RES_NUM		(16u)
-/* for DPBP resources */
-#define BP_RID_OFF		(IO_RID_OFF + IO_RES_NUM)
-#define BP_RID(rid)		((rid) + BP_RID_OFF)
-#define BP_RES_NUM		(1u)
-/* for DPCON resources */
-#define CON_RID_OFF		(BP_RID_OFF + BP_RES_NUM)
-#define CON_RID(rid)		((rid) + CON_RID_OFF)
-#define CON_RES_NUM		(16u)
-/* for DPMCP resources */
-#define MCP_RID_OFF		(CON_RID_OFF + CON_RES_NUM)
-#define MCP_RID(rid)		((rid) + MCP_RID_OFF)
-#define MCP_RES_NUM		(1u)
-
 struct resource_spec dpaa2_ni_spec[] = {
 	/*
 	 * DPIO resources (software portals).
@@ -204,6 +188,10 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 availability interrupts, the DPCONs are used to identify the
 	 *	 network interface that has produced ingress data to that core.
 	 */
+#define IO_RES_NUM	(8u)
+#define IO_RID_OFF	(0u)
+#define IO_RID(rid)	((rid) + IO_RID_OFF)
+	/* --- */
 	{ DPAA2_DEV_IO,  IO_RID(0),    RF_ACTIVE | RF_SHAREABLE },
 	{ DPAA2_DEV_IO,  IO_RID(1),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(2),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
@@ -212,22 +200,20 @@ struct resource_spec dpaa2_ni_spec[] = {
 	{ DPAA2_DEV_IO,  IO_RID(5),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(6),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(7),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(8),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(9),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(10),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(11),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(12),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(13),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(14),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	{ DPAA2_DEV_IO,  IO_RID(15),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+
 	/*
-	 * DPBP resources.
+	 * DPBP resources (buffer pools).
 	 *
-	 * NOTE: One buffer pool per network interface.
+	 * NOTE: One per network interface.
 	 */
+#define BP_RES_NUM	(1u)
+#define BP_RID_OFF	(IO_RID_OFF + IO_RES_NUM)
+#define BP_RID(rid)	((rid) + BP_RID_OFF)
+	/* --- */
 	{ DPAA2_DEV_BP,  BP_RID(0),   RF_ACTIVE },
+
 	/*
-	 * DPCON  resources (channels).
+	 * DPCON resources (channels).
 	 *
 	 * NOTE: One DPCON per core where Rx or Tx confirmation traffic to be
 	 *	 distributed to.
@@ -235,6 +221,10 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 different network interfaces arriving on the same core, the
 	 *	 DPCONs must be private to the DPNIs.
 	 */
+#define CON_RES_NUM	(8u)
+#define CON_RID_OFF	(BP_RID_OFF + BP_RES_NUM)
+#define CON_RID(rid)	((rid) + CON_RID_OFF)
+	/* --- */
 	{ DPAA2_DEV_CON, CON_RID(0),   RF_ACTIVE },
 	{ DPAA2_DEV_CON, CON_RID(1),   RF_ACTIVE | RF_OPTIONAL },
 	{ DPAA2_DEV_CON, CON_RID(2),   RF_ACTIVE | RF_OPTIONAL },
@@ -243,20 +233,17 @@ struct resource_spec dpaa2_ni_spec[] = {
  	{ DPAA2_DEV_CON, CON_RID(5),   RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(6),   RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(7),   RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(8),   RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(9),   RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
- 	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
+
 	/*
 	 * DPMCP resources.
 	 *
-	 * NOTE: One per DPNI. MC command portals (MCPs) are used to send
-	 * commands to, and receive responses from, the MC firmware.
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPNI.
 	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(CON_RID_OFF + CON_RES_NUM)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
 	/* { DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE }, */
 
 	RESOURCE_SPEC_END
@@ -374,6 +361,8 @@ static void dpni_ifmedia_tick(void *);
 static void dpni_cdan_cb(struct dpaa2_io_notif_ctx *);
 static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
+static void dpni_poll_channel(void *, int);
+
 static void dpni_consume_tx_conf(device_t, struct dpaa2_ni_channel *,
     struct dpaa2_ni_fq *, struct dpaa2_fd *);
 static void dpni_consume_rx(device_t, struct dpaa2_ni_channel *,
@@ -478,6 +467,16 @@ dpaa2_ni_attach(device_t dev)
 		    dinfo->id, error);
 		goto err_close_rc;
 	}
+
+	/* Create a private taskqueue thread for handling driver events */
+	sc->tq = taskqueue_create("dpaa2_ni_taskq", M_WAITOK,
+	    taskqueue_thread_enqueue, &sc->tq);
+	if (sc->tq == NULL) {
+		device_printf(dev, "Failed to allocate task queue\n");
+		goto err_close_ni;
+	}
+	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s taskq",
+	    device_get_nameunit(dev));
 
 	error = setup_dpni(dev);
 	if (error) {
@@ -790,6 +789,7 @@ setup_channels(device_t dev)
 
 		sc->channel[i] = channel;
 
+		channel->ni_dev = dev;
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
@@ -838,17 +838,15 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
+		/* Initialize a task to poll frames from the channel. */
+		TASK_INIT(&channel->poll_task, 0, dpni_poll_channel, channel);
+
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d "
 			    "dpcon_id=%d chan_id=%d, priorities=%d\n",
 			    io_info->id, con_info->id, channel->id,
 			    consc->attr.prior_num);
 	}
-
-	/*
-	 * TODO: De-allocate redundant DPIOs or DPCONs if exist.
-	 */
-
 	return (0);
 }
 
@@ -1888,32 +1886,14 @@ static void
 dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
-	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
-	struct dpaa2_swp *swp = iosc->swp;
-	device_t dev = chan->io_dev;
-	int error;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
+
 #if 0
 	device_printf(dev, "CDAN: chan_id=%d, swp_id=%d\n", chan->id,
 	    iosc->attr.swp_id);
 #endif
-	error = dpaa2_swp_pull(swp, chan->id, chan->storage.paddr,
-	    ETH_STORE_FRAMES);
-	if (error)
-		device_printf(dev, "failed to pull frames from channel: "
-		    "error=%d\n", error);
 
-	/* Pretend that frames are under processing for now. */
-	DELAY(50000); /* 50 ms */
-
-	/* Mark volatile dequeue command available again. */
-	atomic_swap_int(&swp->vdq.avail.counter, 1);
-
-	/* Re-enable data availability notifications. */
-	error = dpaa2_swp_conf_wq_channel(swp, ctx->fq_chan_id,
-	    DPAA2_WQCHAN_WE_EN, ctx->cdan_en, ctx->qman_ctx);
-	if (error)
-		device_printf(dev, "failed to re-arm channel: error=%d\n",
-		    error);
+	taskqueue_enqueue(sc->tq, &chan->poll_task);
 }
 
 /**
@@ -1926,6 +1906,17 @@ dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	if (err)
 		return;
 	*(bus_addr_t *) arg = segs[0].ds_addr;
+}
+
+/**
+ * @internal
+ */
+static void
+dpni_poll_channel(void *arg, int count)
+{
+	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
+
+	printf("%s: chan_id=%d, count=%d\n", __func__, chan->id, count);
 }
 
 /**
@@ -2002,7 +1993,7 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
  * @internal
  * @brief Allocate buffers visible to QBMan and release them to the buffer pool.
  *
- * NOTE: DMA tag (for buffer pool) for the given channel should be created.
+ * NOTE: Buffer Pool DMA tag for the given channel must already be created.
  */
 static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
@@ -2060,7 +2051,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
  * @internal
  * @brief Allocate channel storage visible to QBMan.
  *
- * NOTE: DMA tag (for storage) for the given channel should be created.
+ * NOTE: Storage DMA tag for the given channel must already be created.
  */
 static int
 seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)

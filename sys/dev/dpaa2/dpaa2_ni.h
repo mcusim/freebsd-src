@@ -32,6 +32,7 @@
 #include <sys/rman.h>
 #include <sys/bus.h>
 #include <sys/queue.h>
+#include <sys/taskqueue.h>
 
 #include <net/ethernet.h>
 
@@ -202,6 +203,7 @@ struct dpaa2_ni_buf {
  */
 struct dpaa2_ni_channel {
 	struct dpaa2_io_notif_ctx ctx;
+	device_t		 ni_dev;
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
@@ -212,6 +214,9 @@ struct dpaa2_ni_channel {
 
 	/* Channel storage (to keep frames got by Volatile Dequeue Command). */
 	struct dpaa2_ni_buf	 storage;
+
+	/* Task to pull frames when CDAN is received. */
+	struct task		 poll_task;
 };
 
 /**
@@ -483,7 +488,7 @@ struct dpaa2_ni_softc {
 
 	struct dpaa2_ni_attr	 attr;
 
-	/* Help to send commands to MC. */
+	/* Helps to send commands to MC. */
 	struct dpaa2_cmd	*cmd;
 	uint16_t		 rc_token;
 	uint16_t		 ni_token;
@@ -496,15 +501,13 @@ struct dpaa2_ni_softc {
 	struct callout		 mii_callout;
 	int			 media_status;
 
-	/* DMA tag to allocate buffers for a buffer pool. */
-	bus_dma_tag_t		 bp_dtag;
-	/* DMA tag to allocate channel's storage to pull frames to. */
-	bus_dma_tag_t		 st_dtag;
+	/* DMA resources */
+	bus_dma_tag_t		 bp_dtag; /* for buffer pool */
+	bus_dma_tag_t		 st_dtag; /* for channel storage */
 
-	/* Channels for ingress traffic (Rx, Tx confirmation). */
+	/* Channels and frame queues */
 	uint8_t			 num_chan;
 	struct dpaa2_ni_channel	*channel[DPAA2_NI_MAX_CHANNELS];
- 	/* Frame queues. */
 	uint32_t		 num_fqs;
 	struct dpaa2_ni_fq	 fq[DPAA2_NI_MAX_QUEUES];
 
@@ -512,6 +515,9 @@ struct dpaa2_ni_softc {
 	int			 irq_rid[DPAA2_NI_MSI_COUNT];
 	struct resource		*irq_res;
 	void			*intr; /* interrupt handle */
+
+	/* Tasks */
+	struct taskqueue	*tq;
 
 	struct {
 		bus_dma_tag_t	 dtag;
