@@ -215,7 +215,7 @@ struct dpaa2_ni_channel {
 	/* Channel storage (to keep frames got by Volatile Dequeue Command). */
 	struct dpaa2_ni_buf	 storage;
 
-	/* Task to pull frames when CDAN is received. */
+	/* Task to poll frames when CDAN is received. */
 	struct task		 poll_task;
 };
 
@@ -479,12 +479,11 @@ struct dpaa2_ni_softc {
 	uint16_t		 api_minor;
 	uint16_t		 rx_bufsz;
 	uint16_t		 rx_buf_align;
+	uint64_t		 rx_hash_fields;
 	uint16_t		 tx_data_off;
 	uint16_t		 tx_qdid;
-	uint32_t		 if_flags;
 	uint32_t		 link_options;
 	int			 link_state;
-	uint64_t		 rx_hash_fields;
 
 	struct dpaa2_ni_attr	 attr;
 
@@ -495,6 +494,7 @@ struct dpaa2_ni_softc {
 
 	/* For network interface and miibus. */
 	struct ifnet		*ifp;
+	uint32_t		 if_flags;
 	struct mtx		 lock;
 	device_t		 miibus;
 	struct mii_data		*mii;
@@ -502,8 +502,13 @@ struct dpaa2_ni_softc {
 	int			 media_status;
 
 	/* DMA resources */
-	bus_dma_tag_t		 bp_dtag; /* for buffer pool */
-	bus_dma_tag_t		 st_dtag; /* for channel storage */
+	bus_dma_tag_t		 bp_dmat;  /* for buffer pool */
+	bus_dma_tag_t		 st_dmat;  /* for channel storage */
+	bus_dma_tag_t		 rxd_dmat; /* for Rx traffic distribution key */
+	bus_dma_tag_t		 qos_dmat; /* for QoS table key */
+
+	struct dpaa2_ni_buf	 qos_kcfg; /* QoS table key config. */
+	struct dpaa2_ni_buf	 rxd_kcfg; /* Rx distribution key config. */
 
 	/* Channels and frame queues */
 	uint8_t			 num_chan;
@@ -518,20 +523,6 @@ struct dpaa2_ni_softc {
 
 	/* Tasks */
 	struct taskqueue	*tq;
-
-	struct {
-		bus_dma_tag_t	 dtag;
-		bus_dmamap_t	 dmap;
-		bus_addr_t	 buf_pa;
-		uint8_t		*buf_va;
-	} qos_kcfg; /* QoS table key configuration. */
-
-	struct {
-		bus_dma_tag_t	 dtag;
-		bus_dmamap_t	 dmap;
-		bus_addr_t	 paddr;
-		void		*vaddr;
-	} rx_dist_kcfg; /* Key configuration for Rx traffic distribution. */
 
 	struct {
 		uint32_t	 dpmac_id;
