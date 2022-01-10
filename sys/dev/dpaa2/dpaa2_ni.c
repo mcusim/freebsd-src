@@ -98,17 +98,14 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-/* Index of the only DPNI IRQ. */
-#define DPNI_IRQ_INDEX		0
+#define DPNI_IRQ_INDEX		0   /* Index of the only DPNI IRQ. */
+#define DPNI_IRQ_LINK_CHANGED	0x1 /* Link state changed */
+#define DPNI_IRQ_EP_CHANGED	0x2 /* DPAA2 endpoint dis/connected */
 
-/* Maximum acceptable frame length and MTU. */
+/* Maximum frame length and MTU. */
 #define DPAA2_ETH_MFL		(10 * 1024)
 #define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
 #define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
-
-/* DPNI IRQ statuses. */
-#define DPNI_IRQ_LINK_CHANGED	0x1 /* link state changed */
-#define DPNI_IRQ_EP_CHANGED	0x2 /* DPAA2 endpoint dis/connected */
 
 /* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7U
@@ -118,11 +115,8 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_BUF_ALIGN_V1	256 /* limitation of the WRIOP v1.0.0 */
 #define ETH_RX_BUF_ALIGN	64
 
-/* Frame's software annotation. The hardware options are either 0 or 64. */
-#define ETH_SWA_SIZE		64
-
-/* Hardware annotation area in RX/TX buffers. */
-#define ETH_RX_HWA_SIZE		64
+#define ETH_SWA_SIZE		64 /* SW annotation area (limited to 0 or 64) */
+#define ETH_RX_HWA_SIZE		64 /* HW annotation area in RX/TX buffers */
 
 /* Rx buffer configuration. */
 #define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
@@ -335,18 +329,16 @@ static int set_buf_layout(device_t, struct dpaa2_cmd *);
 static int set_pause_frame(device_t, struct dpaa2_cmd *);
 static int set_qos_table(device_t, struct dpaa2_cmd *);
 static int set_mac_addr(device_t, struct dpaa2_cmd *, uint16_t, uint16_t);
-
-static int calc_channels_num(struct dpaa2_ni_softc *);
-static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
-static int print_statistics(struct dpaa2_ni_softc *);
+static int set_hash(device_t, uint64_t);
+static int set_dist_key(device_t, enum dpaa2_ni_dist_mode, uint64_t);
 
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 
-static int dpni_prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
-static int dpaa2_eth_set_hash(struct dpaa2_ni_softc *, uint64_t);
-static int dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *,
-    enum dpaa2_ni_dist_mode, uint64_t);
+static int calc_channels_num(struct dpaa2_ni_softc *);
+static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
+static int print_statistics(struct dpaa2_ni_softc *);
+static int prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
 
 /* Callbacks. */
 
@@ -404,10 +396,18 @@ dpaa2_ni_attach(device_t dev)
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
 
-	sc->qos_kcfg.dtag = NULL;
+	sc->bp_dmat = NULL;
+	sc->st_dmat = NULL;
+	sc->rxd_dmat = NULL;
+	sc->qos_dmat = NULL;
+
 	sc->qos_kcfg.dmap = NULL;
-	sc->qos_kcfg.buf_pa = 0;
-	sc->qos_kcfg.buf_va = NULL;
+	sc->qos_kcfg.paddr = 0;
+	sc->qos_kcfg.vaddr = NULL;
+
+	sc->rxd_kcfg.dmap = NULL;
+	sc->rxd_kcfg.paddr = 0;
+	sc->rxd_kcfg.vaddr = NULL;
 
 	sc->mac.dpmac_id = 0;
 	sc->mac.phy_dev = NULL;
@@ -469,7 +469,7 @@ dpaa2_ni_attach(device_t dev)
 	}
 
 	/* Create a private taskqueue thread for handling driver events */
-	sc->tq = taskqueue_create("dpaa2_ni_taskq", M_WAITOK,
+	sc->tq = taskqueue_create("dpaa2_ni_tq", M_WAITOK,
 	    taskqueue_thread_enqueue, &sc->tq);
 	if (sc->tq == NULL) {
 		device_printf(dev, "Failed to allocate task queue\n");
@@ -734,7 +734,7 @@ setup_channels(device_t dev)
 	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
 	    ETH_RX_BUF_RAW_SIZE, 0,	/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->bp_dtag);
+	    &sc->bp_dmat);
 	if (error) {
 		device_printf(dev, "Failed to create a DMA tag for buffer "
 		    "pool\n");
@@ -751,7 +751,7 @@ setup_channels(device_t dev)
 	    ETH_STORE_SIZE, 1,		/* maxsize, nsegments */
 	    ETH_STORE_SIZE, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->st_dtag);
+	    &sc->st_dmat);
 	if (error) {
 		device_printf(dev, "Failed to create a DMA tag for channel "
 		    "storage\n");
@@ -1014,7 +1014,7 @@ setup_rx_distribution(device_t dev)
 	    DPAA2_CLASSIFIER_DMA_SIZE, 1, /* maxsize, nsegments */
 	    DPAA2_CLASSIFIER_DMA_SIZE, 0, /* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->rx_dist_kcfg.dtag);
+	    &sc->rxd_dmat);
 	if (error) {
 		device_printf(dev, "Failed to create a DMA tag for Rx traffic "
 		    "distribution key configuration buffer\n");
@@ -1025,7 +1025,7 @@ setup_rx_distribution(device_t dev)
 	 * Have the interface implicitly distribute traffic based on the default
 	 * hash key.
 	 */
-	return (dpaa2_eth_set_hash(sc, DPAA2_RXH_DEFAULT));
+	return (set_hash(dev, DPAA2_RXH_DEFAULT));
 }
 
 /**
@@ -1508,25 +1508,24 @@ set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	    ETH_QOS_KCFG_BUF_SIZE, 1,	/* maxsize, nsegments */
 	    ETH_QOS_KCFG_BUF_SIZE, 0,	/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->qos_kcfg.dtag);
+	    &sc->qos_dmat);
 	if (error) {
 		device_printf(dev, "Failed to create a DMA tag for QoS key "
 		    "configuration buffer\n");
 		return (error);
 	}
 
-	error = bus_dmamem_alloc(sc->qos_kcfg.dtag,
-	    (void **) &sc->qos_kcfg.buf_va, BUS_DMA_ZERO | BUS_DMA_COHERENT,
-	    &sc->qos_kcfg.dmap);
+	error = bus_dmamem_alloc(sc->qos_dmat, &sc->qos_kcfg.vaddr,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->qos_kcfg.dmap);
 	if (error) {
 		device_printf(dev, "Failed to allocate a buffer for QoS key "
 		    "configuration\n");
 		return (error);
 	}
 
-	error = bus_dmamap_load(sc->qos_kcfg.dtag, sc->qos_kcfg.dmap,
-	    sc->qos_kcfg.buf_va, ETH_QOS_KCFG_BUF_SIZE,
-	    dpni_single_seg_dmamap_cb, &sc->qos_kcfg.buf_pa, BUS_DMA_NOWAIT);
+	error = bus_dmamap_load(sc->qos_dmat, sc->qos_kcfg.dmap,
+	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE,
+	    dpni_single_seg_dmamap_cb, &sc->qos_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(dev, "Failed to map QoS key configuration buffer "
 		    "into bus space\n");
@@ -1536,7 +1535,7 @@ set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	tbl.default_tc = 0;
 	tbl.discard_on_miss = false;
 	tbl.keep_entries = false;
-	tbl.kcfg_busaddr = sc->qos_kcfg.buf_pa;
+	tbl.kcfg_busaddr = sc->qos_kcfg.paddr;
 	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, cmd, &tbl);
 	if (error) {
 		device_printf(dev, "Failed to set QoS table\n");
@@ -1888,11 +1887,6 @@ dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 
-#if 0
-	device_printf(dev, "CDAN: chan_id=%d, swp_id=%d\n", chan->id,
-	    iosc->attr.swp_id);
-#endif
-
 	taskqueue_enqueue(sc->tq, &chan->poll_task);
 }
 
@@ -1910,6 +1904,7 @@ dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 
 /**
  * @internal
+ * @brief Task to poll frames from a specific channel when CDAN is received.
  */
 static void
 dpni_poll_channel(void *arg, int count)
@@ -1992,8 +1987,6 @@ calc_channels_num(struct dpaa2_ni_softc *sc)
 /**
  * @internal
  * @brief Allocate buffers visible to QBMan and release them to the buffer pool.
- *
- * NOTE: Buffer Pool DMA tag for the given channel must already be created.
  */
 static int
 seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
@@ -2004,6 +1997,10 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
 	int error, bufn;
 
+	/* DMA tag for buffer pool must already be created. */
+	if (sc->bp_dmat == NULL)
+		return (ENXIO);
+
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
@@ -2013,7 +2010,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 		for (int j = bufn = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf = &chan->buf[i + j];
 
-			error = bus_dmamem_alloc(sc->bp_dtag, &buf->vaddr,
+			error = bus_dmamem_alloc(sc->bp_dmat, &buf->vaddr,
 			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
 			if (error) {
 				device_printf(sc->dev, "Failed to allocate a "
@@ -2021,7 +2018,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 				return (error);
 			}
 
-			error = bus_dmamap_load(sc->bp_dtag, buf->dmap,
+			error = bus_dmamap_load(sc->bp_dmat, buf->dmap,
 			    buf->vaddr, ETH_RX_BUF_RAW_SIZE,
 			    dpni_single_seg_dmamap_cb, &buf->paddr,
 			    BUS_DMA_NOWAIT);
@@ -2051,7 +2048,6 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
  * @internal
  * @brief Allocate channel storage visible to QBMan.
  *
- * NOTE: Storage DMA tag for the given channel must already be created.
  */
 static int
 seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
@@ -2059,14 +2055,18 @@ seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	struct dpaa2_ni_buf *storage = &chan->storage;
 	int error;
 
-	error = bus_dmamem_alloc(sc->st_dtag, &storage->vaddr,
+	/* DMA tag for channel storage must already be created. */
+	if (sc->st_dmat == NULL)
+		return (ENXIO);
+
+	error = bus_dmamem_alloc(sc->st_dmat, &storage->vaddr,
 	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &storage->dmap);
 	if (error) {
 		device_printf(sc->dev, "Failed to allocate channel storage\n");
 		return (error);
 	}
 
-	error = bus_dmamap_load(sc->st_dtag, storage->dmap, storage->vaddr,
+	error = bus_dmamap_load(sc->st_dmat, storage->dmap, storage->vaddr,
 	    ETH_STORE_SIZE, dpni_single_seg_dmamap_cb, &storage->paddr,
 	    BUS_DMA_NOWAIT);
 	if (error) {
@@ -2131,8 +2131,9 @@ print_statistics(struct dpaa2_ni_softc *sc)
  * @internal
  */
 static int
-dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags)
+set_hash(device_t dev, uint64_t flags)
 {
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	uint64_t key = 0;
 	int i;
 
@@ -2143,7 +2144,7 @@ dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags)
 		if (dist_fields[i].rxnfc_field & flags)
 			key |= dist_fields[i].id;
 
-	return dpaa2_eth_set_dist_key(sc, DPAA2_NI_DIST_MODE_HASH, key);
+	return set_dist_key(dev, DPAA2_NI_DIST_MODE_HASH, key);
 }
 
 /**
@@ -2152,14 +2153,17 @@ dpaa2_eth_set_hash(struct dpaa2_ni_softc *sc, uint64_t flags)
  * combination of RXH_ bits.
  */
 static int
-dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
-    uint64_t flags)
+set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags)
 {
-	device_t dev = sc->dev;
+	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpkg_profile_cfg cls_cfg;
 	struct dpkg_extract *key;
 	uint32_t rx_hash_fields = 0;
 	int i, err = 0;
+
+	/* DMA tag for Rx traffic distribution key must already be created. */
+	if (sc->rxd_dmat == NULL)
+		return (ENXIO);
 
 	memset(&cls_cfg, 0, sizeof(cls_cfg));
 
@@ -2185,24 +2189,24 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
 		cls_cfg.num_extracts++;
 	}
 
-	err = bus_dmamem_alloc(sc->rx_dist_kcfg.dtag, &sc->rx_dist_kcfg.vaddr,
-	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->rx_dist_kcfg.dmap);
+	err = bus_dmamem_alloc(sc->rxd_dmat, &sc->rxd_kcfg.vaddr,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->rxd_kcfg.dmap);
 	if (err) {
 		device_printf(dev, "Failed to allocate a buffer for Rx traffic "
 		    "distribution key configuration\n");
 		return (err);
 	}
 
-	err = dpni_prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rx_dist_kcfg.vaddr);
+	err = dpni_prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rxd_kcfg.vaddr);
 	if (err) {
 		device_printf(dev, "dpni_prepare_key_cfg error %d\n", err);
 		return (err);
 	}
 
 	/* Prepare for setting the Rx dist. */
-	err = bus_dmamap_load(sc->rx_dist_kcfg.dtag, sc->rx_dist_kcfg.dmap,
-	    sc->rx_dist_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE,
-	    dpni_single_seg_dmamap_cb, &sc->rx_dist_kcfg.paddr, BUS_DMA_NOWAIT);
+	err = bus_dmamap_load(sc->rxd_dmat, sc->rxd_kcfg.dmap,
+	    sc->rxd_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE,
+	    dpni_single_seg_dmamap_cb, &sc->rxd_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (err) {
 		device_printf(sc->dev, "Failed to map a buffer for Rx traffic "
 		    "distribution key configuration\n");
@@ -2212,7 +2216,7 @@ dpaa2_eth_set_dist_key(struct dpaa2_ni_softc *sc, enum dpaa2_ni_dist_mode type,
 	if (type == DPAA2_NI_DIST_MODE_HASH) {
 		err = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
 		    sc->ni_token), sc->attr.num.queues, 0,
-		    DPAA2_NI_DIST_MODE_HASH, sc->rx_dist_kcfg.paddr);
+		    DPAA2_NI_DIST_MODE_HASH, sc->rxd_kcfg.paddr);
 		if (err)
 			device_printf(dev, "Failed to set distribution mode "
 			    "and size for the traffic class\n");
