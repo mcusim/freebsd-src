@@ -2197,9 +2197,9 @@ set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags)
 		return (err);
 	}
 
-	err = dpni_prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rxd_kcfg.vaddr);
+	err = prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rxd_kcfg.vaddr);
 	if (err) {
-		device_printf(dev, "dpni_prepare_key_cfg error %d\n", err);
+		device_printf(dev, "prepare_key_cfg error %d\n", err);
 		return (err);
 	}
 
@@ -2226,18 +2226,13 @@ set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags)
 }
 
 /**
- * dpni_prepare_key_cfg() - function prepare extract parameters
- * @cfg: defining a full Key Generation profile (rule)
- * @key_cfg_buf: Zeroed 256 bytes of memory before mapping it to DMA
+ * @brief Prepares extract parameters.
  *
- * This function has to be called before the following functions:
- *	- dpni_set_rx_tc_dist()
- *	- dpni_set_qos_table()
- *
- * Return:	'0' on Success; Error code otherwise.
+ * cfg:		Defining a full Key Generation profile.
+ * key_cfg_buf:	Zeroed 256 bytes of memory before mapping it to DMA.
  */
 static int
-dpni_prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
+prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 {
 	struct dpni_ext_set_rx_tc_dist *dpni_ext;
 	struct dpni_dist_extract *extr;
