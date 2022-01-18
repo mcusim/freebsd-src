@@ -1934,6 +1934,8 @@ dpni_poll_channel(void *arg, int count)
 			break;
 		}
 
+		device_printf(chan->ni_dev, "chan_id=%d: stage 1\n", chan->id);
+
 		/* Keep pointer to the first dequeue result for now. */
 		swp->vdq.store = chan->store.vaddr;
 
@@ -1946,8 +1948,11 @@ dpni_poll_channel(void *arg, int count)
 			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
 		}
-		if (error == ENOENT || store_cleaned == 0)
+		if (error == ENOENT || store_cleaned == 0) {
+			device_printf(chan->ni_dev, "chan_id=%d: stage 2\n",
+			    chan->id);
 			break;
+		}
 	} while (store_cleaned);
 
 	/* do { */

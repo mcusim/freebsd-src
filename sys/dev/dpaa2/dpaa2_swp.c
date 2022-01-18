@@ -813,7 +813,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 	cmd.rsp_addr = (uint64_t) buf;
 
 	cmd.verb |= 1 << QB_VDQCR_VERB_RLS_SHIFT;
-	cmd.verb |= 1 << QB_VDQCR_VERB_WAE_SHIFT;
+	cmd.verb |= 0 << QB_VDQCR_VERB_WAE_SHIFT;
 	cmd.verb |= 1 << QB_VDQCR_VERB_DCT_SHIFT;
 	cmd.verb |= 0 << QB_VDQCR_VERB_DT_SHIFT; /* pull from channel */
 
