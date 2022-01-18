@@ -1109,7 +1109,7 @@ exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
 	if (atomic_read(&swp->vdq.avail) == 0)
 		return (EBUSY);
 	else
-		atomic_xchg(&p->vdq.avail, 0);
+		atomic_xchg(&swp->vdq.avail, 0);
 
 	dpaa2_swp_lock(swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
