@@ -345,7 +345,7 @@ static int print_statistics(struct dpaa2_ni_softc *);
 
 static int prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
 
-static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq *);
+static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq **);
 
 /* Callbacks. */
 
@@ -1960,7 +1960,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src)
 	int rc;
 
 	do {
-		rc = chan_storage_next(chan->store, &dq);
+		rc = chan_storage_next(chan, &dq);
 		if (rc == STORE_NO_FRAME) {
 			if (retries++ >= DPAA2_SWP_BUSY_RETRIES)
 				return (ETIMEDOUT);
@@ -2126,7 +2126,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 static int
 seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 {
-	struct dpaa2_ni_buf *store = &chan->store;
+	struct dpaa2_ni_sbuf *store = &chan->store;
 	int error;
 
 	/* DMA tag for channel storage must already be created. */
@@ -2368,10 +2368,11 @@ prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 static int
 chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 {
+	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
 	int rc = STORE_NO_FRAME;
 
-	if (dpaa2_swp_has_result(s->swp, msg) == 0)
+	if (dpaa2_swp_has_result(iosc->swp, msg) == 0)
 		return (rc);
 
 	chan->store_idx++;
