@@ -571,26 +571,27 @@ int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
 int
 dpaa2_swp_has_result(struct dpaa2_swp *swp, struct dpaa2_dq *dq)
 {
-	if (dq->fdr.desc.tok != QMAN_VDQCR_TOKEN)
-		return (0);
+	if ((dq->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
+	    (dq->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
+		/* Reset token in order to detect a change next time. */
+		dq->fdr.desc.tok = 0;
 
-	/* Reset token in order to detect a change next time. */
-	dq->fdr.desc.tok = 0;
+		/*
+		 * Determine whether VDQCR is available based on whether the
+		 * current result is sitting in the first storage location of
+		 * the busy command.
+		 *
+		 * TODO: Shouldn't it be marked available when all of the frames
+		 *	 in the channel storage are consumed?
+		 */
+		if (swp->vdq.store == dq) {
+			swp->vdq.store = NULL;
+			atomic_xchg(&swp->vdq.avail, 1);
+		}
 
-	/*
-	 * Determine whether VDQCR is available based on whether the
-	 * current result is sitting in the first storage location of
-	 * the busy command.
-	 *
-	 * TODO: Shouldn't it be marked available when all of the frames in the
-	 *	 channel storage are consumed?
-	 */
-	if (swp->vdq.store == dq) {
-		swp->vdq.store = NULL;
-		atomic_xchg(&swp->vdq.avail, 1);
+		return (1);
 	}
-
-	return (1);
+	return (0);
 }
 
 /*
