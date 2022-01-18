@@ -1927,8 +1927,11 @@ dpni_poll_channel(void *arg, int count)
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
-		if (error)
+		if (error) {
+			device_printf(chan->ni_dev, "failed to pull frames from "
+			    "channel: chan_id=%d, error=%d\n", chan->id, error);
 			break;
+		}
 
 		/* Keep pointer to the first dequeue result for now. */
 		swp->vdq.store = chan->store.vaddr;
