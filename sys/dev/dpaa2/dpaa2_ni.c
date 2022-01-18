@@ -1969,6 +1969,12 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	int cleaned = 0, retries = 0;
 	int rc;
 
+	/*
+	 * Let's have a data synchronization barrier for the whole system to be
+	 * sure that QBMan's command execution result is transferred to memory.
+	 */
+	dsb(sy);
+
 	do {
 		rc = chan_storage_next(chan, &dq);
 		if (rc == STORE_NO_FRAME) {
