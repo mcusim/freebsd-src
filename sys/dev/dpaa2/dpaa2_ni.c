@@ -362,7 +362,8 @@ static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
 
-static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **);
+static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
+    uint32_t *);
 static int dpni_consume_rx(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 static int dpni_consume_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
@@ -1928,8 +1929,8 @@ dpni_poll_channel(void *arg, int count)
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
 		if (error) {
-			device_printf(chan->ni_dev, "failed to pull frames from "
-			    "channel: chan_id=%d, error=%d\n", chan->id, error);
+			device_printf(chan->ni_dev, "failed to pull frames: "
+			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
 		}
 
@@ -1939,8 +1940,13 @@ dpni_poll_channel(void *arg, int count)
 		/* Refill pool if appropriate */
 		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
 
-		store_cleaned = dpni_consume_frames(chan, &fq);
-		if (store_cleaned <= 0)
+		error = dpni_consume_frames(chan, &fq, &store_cleaned);
+		if (error > 0 && error != ENOENT) {
+			device_printf(chan->ni_dev, "failed to consume frames: "
+			    "chan_id=&d, error=%d\n", chan->id, error);
+			break;
+		}
+		if (error == ENOENT || store_cleaned == 0)
 			break;
 	} while (store_cleaned);
 
@@ -1954,7 +1960,8 @@ dpni_poll_channel(void *arg, int count)
  * @internal
  */
 static int
-dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src)
+dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
+    uint32_t *consumed)
 {
 	struct dpaa2_ni_fq *fq = NULL;
 	struct dpaa2_dq *dq;
@@ -1979,16 +1986,18 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src)
 	} while (rc != STORE_LAST_FRAME);
 
 	if (cleaned == 0)
-		return (0);
+		return (ENOENT);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
-	 * Return the frame queue as an output.
+	 * Return the frame queue and a number of consumed frames as an output.
 	 */
-	if (src)
+	if (src != NULL)
 		*src = fq;
+	if (consumed != NULL)
+		*consumed = cleaned;
 
-	return (cleaned);
+	return (0);
 }
 
 /**
