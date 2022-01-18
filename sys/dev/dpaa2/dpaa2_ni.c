@@ -172,9 +172,9 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_RXH_DEFAULT	(RXH_L3_PROTO | RXH_IP_SRC | RXH_IP_DST | \
 				 RXH_L4_B_0_1 | RXH_L4_B_2_3)
 
-#define STORE_VALID_FRAME	(0)
-#define STORE_LAST_FRAME	(1)
-#define STORE_NO_FRAME		(2)
+#define STORE_VALID_FRAME	(7500)
+#define STORE_LAST_FRAME	(7501)
+#define STORE_NO_FRAME		(7502)
 
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
@@ -1934,7 +1934,7 @@ dpni_poll_channel(void *arg, int count)
 			break;
 		}
 
-		device_printf(chan->ni_dev, "chan_id=%d: stage 1\n", chan->id);
+		/* device_printf(chan->ni_dev, "chan_id=%d: stage 1\n", chan->id); */
 
 		/* Keep pointer to the first dequeue result for now. */
 		swp->vdq.store = chan->store.vaddr;
@@ -1942,17 +1942,8 @@ dpni_poll_channel(void *arg, int count)
 		/* Refill pool if appropriate */
 		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
 
-		error = dpni_consume_frames(chan, &fq, &store_cleaned);
-		if (error > 0 && error != ENOENT) {
-			device_printf(chan->ni_dev, "failed to consume frames: "
-			    "chan_id=%d, error=%d\n", chan->id, error);
-			break;
-		}
-		if (error == ENOENT || store_cleaned == 0) {
-			device_printf(chan->ni_dev, "chan_id=%d: stage 2\n",
-			    chan->id);
-			break;
-		}
+		store_cleaned = 0;
+		dpni_consume_frames(chan, &fq, &store_cleaned);
 	} while (store_cleaned);
 
 	/* do { */
@@ -1983,8 +1974,10 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	do {
 		rc = chan_storage_next(chan, &dq);
 		if (rc == STORE_NO_FRAME) {
-			if (retries++ >= DPAA2_SWP_BUSY_RETRIES)
-				return (ETIMEDOUT);
+			if (retries++ >= DPAA2_SWP_BUSY_RETRIES) {
+				rc = ETIMEDOUT;
+				break;
+			}
 			continue;
 		}
 
@@ -1996,9 +1989,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 		retries = 0;
 	} while (rc != STORE_LAST_FRAME);
 
-	if (cleaned == 0)
-		return (ENOENT);
-
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
 	 * Return the frame queue and a number of consumed frames as an output.
@@ -2008,7 +1998,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	if (consumed != NULL)
 		*consumed = cleaned;
 
-	return (0);
+	return (rc);
 }
 
 /**
@@ -2400,9 +2390,6 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 
 	chan->store_idx++;
 
-	device_printf(chan->ni_dev, "chan_id=%d: stat=0x%x\n", chan->id,
-	    msg->fdr.desc.stat);
-
 	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
 		rc = STORE_LAST_FRAME;
 		chan->store_idx = 0;
@@ -2414,8 +2401,9 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 		rc = STORE_VALID_FRAME;
 	}
 
-	if (msg != NULL)
+	if (dq != NULL && msg != NULL)
 		*dq = msg;
+
 	return (rc);
 }
 
