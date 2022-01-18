@@ -2400,6 +2400,9 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 
 	chan->store_idx++;
 
+	device_printf(chan->ni_dev, "chan_id=%d: stat=0x%x\n", chan->id,
+	    msg->fdr.desc.stat);
+
 	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
 		rc = STORE_LAST_FRAME;
 		chan->store_idx = 0;
