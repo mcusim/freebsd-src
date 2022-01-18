@@ -160,14 +160,15 @@ static int wait_for_mgmt_response(struct dpaa2_swp *swp,
 
 /* Atomic access routines. */
 
-#define	atomic_inc_and_test(v) (atomic_add_return(1, (v)) == 0)
-#define	atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
+#define	atomic_inc_and_test(v)	(atomic_add_return(1, (v)) == 0)
+#define	atomic_dec_and_test(v)	(atomic_sub_return(1, (v)) == 0)
 
 static inline int atomic_add_return(int i, atomic_t *v);
 static inline int atomic_sub_return(int i, atomic_t *v);
 static inline int atomic_xchg(atomic_t *v, int i);
 static inline int atomic_inc(atomic_t *v);
 static inline int atomic_dec(atomic_t *v);
+static inline int atomic_read(atomic_t *v);
 
 /* Management routines. */
 
@@ -1105,10 +1106,10 @@ exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
 	if (!swp || !cmd)
 		return (EINVAL);
 
-	if (!atomic_dec_and_test(&swp->vdq.avail)) {
-		atomic_inc(&swp->vdq.avail);
+	if (atomic_read(&swp->vdq.avail) == 0)
 		return (EBUSY);
-	}
+	else
+		atomic_xchg(&p->vdq.avail, 0);
 
 	dpaa2_swp_lock(swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
@@ -1289,7 +1290,7 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 static inline int
 atomic_add_return(int i, atomic_t *v)
 {
-	return i + atomic_fetchadd_int(&v->counter, i);
+	return (i + atomic_fetchadd_int(&v->counter, i));
 }
 
 /**
@@ -1298,7 +1299,7 @@ atomic_add_return(int i, atomic_t *v)
 static inline int
 atomic_sub_return(int i, atomic_t *v)
 {
-	return atomic_fetchadd_int(&v->counter, -i) - i;
+	return (atomic_fetchadd_int(&v->counter, -i) - i);
 }
 
 /**
@@ -1316,7 +1317,7 @@ atomic_xchg(atomic_t *v, int i)
 static inline int
 atomic_inc(atomic_t *v)
 {
-	return atomic_fetchadd_int(&v->counter, 1) + 1;
+	return (atomic_fetchadd_int(&v->counter, 1) + 1);
 }
 
 /**
@@ -1325,5 +1326,14 @@ atomic_inc(atomic_t *v)
 static inline int
 atomic_dec(atomic_t *v)
 {
-	return atomic_fetchadd_int(&v->counter, -1) - 1;
+	return (atomic_fetchadd_int(&v->counter, -1) - 1);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_read(atomic_t *v)
+{
+	return (atomic_load_acq_int(&v->counter));
 }
