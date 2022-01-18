@@ -571,11 +571,8 @@ int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
 int
 dpaa2_swp_has_result(struct dpaa2_swp *swp, struct dpaa2_dq *dq)
 {
-	if (dq->fdr.desc.tok != QMAN_VDQCR_TOKEN) {
-		device_printf(swp->desc->dpio_dev, "tok=0x%x, stat=0x%x\n",
-		    dq->fdr.desc.tok, dq->fdr.desc.stat);
+	if (dq->fdr.desc.tok != QMAN_VDQCR_TOKEN)
 		return (0);
-	}
 
 	/* Reset token in order to detect a change next time. */
 	dq->fdr.desc.tok = 0;
