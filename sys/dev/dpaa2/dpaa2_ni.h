@@ -255,7 +255,7 @@ struct dpaa2_ni_fq {
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 
-	void (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
+	int (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
 	    struct dpaa2_fd *fd);
 };
 
