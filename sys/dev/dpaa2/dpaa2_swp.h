@@ -167,6 +167,15 @@
 #define DPAA2_DQRR_RESULT_BPSCN		(0x29u)
 #define DPAA2_DQRR_RESULT_CSCN_WQ	(0x2au)
 
+/* Parsing frame dequeue results */
+#define DPAA2_DQ_STAT_FQEMPTY		(0x80u) /* FQ empty */
+#define DPAA2_DQ_STAT_HELDACTIVE	(0x40u) /* FQ held active */
+#define DPAA2_DQ_STAT_FORCEELIGIBLE	(0x20u) /* FQ force eligible */
+#define DPAA2_DQ_STAT_VALIDFRAME	(0x10u) /* valid frame */
+#define DPAA2_DQ_STAT_ODPVALID		(0x04u) /* FQ ODP enable */
+#define DPAA2_DQ_STAT_VOLATILE		(0x02u) /* volatile dequeue (VDC) */
+#define DPAA2_DQ_STAT_EXPIRED		(0x01u) /* VDC is expired */
+
 /*
  * Portal flags.
  *
@@ -387,6 +396,7 @@ struct dpaa2_swp {
 	struct {
 		atomic_t	 avail;
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
+		struct dpaa2_dq *store;
 	} vdq;
 
 	struct {
@@ -426,32 +436,33 @@ struct dpaa2_swp {
 
 /* Management routines. */
 
-int	 dpaa2_swp_init_portal(struct dpaa2_swp **swp,
-	     struct dpaa2_swp_desc *desc, uint16_t flags, bool atomic);
-void	 dpaa2_swp_free_portal(struct dpaa2_swp *swp);
-void	 dpaa2_swp_lock(struct dpaa2_swp *swp, uint16_t *flags);
-void	 dpaa2_swp_unlock(struct dpaa2_swp *swp);
+int dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
+    uint16_t flags, bool atomic);
+void dpaa2_swp_free_portal(struct dpaa2_swp *swp);
+void dpaa2_swp_lock(struct dpaa2_swp *swp, uint16_t *flags);
+void dpaa2_swp_unlock(struct dpaa2_swp *swp);
 uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
-	     uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se,
-	     int dp, int de, int ep);
+    uint8_t rpm, uint8_t dcm, uint8_t epm, int sd, int sp, int se, int dp,
+    int de, int ep);
 
 /* Read/write registers of a software portal. */
 
-void	 dpaa2_swp_write_reg(struct dpaa2_swp *swp, uint32_t o, uint32_t v);
+void dpaa2_swp_write_reg(struct dpaa2_swp *swp, uint32_t o, uint32_t v);
 uint32_t dpaa2_swp_read_reg(struct dpaa2_swp *swp, uint32_t o);
 
 /* Helper routines. */
 
-void	 dpaa2_swp_set_ed_norp(struct dpaa2_eq_desc *ed, bool resp_always);
-void	 dpaa2_swp_set_ed_fq(struct dpaa2_eq_desc *ed, uint32_t fqid);
-void	 dpaa2_swp_set_intr_trigger(struct dpaa2_swp *swp, uint32_t mask);
+void dpaa2_swp_set_ed_norp(struct dpaa2_eq_desc *ed, bool resp_always);
+void dpaa2_swp_set_ed_fq(struct dpaa2_eq_desc *ed, uint32_t fqid);
+void dpaa2_swp_set_intr_trigger(struct dpaa2_swp *swp, uint32_t mask);
 uint32_t dpaa2_swp_get_intr_trigger(struct dpaa2_swp *swp);
 uint32_t dpaa2_swp_read_intr_status(struct dpaa2_swp *swp);
-void	 dpaa2_swp_clear_intr_status(struct dpaa2_swp *swp, uint32_t mask);
-void	 dpaa2_swp_set_push_dequeue(struct dpaa2_swp *swp, uint8_t chan_idx,
-	     bool en);
-int	 dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
-	     uint32_t holdoff);
+void dpaa2_swp_clear_intr_status(struct dpaa2_swp *swp, uint32_t mask);
+void dpaa2_swp_set_push_dequeue(struct dpaa2_swp *swp, uint8_t chan_idx,
+    bool en);
+int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
+    uint32_t holdoff);
+int dpaa2_swp_has_result(struct dpaa2_swp *swp, struct dpaa2_dq *dq);
 
 /* Software portal commands. */
 

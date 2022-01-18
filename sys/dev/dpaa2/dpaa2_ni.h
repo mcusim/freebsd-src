@@ -188,12 +188,21 @@ struct dpaa2_ni_attr {
 };
 
 /**
- * @brief DMA-mapped buffer (for buffer pool, channel storage, etc.).
+ * @brief DMA-mapped buffer (for buffer pool, etc.).
  */
 struct dpaa2_ni_buf {
 	bus_dmamap_t		 dmap;
 	bus_addr_t		 paddr;
 	void			*vaddr;
+};
+
+/**
+ * @brief DMA-mapped storage buffer.
+ */
+struct dpaa2_ni_sbuf {
+	bus_dmamap_t		 dmap;
+	bus_addr_t		 paddr;
+	struct dpaa2_dq		*vaddr;
 };
 
 /**
@@ -212,8 +221,10 @@ struct dpaa2_ni_channel {
 	uint32_t		 buf_num;
 	struct dpaa2_ni_buf	 buf[DPAA2_NI_BUFS_PER_CHAN];
 
-	/* Channel storage (to keep frames got by Volatile Dequeue Command). */
-	struct dpaa2_ni_buf	 storage;
+	/* Channel storage (to keep responses from Volatile Dequeue Command). */
+	struct dpaa2_ni_sbuf	 store;
+	uint32_t		 store_sz; /* in frames */
+	uint32_t		 store_idx; /* frame index */
 
 	/* Task to poll frames when CDAN is received. */
 	struct task		 poll_task;
@@ -244,8 +255,8 @@ struct dpaa2_ni_fq {
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 
-	void (*consume)(device_t dev, struct dpaa2_ni_channel *channel,
-	    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd);
+	void (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
+	    struct dpaa2_fd *fd);
 };
 
 /**
