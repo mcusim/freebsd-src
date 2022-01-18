@@ -172,6 +172,10 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_RXH_DEFAULT	(RXH_L3_PROTO | RXH_IP_SRC | RXH_IP_DST | \
 				 RXH_L4_B_0_1 | RXH_L4_B_2_3)
 
+#define STORE_VALID_FRAME	(0)
+#define STORE_LAST_FRAME	(1)
+#define STORE_NO_FRAME		(2)
+
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
 struct resource_spec dpaa2_ni_spec[] = {
@@ -338,7 +342,10 @@ static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *)
 static int calc_channels_num(struct dpaa2_ni_softc *);
 static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
 static int print_statistics(struct dpaa2_ni_softc *);
+
 static int prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
+
+static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq *);
 
 /* Callbacks. */
 
@@ -355,12 +362,13 @@ static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
 
-static void dpni_consume_tx_conf(device_t, struct dpaa2_ni_channel *,
-    struct dpaa2_ni_fq *, struct dpaa2_fd *);
-static void dpni_consume_rx(device_t, struct dpaa2_ni_channel *,
-    struct dpaa2_ni_fq *, struct dpaa2_fd *);
-static void dpni_consume_rx_err(device_t, struct dpaa2_ni_channel *,
-    struct dpaa2_ni_fq *fq, struct dpaa2_fd *);
+static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **);
+static int dpni_consume_rx(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+    struct dpaa2_fd *);
+static int dpni_consume_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+    struct dpaa2_fd *);
+static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+    struct dpaa2_fd *);
 
 /* ISRs */
 
@@ -1910,41 +1918,107 @@ static void
 dpni_poll_channel(void *arg, int count)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
+	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
+	struct dpaa2_swp *swp = iosc->swp;
+	struct dpaa2_ni_fq *fq;
+	int store_cleaned;
+	int error;
 
-	printf("%s: chan_id=%d, count=%d\n", __func__, chan->id, count);
+	do {
+		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
+		    ETH_STORE_FRAMES);
+		if (error)
+			break;
+
+		/* Keep pointer to the first dequeue result for now. */
+		swp->vdq.store = chan->store.vaddr;
+
+		/* Refill pool if appropriate */
+		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
+
+		store_cleaned = dpni_consume_frames(chan, &fq);
+		if (store_cleaned <= 0)
+			break;
+	} while (store_cleaned);
+
+	/* do { */
+	/* 	err = dpaa2_io_service_rearm(ch->dpio, &ch->nctx); */
+	/* 	cpu_relax(); */
+	/* } while (err == -EBUSY && retries++ < DPAA2_ETH_SWP_BUSY_RETRIES); */
 }
 
 /**
  * @internal
  */
-static void
-dpni_consume_tx_conf(device_t dev, struct dpaa2_ni_channel *chan,
-    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
+static int
+dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src)
 {
-	/* TBD */
-	device_printf(dev, "invoked\n");
+	struct dpaa2_ni_fq *fq = NULL;
+	struct dpaa2_dq *dq;
+	struct dpaa2_fd *fd;
+	int cleaned = 0, retries = 0;
+	int rc;
+
+	do {
+		rc = chan_storage_next(chan->store, &dq);
+		if (rc == STORE_NO_FRAME) {
+			if (retries++ >= DPAA2_SWP_BUSY_RETRIES)
+				return (ETIMEDOUT);
+			continue;
+		}
+
+		fd = &dq->fdr.fd;
+		fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
+		fq->consume(chan, fq, fd);
+
+		cleaned++;
+		retries = 0;
+	} while (rc != STORE_LAST_FRAME);
+
+	if (cleaned == 0)
+		return (0);
+
+	/*
+	 * A dequeue operation pulls frames from a single queue into the store.
+	 * Return the frame queue as an output.
+	 */
+	if (src)
+		*src = fq;
+
+	return (cleaned);
 }
 
 /**
  * @internal
  */
-static void
-dpni_consume_rx(device_t dev, struct dpaa2_ni_channel *chan,
-    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
+static int
+dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+    struct dpaa2_fd *fd)
 {
-	/* TBD */
-	device_printf(dev, "invoked\n");
+	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
+	return (0);
 }
 
 /**
  * @internal
  */
-static void
-dpni_consume_rx_err(device_t dev, struct dpaa2_ni_channel *chan,
-    struct dpaa2_ni_fq *fq, struct dpaa2_fd *fd)
+static int
+dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+    struct dpaa2_fd *fd)
 {
-	/* TBD */
-	device_printf(dev, "invoked\n");
+	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
+	return (0);
+}
+
+/**
+ * @internal
+ */
+static int
+dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+    struct dpaa2_fd *fd)
+{
+	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
+	return (0);
 }
 
 /**
@@ -2052,27 +2126,30 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 static int
 seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 {
-	struct dpaa2_ni_buf *storage = &chan->storage;
+	struct dpaa2_ni_buf *store = &chan->store;
 	int error;
 
 	/* DMA tag for channel storage must already be created. */
 	if (sc->st_dmat == NULL)
 		return (ENXIO);
 
-	error = bus_dmamem_alloc(sc->st_dmat, &storage->vaddr,
-	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &storage->dmap);
+	error = bus_dmamem_alloc(sc->st_dmat, (void *) &store->vaddr,
+	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &store->dmap);
 	if (error) {
 		device_printf(sc->dev, "Failed to allocate channel storage\n");
 		return (error);
 	}
 
-	error = bus_dmamap_load(sc->st_dmat, storage->dmap, storage->vaddr,
-	    ETH_STORE_SIZE, dpni_single_seg_dmamap_cb, &storage->paddr,
+	error = bus_dmamap_load(sc->st_dmat, store->dmap, (void *) store->vaddr,
+	    ETH_STORE_SIZE, dpni_single_seg_dmamap_cb, &store->paddr,
 	    BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(sc->dev, "Failed to map channel storage\n");
 		return (error);
 	}
+
+	chan->store_sz = ETH_STORE_FRAMES;
+	chan->store_idx = 0;
 
 	return (0);
 }
@@ -2282,7 +2359,37 @@ prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 		}
 	}
 
-	return 0;
+	return (0);
+}
+
+/**
+ * @brief Obtain the next dequeue response from the channel storage.
+ */
+static int
+chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
+{
+	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
+	int rc = STORE_NO_FRAME;
+
+	if (dpaa2_swp_has_result(s->swp, msg) == 0)
+		return (rc);
+
+	chan->store_idx++;
+
+	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
+		rc = STORE_LAST_FRAME;
+		chan->store_idx = 0;
+		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
+			rc = STORE_NO_FRAME;
+			msg = NULL;
+		}
+	} else {
+		rc = STORE_VALID_FRAME;
+	}
+
+	if (msg != NULL)
+		*dq = msg;
+	return (rc);
 }
 
 static device_method_t dpaa2_ni_methods[] = {
