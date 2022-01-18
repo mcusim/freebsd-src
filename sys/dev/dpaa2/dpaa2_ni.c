@@ -1943,7 +1943,7 @@ dpni_poll_channel(void *arg, int count)
 		error = dpni_consume_frames(chan, &fq, &store_cleaned);
 		if (error > 0 && error != ENOENT) {
 			device_printf(chan->ni_dev, "failed to consume frames: "
-			    "chan_id=&d, error=%d\n", chan->id, error);
+			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
 		}
 		if (error == ENOENT || store_cleaned == 0)
