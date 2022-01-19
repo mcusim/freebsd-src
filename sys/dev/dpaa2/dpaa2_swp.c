@@ -205,7 +205,6 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	/* Volatile Dequeue Command configuration. */
 	atomic_xchg(&p->vdq.avail, 1);
 	p->vdq.valid_bit = DPAA2_SWP_VALID_BIT;
-	p->vdq.store = NULL;
 
 	/* Dequeue Response Ring configuration */
 	p->dqrr.next_idx = 0;
@@ -591,11 +590,8 @@ dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
 
 	error = exec_mgmt_command(swp, (struct dpaa2_swp_cmd *) &cmd,
 	    (struct dpaa2_swp_rsp *) &rsp, CMDID_SWP_WQCHAN_CONFIGURE);
-	if (error) {
-		device_printf(swp->desc->dpio_dev, "WQ channel configuration "
-		    "failed: error=%d\n", error);
-		return (EIO);
-	}
+	if (error)
+		return (error);
 
 	if (rsp.result != QBMAN_CMD_RC_OK) {
 		device_printf(swp->desc->dpio_dev, "WQ channel configuration "
@@ -780,13 +776,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 		cpu_spinwait();
 	} while (error == EBUSY && dequeues < DPAA2_SWP_BUSY_RETRIES);
 
-	if (error) {
-		device_printf(swp->desc->dpio_dev, "volatile dequeue command "
-		    "failed\n");
-		return (error);
-	}
-
-	return (0);
+	return (error);
 }
 
 /*
@@ -1193,11 +1183,13 @@ send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 static int
 wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 {
-	const uint32_t attempts = swp->cfg.atomic ? CMD_SPIN_ATTEMPTS
+	const uint32_t attempts = swp->cfg.atomic
+	    ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
 	struct resource_map *map = swp->cena_map;
 	/* Management command response to be read from the only RR or RR0/RR1. */
-	const uint32_t offset = swp->cfg.mem_backed ? DPAA2_SWP_CENA_RR_MEM
+	const uint32_t offset = swp->cfg.mem_backed
+	    ? DPAA2_SWP_CENA_RR_MEM
 	    : DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
 	uint32_t i;
 	uint8_t verb;
@@ -1207,7 +1199,7 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 	 * Let's have a data synchronization barrier for the whole system to be
 	 * sure that QBMan's command execution result is transferred to memory.
 	 */
-	dsb(sy);
+	dsb(osh);
 
 	/* Wait for a command response from QBMan. */
 	for (i = 1; i <= attempts; i++) {
