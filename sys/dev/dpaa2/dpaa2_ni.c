@@ -2446,7 +2446,6 @@ prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 static int
 chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 {
-	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
 	int rc = EAGAIN;
 
