@@ -1918,7 +1918,8 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
-	int error, consumed;
+	int retries = 0, consumed = 0;
+	int error;
 
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
@@ -1938,9 +1939,14 @@ dpni_poll_channel(void *arg, int count)
 		dpni_consume_frames(chan, &fq, &consumed);
 	} while (consumed > 0);
 
-	error = dpaa2_swp_conf_wq_channel(swp, chan->id,
-	    DPAA2_WQCHAN_WE_EN, true, 0);
-	if (error)
+	do {
+		error = dpaa2_swp_conf_wq_channel(swp, chan->id,
+		    DPAA2_WQCHAN_WE_EN, true, 0);
+		retries++;
+		cpu_spinwait();
+	} while (error == EIO && retries < DPAA2_SWP_BUSY_RETRIES);
+
+	if (error && error != EIO)
 		device_printf(chan->ni_dev, "failed to re-arm channel: "
 		    "chan_id=%d, error=%d\n", chan->id, error);
 }
