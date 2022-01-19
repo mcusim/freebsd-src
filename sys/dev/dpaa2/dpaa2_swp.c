@@ -95,17 +95,11 @@ __FBSDID("$FreeBSD$");
 #define QB_SDQCR_SRC_SHIFT		0u
 #define QB_SDQCR_SRC_MASK		0xFFFFu
 
-/* Opaque token for static dequeues. */
-#define QMAN_SDQCR_TOKEN		0xBBu
-
 /* Shifts in the VERB byte of the volatile dequeue command. */
 #define QB_VDQCR_VERB_DCT_SHIFT		0
 #define QB_VDQCR_VERB_DT_SHIFT		2
 #define QB_VDQCR_VERB_RLS_SHIFT		4
 #define QB_VDQCR_VERB_WAE_SHIFT		5
-
-/* Opaque token for static dequeues. */
-#define QMAN_VDQCR_TOKEN		0xCCu
 
 /* Maximum timeout period for the DQRR interrupt. */
 #define DQRR_MAX_ITP			4096u
@@ -218,7 +212,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	p->sdq = 0;
 	p->sdq |= qbman_sdqcr_dct_prio_ics << QB_SDQCR_DCT_SHIFT;
 	p->sdq |= qbman_sdqcr_fc_up_to_3 << QB_SDQCR_FC_SHIFT;
-	p->sdq |= QMAN_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
+	p->sdq |= DPAA2_SWP_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
 
 	/* Volatile Dequeue Command configuration. */
 	atomic_xchg(&p->vdq.avail, 1);
@@ -568,32 +562,6 @@ int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
 	return 0;
 }
 
-int
-dpaa2_swp_has_result(struct dpaa2_swp *swp, struct dpaa2_dq *dq)
-{
-	if ((dq->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
-	    (dq->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
-		/* Reset token in order to detect a change next time. */
-		dq->fdr.desc.tok = 0;
-
-		/*
-		 * Determine whether VDQCR is available based on whether the
-		 * current result is sitting in the first storage location of
-		 * the busy command.
-		 *
-		 * TODO: Shouldn't it be marked available when all of the frames
-		 *	 in the channel storage are consumed?
-		 */
-		if (swp->vdq.store == dq) {
-			swp->vdq.store = NULL;
-			atomic_xchg(&swp->vdq.avail, 1);
-		}
-
-		return (1);
-	}
-	return (0);
-}
-
 /*
  * Software portal commands.
  */
@@ -808,7 +776,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 		return (EINVAL);
 
 	cmd.numf = frames_n - 1;
-	cmd.tok = QMAN_VDQCR_TOKEN;
+	cmd.tok = DPAA2_SWP_VDQCR_TOKEN;
 	cmd.dq_src = chan_id;
 	cmd.rsp_addr = (uint64_t) buf;
 

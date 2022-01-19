@@ -172,10 +172,6 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_RXH_DEFAULT	(RXH_L3_PROTO | RXH_IP_SRC | RXH_IP_DST | \
 				 RXH_L4_B_0_1 | RXH_L4_B_2_3)
 
-#define STORE_VALID_FRAME	(7500)
-#define STORE_LAST_FRAME	(7501)
-#define STORE_NO_FRAME		(7502)
-
 MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 
 struct resource_spec dpaa2_ni_spec[] = {
@@ -1922,8 +1918,7 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
-	int store_cleaned;
-	int error;
+	int error, consumed;
 
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
@@ -1934,17 +1929,18 @@ dpni_poll_channel(void *arg, int count)
 			break;
 		}
 
-		/* device_printf(chan->ni_dev, "chan_id=%d: stage 1\n", chan->id); */
-
 		/* Keep pointer to the first dequeue result for now. */
 		swp->vdq.store = chan->store.vaddr;
 
 		/* Refill pool if appropriate */
 		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
 
-		store_cleaned = 0;
-		dpni_consume_frames(chan, &fq, &store_cleaned);
-	} while (store_cleaned);
+		error = dpni_consume_frames(chan, &fq, &consumed);
+		if (error != EALREADY) {
+			device_printf(chan->ni_dev, "failed to consume frames: "
+			    "chan_id=%d, error=%d\n", chan->id, error);
+		}
+	} while (consumed > 0);
 
 	/* do { */
 	/* 	err = dpaa2_io_service_rearm(ch->dpio, &ch->nctx); */
@@ -1962,7 +1958,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	struct dpaa2_ni_fq *fq = NULL;
 	struct dpaa2_dq *dq;
 	struct dpaa2_fd *fd;
-	int cleaned = 0, retries = 0;
+	int frames = 0, retries = 0;
 	int rc;
 
 	/*
@@ -1973,21 +1969,30 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 
 	do {
 		rc = chan_storage_next(chan, &dq);
-		if (rc == STORE_NO_FRAME) {
-			if (retries++ >= DPAA2_SWP_BUSY_RETRIES) {
+		if (rc == EAGAIN) {
+			if (retries >= DPAA2_SWP_BUSY_RETRIES) {
 				rc = ETIMEDOUT;
 				break;
 			}
+			retries++;
 			continue;
+		} else if (rc == EINPROGRESS) {
+			fd = &dq->fdr.fd;
+			fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
+			fq->consume(chan, fq, fd);
+			frames++;
+		} else if (rc == EALREADY) {
+			/* Last frame */
+			fd = &dq->fdr.fd;
+			fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
+			fq->consume(chan, fq, fd);
+			frames++;
+			break;
+		} else {
+			break;
 		}
-
-		fd = &dq->fdr.fd;
-		fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
-		fq->consume(chan, fq, fd);
-
-		cleaned++;
 		retries = 0;
-	} while (rc != STORE_LAST_FRAME);
+	} while (rc == EINPROGRESS);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -1996,7 +2001,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	if (src != NULL)
 		*src = fq;
 	if (consumed != NULL)
-		*consumed = cleaned;
+		*consumed = frames;
 
 	return (rc);
 }
@@ -2383,25 +2388,44 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 {
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
-	int rc = STORE_NO_FRAME;
+	int rc = EAGAIN;
 
-	if (dpaa2_swp_has_result(iosc->swp, msg) == 0)
-		return (rc);
+	if ((dq->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
+	    (dq->fdr.desc.tok == DPAA2_SWP_VDQCR_TOKEN)) {
+		/* Reset token in order to detect a change next time. */
+		dq->fdr.desc.tok = 0;
 
-	chan->store_idx++;
-
-	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
-		rc = STORE_LAST_FRAME;
-		chan->store_idx = 0;
-		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
-			rc = STORE_NO_FRAME;
-			msg = NULL;
+		/*
+		 * Determine whether VDQCR is available based on whether the
+		 * current result is sitting in the first storage location of
+		 * the busy command.
+		 *
+		 * TODO: Shouldn't it be marked available when all of the frames
+		 *	 in the channel storage are consumed?
+		 */
+		if (swp->vdq.store == dq) {
+			swp->vdq.store = NULL;
+			atomic_xchg(&swp->vdq.avail, 1);
 		}
 	} else {
-		rc = STORE_VALID_FRAME;
+		/* Dequeue response is not available yet. */
+		return (rc);
 	}
 
-	if (dq != NULL && msg != NULL)
+	chan->store_idx++;
+	rc = EINPROGRESS;
+
+	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
+		rc = EALREADY;
+		chan->store_idx = 0;
+		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
+			/* No frame delivered, i.e. null response */
+			rc = ENOENT;
+			msg = NULL;
+		}
+	}
+
+	if (dq != NULL)
 		*dq = msg;
 
 	return (rc);
