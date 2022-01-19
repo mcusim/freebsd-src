@@ -1935,17 +1935,14 @@ dpni_poll_channel(void *arg, int count)
 		/* Refill pool if appropriate */
 		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
 
-		error = dpni_consume_frames(chan, &fq, &consumed);
-		if (error != EALREADY) {
-			device_printf(chan->ni_dev, "failed to consume frames: "
-			    "chan_id=%d, error=%d\n", chan->id, error);
-		}
+		dpni_consume_frames(chan, &fq, &consumed);
 	} while (consumed > 0);
 
-	/* do { */
-	/* 	err = dpaa2_io_service_rearm(ch->dpio, &ch->nctx); */
-	/* 	cpu_relax(); */
-	/* } while (err == -EBUSY && retries++ < DPAA2_ETH_SWP_BUSY_RETRIES); */
+	error = dpaa2_swp_conf_wq_channel(swp, chan->id,
+	    DPAA2_WQCHAN_WE_EN, true, 0);
+	if (error)
+		device_printf(chan->ni_dev, "failed to re-arm channel: "
+		    "chan_id=%d, error=%d\n", chan->id, error);
 }
 
 /**

@@ -152,7 +152,7 @@
 #define DPAA2_SWP_INTR_VDCI		0x20
 
 /* "Write Enable" bitmask for a command to configure SWP WQ Channel.*/
-#define DPAA2_WQCHAN_WE_EN		(0x1u)
+#define DPAA2_WQCHAN_WE_EN		(0x1u) /* Enable CDAN generation */
 #define DPAA2_WQCHAN_WE_ICD		(0x2u) /* Interrupt Coalescing Disable */
 #define DPAA2_WQCHAN_WE_CTX		(0x4u)
 
