@@ -1918,7 +1918,7 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
-	int retries = 0, consumed = 0;
+	int consumed = 0;
 	int error;
 
 	do {
