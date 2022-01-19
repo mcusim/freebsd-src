@@ -483,14 +483,58 @@ int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 
 /* Atomic access routines. */
 
-#define	atomic_inc_and_test(v)	(atomic_add_return(1, (v)) == 0)
-#define	atomic_dec_and_test(v)	(atomic_sub_return(1, (v)) == 0)
+/**
+ * @internal
+ */
+static inline int
+atomic_add_return(int i, atomic_t *v)
+{
+	return (i + atomic_fetchadd_int(&v->counter, i));
+}
 
-inline int atomic_add_return(int i, atomic_t *v);
-inline int atomic_sub_return(int i, atomic_t *v);
-inline int atomic_xchg(atomic_t *v, int i);
-inline int atomic_inc(atomic_t *v);
-inline int atomic_dec(atomic_t *v);
-inline int atomic_read(atomic_t *v);
+/**
+ * @internal
+ */
+static inline int
+atomic_sub_return(int i, atomic_t *v)
+{
+	return (atomic_fetchadd_int(&v->counter, -i) - i);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_xchg(atomic_t *v, int i)
+{
+	return (atomic_swap_int(&v->counter, i));
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_inc(atomic_t *v)
+{
+	return (atomic_fetchadd_int(&v->counter, 1) + 1);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_dec(atomic_t *v)
+{
+	return (atomic_fetchadd_int(&v->counter, -1) - 1);
+}
+
+/**
+ * @internal
+ */
+static inline int
+atomic_read(atomic_t *v)
+{
+	return (atomic_load_acq_int(&v->counter));
+}
 
 #endif /* _DPAA2_SWP_H */
