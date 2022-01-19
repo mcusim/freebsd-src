@@ -2016,7 +2016,6 @@ static int
 dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
 	return (0);
 }
 
@@ -2027,7 +2026,6 @@ static int
 dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
 	return (0);
 }
 
@@ -2038,7 +2036,6 @@ static int
 dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	device_printf(chan->ni_dev, "%s: invoked\n", __func__);
 	return (0);
 }
 
