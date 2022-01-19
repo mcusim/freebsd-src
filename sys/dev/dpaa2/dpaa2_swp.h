@@ -193,6 +193,11 @@
 #define DPAA2_SWP_STAT_EINVAL		0xFE	/* Invalid argument */
 #define DPAA2_SWP_STAT_ERR		0xFF	/* General error */
 
+/* Opaque token for static dequeues. */
+#define DPAA2_SWP_SDQCR_TOKEN		0xBBu
+/* Opaque token for static dequeues. */
+#define DPAA2_SWP_VDQCR_TOKEN		0xCCu
+
 /*
  * Public types.
  */
@@ -462,7 +467,6 @@ void dpaa2_swp_set_push_dequeue(struct dpaa2_swp *swp, uint8_t chan_idx,
     bool en);
 int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
     uint32_t holdoff);
-int dpaa2_swp_has_result(struct dpaa2_swp *swp, struct dpaa2_dq *dq);
 
 /* Software portal commands. */
 
