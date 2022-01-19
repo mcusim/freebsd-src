@@ -1918,10 +1918,13 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
-	int consumed = 0;
+	int consumed = 0, attempts = 0;
 	int error;
 
 	do {
+		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
+		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
 		if (error) {
@@ -1930,20 +1933,24 @@ dpni_poll_channel(void *arg, int count)
 			break;
 		}
 
-		/* Keep pointer to the first dequeue result for now. */
-		swp->vdq.store = chan->store.vaddr;
+		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
-		/* Refill pool if appropriate */
-		/* dpaa2_eth_refill_pool(priv, ch, priv->bpid); */
+		error = dpni_consume_frames(chan, &fq, &consumed);
+		if (error == ENOENT || error == ETIMEDOUT)
+			break;
+	} while (true);
 
-		dpni_consume_frames(chan, &fq, &consumed);
-	} while (consumed > 0);
+	/* Make VDQC available again. */
+	atomic_xchg(&swp->vdq.avail, 1);
 
-	error = dpaa2_swp_conf_wq_channel(swp, chan->id, DPAA2_WQCHAN_WE_EN,
-	    true, 0);
-	if (error)
-		device_printf(chan->ni_dev, "failed to re-arm channel: "
-		    "chan_id=%d, error=%d\n", chan->id, error);
+	/* Re-arm channel to generate CDAN. */
+	do {
+		error = dpaa2_swp_conf_wq_channel(swp, chan->id,
+		    DPAA2_WQCHAN_WE_EN, true, 0);
+		attempts++;
+		cpu_spinwait();
+	} while (error = ETIMEDOUT && attempts < 5);
 }
 
 /**
@@ -1963,7 +1970,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	 * Let's have a data synchronization barrier for the whole system to be
 	 * sure that QBMan's command execution result is transferred to memory.
 	 */
-	dsb(sy);
+	dsb(osh);
 
 	do {
 		rc = chan_storage_next(chan, &dq);
@@ -1975,22 +1982,25 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 			retries++;
 			continue;
 		} else if (rc == EINPROGRESS) {
-			fd = &dq->fdr.fd;
-			fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
-			fq->consume(chan, fq, fd);
-			frames++;
-		} else if (rc == EALREADY) {
-			/* Last frame */
-			fd = &dq->fdr.fd;
-			fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
-			fq->consume(chan, fq, fd);
-			frames++;
+			if (dq != NULL) {
+				fd = &dq->fdr.fd;
+				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
+				fq->consume(chan, fq, fd);
+				frames++;
+			}
+		} else if (rc == EALREADY || rc == ENOENT) {
+			if (dq != NULL) {
+				fd = &dq->fdr.fd;
+				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
+				fq->consume(chan, fq, fd);
+				frames++;
+			}
 			break;
 		} else {
 			break;
 		}
 		retries = 0;
-	} while (rc == EINPROGRESS);
+	} while (true);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -2441,39 +2451,22 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 	int rc = EAGAIN;
 
 	if ((msg->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
-	    (msg->fdr.desc.tok == DPAA2_SWP_VDQCR_TOKEN)) {
-		/* Reset token in order to detect a change next time. */
-		msg->fdr.desc.tok = 0;
+	    (msg->fdr.desc.tok == DPAA2_SWP_VDQCR_TOKEN))
+		msg->fdr.desc.tok = 0; /* Reset tokent. */
+	else
+		return (rc); /* DQ response is not available yet. */
 
-		/*
-		 * Determine whether VDQCR is available based on whether the
-		 * current result is sitting in the first storage location of
-		 * the busy command.
-		 *
-		 * TODO: Shouldn't it be marked available when all of the frames
-		 *	 in the channel storage are consumed?
-		 */
-		if (swp->vdq.store == msg) {
-			swp->vdq.store = NULL;
-			atomic_xchg(&swp->vdq.avail, 1);
-		}
-	} else {
-		/* Dequeue response is not available yet. */
-		return (rc);
-	}
-
-	chan->store_idx++;
 	rc = EINPROGRESS;
+	chan->store_idx++;
 
 	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
-		rc = EALREADY;
+		rc = EALREADY; /* FQ is empty or all frames obtained */
 		chan->store_idx = 0;
-		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME)) {
-			/* No frame delivered, i.e. null response */
-			rc = ENOENT;
-			msg = NULL;
-		}
+		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME))
+			msg = NULL; /* Null response, FD is invalid */
 	}
+	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_FQEMPTY)
+		rc = ENOENT; /* FQ is empty */
 
 	if (dq != NULL)
 		*dq = msg;

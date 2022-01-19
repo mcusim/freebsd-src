@@ -403,7 +403,6 @@ struct dpaa2_swp {
 	struct {
 		atomic_t	 avail;
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
-		struct dpaa2_dq *store;
 	} vdq;
 
 	struct {
