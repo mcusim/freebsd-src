@@ -1939,14 +1939,9 @@ dpni_poll_channel(void *arg, int count)
 		dpni_consume_frames(chan, &fq, &consumed);
 	} while (consumed > 0);
 
-	do {
-		error = dpaa2_swp_conf_wq_channel(swp, chan->id,
-		    DPAA2_WQCHAN_WE_EN, true, 0);
-		retries++;
-		cpu_spinwait();
-	} while (error == EIO && retries < DPAA2_SWP_BUSY_RETRIES);
-
-	if (error && error != EIO)
+	error = dpaa2_swp_conf_wq_channel(swp, chan->id, DPAA2_WQCHAN_WE_EN,
+	    true, 0);
+	if (error)
 		device_printf(chan->ni_dev, "failed to re-arm channel: "
 		    "chan_id=%d, error=%d\n", chan->id, error);
 }
