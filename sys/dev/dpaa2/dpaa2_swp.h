@@ -31,6 +31,8 @@
 
 #include <sys/bus.h>
 
+#include <machine/atomic.h>
+
 /*
  * QBMan software portal helper routines.
  */
@@ -478,5 +480,17 @@ int dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
     uint32_t *idx);
 int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
     uint32_t frames_n);
+
+/* Atomic access routines. */
+
+#define	atomic_inc_and_test(v)	(atomic_add_return(1, (v)) == 0)
+#define	atomic_dec_and_test(v)	(atomic_sub_return(1, (v)) == 0)
+
+static inline int atomic_add_return(int i, atomic_t *v);
+static inline int atomic_sub_return(int i, atomic_t *v);
+static inline int atomic_xchg(atomic_t *v, int i);
+static inline int atomic_inc(atomic_t *v);
+static inline int atomic_dec(atomic_t *v);
+static inline int atomic_read(atomic_t *v);
 
 #endif /* _DPAA2_SWP_H */

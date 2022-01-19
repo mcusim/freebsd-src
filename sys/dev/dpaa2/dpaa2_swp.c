@@ -152,18 +152,6 @@ static int send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 static int wait_for_mgmt_response(struct dpaa2_swp *swp,
     struct dpaa2_swp_rsp *rsp);
 
-/* Atomic access routines. */
-
-#define	atomic_inc_and_test(v)	(atomic_add_return(1, (v)) == 0)
-#define	atomic_dec_and_test(v)	(atomic_sub_return(1, (v)) == 0)
-
-static inline int atomic_add_return(int i, atomic_t *v);
-static inline int atomic_sub_return(int i, atomic_t *v);
-static inline int atomic_xchg(atomic_t *v, int i);
-static inline int atomic_inc(atomic_t *v);
-static inline int atomic_dec(atomic_t *v);
-static inline int atomic_read(atomic_t *v);
-
 /* Management routines. */
 
 int
