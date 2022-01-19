@@ -2404,7 +2404,7 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 		 * TODO: Shouldn't it be marked available when all of the frames
 		 *	 in the channel storage are consumed?
 		 */
-		if (swp->vdq.store == dq) {
+		if (swp->vdq.store == msg) {
 			swp->vdq.store = NULL;
 			atomic_xchg(&swp->vdq.avail, 1);
 		}
