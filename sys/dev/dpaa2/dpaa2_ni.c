@@ -1915,6 +1915,7 @@ static void
 dpni_poll_channel(void *arg, int count)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
@@ -1950,7 +1951,7 @@ dpni_poll_channel(void *arg, int count)
 		    DPAA2_WQCHAN_WE_EN, true, 0);
 		attempts++;
 		cpu_spinwait();
-	} while (error = ETIMEDOUT && attempts < 5);
+	} while (error == ETIMEDOUT && attempts < 5);
 }
 
 /**
@@ -2447,7 +2448,6 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 {
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
-	struct dpaa2_swp *swp = iosc->swp;
 	int rc = EAGAIN;
 
 	if ((msg->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
