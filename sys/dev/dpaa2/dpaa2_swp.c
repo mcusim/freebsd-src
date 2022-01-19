@@ -1244,7 +1244,7 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_add_return(int i, atomic_t *v)
 {
 	return (i + atomic_fetchadd_int(&v->counter, i));
@@ -1253,7 +1253,7 @@ atomic_add_return(int i, atomic_t *v)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_sub_return(int i, atomic_t *v)
 {
 	return (atomic_fetchadd_int(&v->counter, -i) - i);
@@ -1262,7 +1262,7 @@ atomic_sub_return(int i, atomic_t *v)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_xchg(atomic_t *v, int i)
 {
 	return (atomic_swap_int(&v->counter, i));
@@ -1271,7 +1271,7 @@ atomic_xchg(atomic_t *v, int i)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_inc(atomic_t *v)
 {
 	return (atomic_fetchadd_int(&v->counter, 1) + 1);
@@ -1280,7 +1280,7 @@ atomic_inc(atomic_t *v)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_dec(atomic_t *v)
 {
 	return (atomic_fetchadd_int(&v->counter, -1) - 1);
@@ -1289,7 +1289,7 @@ atomic_dec(atomic_t *v)
 /**
  * @internal
  */
-static inline int
+inline int
 atomic_read(atomic_t *v)
 {
 	return (atomic_load_acq_int(&v->counter));
