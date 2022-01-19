@@ -2011,6 +2011,22 @@ static int
 dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
+	device_t bp_dev;
+	struct dpaa2_bp_softc *bpsc;
+	bus_addr_t paddr = (bus_addr_t) fd->addr;
+
+	/* There's only one buffer pool for now. */
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bpsc = device_get_softc(bp_dev);
+
+	/* Release buffer to QBMan buffer pool. */
+	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
+	if (error) {
+		device_printf(sc->dev, "failed to release frame buffer to the "
+		    "pool: error=%d\n", error);
+		return (error);
+	}
+
 	return (0);
 }
 
@@ -2021,6 +2037,22 @@ static int
 dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
+	device_t bp_dev;
+	struct dpaa2_bp_softc *bpsc;
+	bus_addr_t paddr = (bus_addr_t) fd->addr;
+
+	/* There's only one buffer pool for now. */
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bpsc = device_get_softc(bp_dev);
+
+	/* Release buffer to QBMan buffer pool. */
+	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
+	if (error) {
+		device_printf(sc->dev, "failed to release frame buffer to the "
+		    "pool: error=%d\n", error);
+		return (error);
+	}
+
 	return (0);
 }
 
@@ -2031,6 +2063,22 @@ static int
 dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
+	device_t bp_dev;
+	struct dpaa2_bp_softc *bpsc;
+	bus_addr_t paddr = (bus_addr_t) fd->addr;
+
+	/* There's only one buffer pool for now. */
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bpsc = device_get_softc(bp_dev);
+
+	/* Release buffer to QBMan buffer pool. */
+	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
+	if (error) {
+		device_printf(sc->dev, "failed to release frame buffer to the "
+		    "pool: error=%d\n", error);
+		return (error);
+	}
+
 	return (0);
 }
 
