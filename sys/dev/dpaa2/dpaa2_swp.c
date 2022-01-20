@@ -1212,7 +1212,7 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		} else {
 			verb = bus_read_1(map, offset);
-			if (!(verb & ~DPAA2_SWP_VALID_BIT))
+			if (swp->mc.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
 			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		}
