@@ -418,7 +418,7 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_dq dq;
 	uint32_t idx, status;
 	uint16_t flags;
-	int cnt = -1;
+	int cnt = 0;
 
 	dpaa2_swp_lock(sc->swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
@@ -429,11 +429,11 @@ dpio_msi_intr(void *arg)
 
 	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
 	if (status == 0u) {
-		dpaa2_swp_unlock(swp);
+		dpaa2_swp_unlock(sc->swp);
 		return;
 	}
 
-	while (cnt < DPIO_POLL_MAX &&
+	while (cnt <= DPIO_POLL_MAX &&
 	    dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
@@ -450,7 +450,7 @@ dpio_msi_intr(void *arg)
 	dpaa2_swp_clear_intr_status(sc->swp, status);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 
-	dpaa2_swp_unlock(swp);
+	dpaa2_swp_unlock(sc->swp);
 }
 
 static device_method_t dpaa2_io_methods[] = {
