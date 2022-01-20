@@ -1938,8 +1938,13 @@ dpni_poll_channel(void *arg, int count)
 		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 		error = dpni_consume_frames(chan, &fq, &consumed);
-		if (error == ENOENT || error == ETIMEDOUT)
+		if (error == ENOENT)
 			break;
+		if (error == ETIMEDOUT) {
+			device_printf(chan->ni_dev, "timeout to consume frames: "
+			    "chan_id=%d\n", chan->id);
+			break;
+		}
 	} while (true);
 
 	/* Make VDQC available again. */
@@ -1952,6 +1957,12 @@ dpni_poll_channel(void *arg, int count)
 		attempts++;
 		cpu_spinwait();
 	} while (error == ETIMEDOUT && attempts < 5);
+
+	if (error) {
+		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d\n",
+		    chan->id);
+		break;
+	}
 }
 
 /**
