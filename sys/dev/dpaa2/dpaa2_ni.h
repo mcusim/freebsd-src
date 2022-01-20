@@ -62,7 +62,7 @@
     DPAA2_NI_MAX_RXEQ)
 
 /* Maximum number of buffers allocated per channel. */
-#define DPAA2_NI_BUFS_PER_CHAN	(50 * DPAA2_SWP_BUFS_PER_CMD)
+#define DPAA2_NI_BUFS_PER_CHAN	(5 * DPAA2_SWP_BUFS_PER_CMD)
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
