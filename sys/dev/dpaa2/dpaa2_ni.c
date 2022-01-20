@@ -1959,8 +1959,8 @@ dpni_poll_channel(void *arg, int count)
 		    "error=%d\n", chan->id, error);
 
 		/* An attempt to re-arm channel one second from now. */
-		callout_reset(&chan->rearm_callout, hz, dpni_rearm_channel,
-		    chan);
+		/* callout_reset(&chan->rearm_callout, hz, dpni_rearm_channel, */
+		/*     chan); */
 	}
 }
 
