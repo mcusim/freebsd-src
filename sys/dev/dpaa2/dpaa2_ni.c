@@ -1958,11 +1958,9 @@ dpni_poll_channel(void *arg, int count)
 		cpu_spinwait();
 	} while (error == ETIMEDOUT && attempts < 5);
 
-	if (error) {
+	if (error)
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d\n",
 		    chan->id);
-		break;
-	}
 }
 
 /**
