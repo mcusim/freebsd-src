@@ -1956,11 +1956,14 @@ dpni_poll_channel(void *arg, int count)
 		    DPAA2_WQCHAN_WE_EN, true, 0);
 		attempts++;
 		cpu_spinwait();
-	} while (error == ETIMEDOUT && attempts < 5);
+	} while (error == ETIMEDOUT && attempts < DPAA2_SWP_BUSY_RETRIES);
 
-	if (error)
-		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d\n",
-		    chan->id);
+	if (error) {
+		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
+		    "error=%d\n", chan->id, error);
+		/* An attempt to re-arm channel during the next invocation. */
+		taskqueue_enqueue(sc->tq, &chan->poll_task);
+	}
 }
 
 /**
