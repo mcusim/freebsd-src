@@ -294,8 +294,8 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	    & p->eqcr.pi_ci_mask;
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
-	/* Initialize the portal with an IRQ threshold and timeout of 0us. */
-	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 0);
+	/* Initialize the portal with an IRQ threshold and timeout of 100us. */
+	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 100);
 
 	*swp = p;
 
@@ -711,7 +711,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	 */
 	swp->dqrr.next_idx++;
 	swp->dqrr.next_idx &= swp->dqrr.ring_size - 1; /* wrap around */
-	if (!swp->dqrr.next_idx)
+	if (swp->dqrr.next_idx == 0u)
 		swp->dqrr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 
 	return (0);
