@@ -369,11 +369,9 @@ static int  dpni_ifmedia_change(struct ifnet *);
 static void dpni_ifmedia_status(struct ifnet *, struct ifmediareq *);
 static void dpni_ifmedia_tick(void *);
 
-static void dpni_cdan_cb(struct dpaa2_io_notif_ctx *);
 static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
-static void dpni_rearm_channel(void *);
 
 static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
     uint32_t *);
@@ -819,12 +817,16 @@ setup_channels(device_t dev)
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
-		ctx->cb = dpni_cdan_cb;
 		ctx->qman_ctx = (uint64_t) ctx;
 		ctx->cdan_en = true;
 		ctx->fq_chan_id = channel->id;
 		ctx->io_dev = channel->io_dev;
 		ctx->channel = channel;
+
+		/* Task to poll frames when CDAN is received. */
+		TASK_INIT(&channel->poll_task, 0, dpni_poll_channel, channel);
+		ctx->tq = sc->tq;
+		ctx->notif_task = &channel->poll_task;
 
 		/* Register the new notification context. */
 		error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
@@ -859,11 +861,6 @@ setup_channels(device_t dev)
 			device_printf(dev, "Failed to seed channel storage\n");
 			return (error);
 		}
-
-		/* Task to poll frames when CDAN is received. */
-		TASK_INIT(&channel->poll_task, 0, dpni_poll_channel, channel);
-		/* Callout to attemt channel re-arming. */
-		callout_init(&channel->rearm_callout, 0);
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d "
@@ -1903,19 +1900,6 @@ dpni_msi_intr(void *arg)
 
 /**
  * @internal
- * @brief Channel data availability notification (CDAN) callback.
- */
-static void
-dpni_cdan_cb(struct dpaa2_io_notif_ctx *ctx)
-{
-	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) ctx->channel;
-	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
-
-	taskqueue_enqueue(sc->tq, &chan->poll_task);
-}
-
-/**
- * @internal
  * @brief Callback to obtain a physical address of the only DMA segment mapped.
  */
 static void
@@ -1970,26 +1954,9 @@ dpni_poll_channel(void *arg, int count)
 
 	/* Re-arm channel to generate CDAN. */
 	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, &chan->ctx);
-	if (error) {
+	if (error)
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
 		    "error=%d\n", chan->id, error);
-
-		/* An attempt to re-arm channel one second from now. */
-		/* callout_reset(&chan->rearm_callout, hz, dpni_rearm_channel, */
-		/*     chan); */
-	}
-}
-
-/*
- * @internal
- */
-static void
-dpni_rearm_channel(void *arg)
-{
-	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
-	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
-
-	taskqueue_enqueue(sc->tq, &chan->poll_task);
 }
 
 /**

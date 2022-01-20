@@ -73,13 +73,14 @@ struct dpaa2_io_attr {
  * (CDAN) on a particular WQ channel.
  */
 struct dpaa2_io_notif_ctx {
-	void (*cb)(struct dpaa2_io_notif_ctx *ctx);
-
 	device_t		 io_dev;
 	void			*channel;
 	uint64_t		 qman_ctx;
 	uint16_t		 fq_chan_id;
 	bool			 cdan_en;
+
+	struct taskqueue	*tq;
+	struct task		*notif_task;
 };
 
 /**

@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_io.h"
 
 #define DPIO_IRQ_INDEX		0 /* index of the only DPIO IRQ */
-#define DPIO_POLL_MAX		128
+#define DPIO_POLL_MAX		32
 
 /*
  * Memory:
@@ -414,11 +414,11 @@ static void
 dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
-	struct dpaa2_io_notif_ctx *ctx;
+	struct dpaa2_io_notif_ctx *ctx[DPIO_POLL_MAX];
 	struct dpaa2_dq dq;
-	uint32_t idx, status;
+	uint32_t idx;
 	uint16_t flags;
-	int cnt = 0;
+	int error, cdan_n = 0;
 
 	dpaa2_swp_lock(sc->swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
@@ -427,36 +427,27 @@ dpio_msi_intr(void *arg)
 		return;
 	}
 
-	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
-	if (status == 0u) {
-		dpaa2_swp_unlock(sc->swp);
-		return;
-	}
+	for (int i = 0; i < DPIO_POLL_MAX; i++) {
+		error = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
+		if (error)
+			continue;
 
-	while (cnt <= DPIO_POLL_MAX &&
-	    dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
-		    DPAA2_DQRR_RESULT_CDAN) {
-			/* Unlock portal temporarily. */
-			dpaa2_swp_unlock(sc->swp);
-
-			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
-			ctx->cb(ctx);
-
-			/* Lock portal back. */
-			dpaa2_swp_lock(sc->swp, &flags);
-		} else {
+		    DPAA2_DQRR_RESULT_CDAN)
+			ctx[cdan_n++] = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
+		else
 			device_printf(sc->dev, "unknown DQRR entry\n");
-		}
 
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx & 0x7u);
-		cnt++;
 	}
 
-	dpaa2_swp_clear_intr_status(sc->swp, status);
+	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
-
 	dpaa2_swp_unlock(sc->swp);
+
+	/* Enqueue notification tasks. */
+	for (int i = 0; i < cdan_n; i++)
+		taskqueue_enqueue(ctx[i]->tq, ctx[i]->notif_task);
 }
 
 static device_method_t dpaa2_io_methods[] = {
