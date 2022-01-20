@@ -637,22 +637,15 @@ dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf,
 }
 
 int
-dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq, uint32_t *idx)
+dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
+    uint32_t *idx)
 {
 	struct resource_map *map;
 	struct dpaa2_swp_rsp *rsp = (struct dpaa2_swp_rsp *) dq;
 	uint32_t verb, offset, pi; /* producer index */
-	uint16_t flags;
 
 	if (swp == NULL || dq == NULL)
 		return (EINVAL);
-
-	dpaa2_swp_lock(swp, &flags);
-	if (flags & DPAA2_SWP_DESTROYED) {
-		/* Terminate operation if portal is destroyed. */
-		dpaa2_swp_unlock(swp);
-		return (ENOENT);
-	}
 
 	map = swp->cena_map;
 	offset = swp->cfg.mem_backed
@@ -675,10 +668,8 @@ dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq, uint32_t *idx)
 		pi = dpaa2_swp_read_reg(swp, DPAA2_SWP_CINH_DQPI) & DQRR_PI_MASK;
 
 		/* There are new entries if pi != next_idx */
-		if (pi == swp->dqrr.next_idx) {
-			dpaa2_swp_unlock(swp);
+		if (pi == swp->dqrr.next_idx)
 			return (ENOENT);
-		}
 
 		/*
 		 * If next_idx is/was the last ring index, and 'pi' is
@@ -707,10 +698,8 @@ dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq, uint32_t *idx)
 	 * valid-bit behaviour is repaired and should tell us what we already
 	 * knew from reading PI.
 	 */
-	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) {
-		dpaa2_swp_unlock(swp);
+	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit)
 		return (ENOENT);
-	}
 
 	/* Return index of the current entry (if requested). */
 	if (idx != NULL)
@@ -725,18 +714,6 @@ dpaa2_swp_dqrr_next(struct dpaa2_swp *swp, struct dpaa2_dq *dq, uint32_t *idx)
 	if (!swp->dqrr.next_idx)
 		swp->dqrr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 
-	/*
-	 * If this is the final response to a volatile dequeue command
-	 * indicate that the VDQ is available.
-	 */
-	/* flags = dq->fdr.stat; */
-	/* resp_verb = verb & QBMAN_RESULT_MASK; */
-	/* if ((response_verb == QBMAN_RESULT_DQ) && */
-	/*     (flags & DPAA2_DQ_STAT_VOLATILE) && */
-	/*     (flags & DPAA2_DQ_STAT_EXPIRED)) */
-	/* 	atomic_inc(&s->vdq.available); */
-
-	dpaa2_swp_unlock(swp);
 	return (0);
 }
 

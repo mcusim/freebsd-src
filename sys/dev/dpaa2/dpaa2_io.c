@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_io.h"
 
 #define DPIO_IRQ_INDEX		0 /* index of the only DPIO IRQ */
-#define DPIO_POLL_MAX		32
+#define DPIO_POLL_MAX		128
 
 /*
  * Memory:
@@ -416,15 +416,25 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx;
 	struct dpaa2_dq dq;
-	uint32_t idx, status = 0u;
+	uint32_t idx, status;
+	uint16_t flags;
 	int cnt = -1;
 
-	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
-	if (status == 0u)
+	dpaa2_swp_lock(sc->swp, &flags);
+	if (flags & DPAA2_SWP_DESTROYED) {
+		/* Terminate operation if portal is destroyed. */
+		dpaa2_swp_unlock(sc->swp);
 		return;
+	}
+
+	status = dpaa2_swp_read_reg(sc->swp, DPAA2_SWP_CINH_ISR);
+	if (status == 0u) {
+		dpaa2_swp_unlock(swp);
+		return;
+	}
 
 	while (cnt < DPIO_POLL_MAX &&
-	    dpaa2_swp_dqrr_next(sc->swp, &dq, &idx) == 0) {
+	    dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
@@ -439,6 +449,8 @@ dpio_msi_intr(void *arg)
 
 	dpaa2_swp_clear_intr_status(sc->swp, status);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
+
+	dpaa2_swp_unlock(swp);
 }
 
 static device_method_t dpaa2_io_methods[] = {
