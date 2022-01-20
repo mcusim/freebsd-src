@@ -229,6 +229,9 @@ struct dpaa2_ni_channel {
 	/* Task to poll frames when CDAN is received. */
 	struct task		 poll_task;
 
+	/* Callout to attemt channel re-arming. */
+	struct callout		 rearm_callout;
+
 	uint32_t		 recycle_bufn;
 	bus_addr_t		 recycle_buf[DPAA2_SWP_BUFS_PER_CMD];
 };
@@ -512,7 +515,6 @@ struct dpaa2_ni_softc {
 	struct mtx		 lock;
 	device_t		 miibus;
 	struct mii_data		*mii;
-	struct callout		 mii_callout;
 	int			 media_status;
 
 	/* DMA resources */
@@ -537,6 +539,9 @@ struct dpaa2_ni_softc {
 
 	/* Tasks */
 	struct taskqueue	*tq;
+
+	/* Callouts */
+	struct callout		 mii_callout;
 
 	struct {
 		uint32_t	 dpmac_id;
