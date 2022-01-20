@@ -357,6 +357,7 @@ static void dpni_cdan_cb(struct dpaa2_io_notif_ctx *);
 static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
+static void dpni_rearm_channel(void *);
 
 static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
     uint32_t *);
@@ -843,8 +844,10 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
-		/* Initialize a task to poll frames from the channel. */
+		/* Task to poll frames when CDAN is received. */
 		TASK_INIT(&channel->poll_task, 0, dpni_poll_channel, channel);
+		/* Callout to attemt channel re-arming. */
+		callout_init(&channel->rearm_callout, 0);
 
 		if (bootverbose)
 			device_printf(dev, "channel: dpio_id=%d "
@@ -1954,9 +1957,23 @@ dpni_poll_channel(void *arg, int count)
 	if (error) {
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
 		    "error=%d\n", chan->id, error);
-		/* An attempt to re-arm channel during the next invocation. */
-		taskqueue_enqueue(sc->tq, &chan->poll_task);
+
+		/* An attempt to re-arm channel one second from now. */
+		callout_reset(&chan->rearm_callout, hz, dpni_rearm_channel,
+		    chan);
 	}
+}
+
+/*
+ * @internal
+ */
+static void
+dpni_rearm_channel(void *arg)
+{
+	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
+
+	taskqueue_enqueue(sc->tq, &chan->poll_task);
 }
 
 /**
