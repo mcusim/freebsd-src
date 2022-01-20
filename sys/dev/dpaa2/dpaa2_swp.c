@@ -1186,7 +1186,9 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 	const uint32_t attempts = swp->cfg.atomic
 	    ? CMD_SPIN_ATTEMPTS
 	    : CMD_SLEEP_ATTEMPTS;
-	struct resource_map *map = swp->cena_map;
+	struct resource_map *map = swp->cfg.mem_backed
+	    ? swp->cena_map
+	    : swp->cinh_map;
 	/* Management command response to be read from the only RR or RR0/RR1. */
 	const uint32_t offset = swp->cfg.mem_backed
 	    ? DPAA2_SWP_CENA_RR_MEM
