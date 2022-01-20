@@ -1191,8 +1191,7 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 	const uint32_t offset = swp->cfg.mem_backed
 	    ? DPAA2_SWP_CENA_RR_MEM
 	    : DPAA2_SWP_CENA_RR(swp->mc.valid_bit);
-	uint32_t i;
-	uint8_t verb;
+	uint32_t i, verb, ret;
 	int rc;
 
 	/*
@@ -1204,15 +1203,16 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 	/* Wait for a command response from QBMan. */
 	for (i = 1; i <= attempts; i++) {
 		if (swp->cfg.mem_backed) {
-			verb = bus_read_1(map, offset);
+			verb = (uint32_t) (bus_read_4(map, offset) & 0xFFu);
 			if (swp->mr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
 				goto wait;
 			if (!(verb & ~DPAA2_SWP_VALID_BIT))
 				goto wait;
 			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		} else {
-			verb = bus_read_1(map, offset);
-			if (swp->mc.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
+			ret = bus_read_4(map, offset);
+			verb = ret & ~DPAA2_SWP_VALID_BIT; /* remove valid bit */
+			if (verb == 0u)
 				goto wait;
 			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
 		}
