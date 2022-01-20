@@ -1919,8 +1919,7 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
-	int consumed = 0, attempts = 0;
-	int error;
+	int error, consumed = 0;
 
 	do {
 		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
@@ -1951,13 +1950,7 @@ dpni_poll_channel(void *arg, int count)
 	atomic_xchg(&swp->vdq.avail, 1);
 
 	/* Re-arm channel to generate CDAN. */
-	do {
-		error = dpaa2_swp_conf_wq_channel(swp, chan->id,
-		    DPAA2_WQCHAN_WE_EN, true, 0);
-		attempts++;
-		cpu_spinwait();
-	} while (error == ETIMEDOUT && attempts < DPAA2_SWP_BUSY_RETRIES);
-
+	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, chan->ctx);
 	if (error) {
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
 		    "error=%d\n", chan->id, error);
