@@ -1950,7 +1950,7 @@ dpni_poll_channel(void *arg, int count)
 	atomic_xchg(&swp->vdq.avail, 1);
 
 	/* Re-arm channel to generate CDAN. */
-	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, chan->ctx);
+	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, &chan->ctx);
 	if (error) {
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
 		    "error=%d\n", chan->id, error);
