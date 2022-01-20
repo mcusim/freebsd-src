@@ -1226,6 +1226,17 @@ wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 	/* Return an error on expired timeout. */
 	rc = i > attempts ? ETIMEDOUT : 0;
 
+	/*
+	 * Try to toggle valid bit in case of a timeout.
+	 * NOTE: For debug purposes only!
+	 */
+	if (rc == ETIMEDOUT) {
+		if (swp->cfg.mem_backed)
+			swp->mr.valid_bit ^= DPAA2_SWP_VALID_BIT;
+		else
+			swp->mc.valid_bit ^= DPAA2_SWP_VALID_BIT;
+	}
+
 	/* Read command response. */
 	for (i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
 		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
