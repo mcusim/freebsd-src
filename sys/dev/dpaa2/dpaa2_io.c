@@ -437,8 +437,14 @@ dpio_msi_intr(void *arg)
 	    dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx) == 0) {
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
+			/* Unlock portal temporarily. */
+			dpaa2_swp_unlock(sc->swp);
+
 			ctx = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
 			ctx->cb(ctx);
+
+			/* Lock portal back. */
+			dpaa2_swp_lock(sc->swp, &flags);
 		} else {
 			device_printf(sc->dev, "unknown DQRR entry\n");
 		}
