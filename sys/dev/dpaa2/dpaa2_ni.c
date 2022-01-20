@@ -182,7 +182,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 availability interrupts, the DPCONs are used to identify the
 	 *	 network interface that has produced ingress data to that core.
 	 */
-#define IO_RES_NUM	(8u)
+#define IO_RES_NUM	(16u)
 #define IO_RID_OFF	(0u)
 #define IO_RID(rid)	((rid) + IO_RID_OFF)
 	/* --- */
@@ -194,6 +194,14 @@ struct resource_spec dpaa2_ni_spec[] = {
 	{ DPAA2_DEV_IO,  IO_RID(5),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(6),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(7),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(8),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(9),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(10),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(11),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(12),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(13),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(14),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(15),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 
 	/*
 	 * DPBP resources (buffer pools).
@@ -215,7 +223,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 different network interfaces arriving on the same core, the
 	 *	 DPCONs must be private to the DPNIs.
 	 */
-#define CON_RES_NUM	(8u)
+#define CON_RES_NUM	(16u)
 #define CON_RID_OFF	(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)	((rid) + CON_RID_OFF)
 	/* --- */
@@ -227,6 +235,14 @@ struct resource_spec dpaa2_ni_spec[] = {
  	{ DPAA2_DEV_CON, CON_RID(5),   RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(6),   RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(7),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(8),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(9),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
 
 	/*
 	 * DPMCP resources.
