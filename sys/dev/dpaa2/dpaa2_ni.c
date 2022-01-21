@@ -1945,6 +1945,10 @@ dpni_poll_channel(void *arg, int count)
 	if (error)
 		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
 		    "error=%d\n", chan->id, error);
+
+	/* Enable software portal interrupts back. */
+	dpaa2_swp_clear_intr_status(swp, 0xFFFFFFFFu);
+	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 /**

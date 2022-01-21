@@ -652,6 +652,8 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
 	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
 
+	dsb(osh);
+
 	/*
 	 * Before using valid-bit to detect if something is there, we have to
 	 * handle the case of the DQRR reset bug...

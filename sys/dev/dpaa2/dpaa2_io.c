@@ -426,7 +426,6 @@ dpio_msi_intr(void *arg)
 		dpaa2_swp_unlock(sc->swp);
 		return;
 	}
-
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
 		error = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
 		if (error)
@@ -440,14 +439,17 @@ dpio_msi_intr(void *arg)
 
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx & 0x7u);
 	}
-
-	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
-	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 	dpaa2_swp_unlock(sc->swp);
 
 	/* Enqueue notification tasks. */
 	for (int i = 0; i < cdan_n; i++)
 		taskqueue_enqueue(ctx[i]->tq, ctx[i]->notif_task);
+
+	/* Enable software portal interrupts back. */
+	if (cdan_n == 0) {
+		dpaa2_swp_clear_intr_status(swp, 0xFFFFFFFFu);
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_IIR, 0);
+	}
 }
 
 static device_method_t dpaa2_io_methods[] = {
