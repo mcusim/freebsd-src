@@ -2001,6 +2001,9 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
 
+	/* Make VDQ command available again. */
+	atomic_xchg(&swp->vdq.avail, 1);
+
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
 	 * Return the frame queue and a number of consumed frames as an output.
