@@ -1926,7 +1926,7 @@ dpni_poll_channel(void *arg, int count)
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
-		if (error) {
+		if (error && error != EBUSY) {
 			device_printf(chan->ni_dev, "failed to pull frames: "
 			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
