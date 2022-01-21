@@ -1918,7 +1918,6 @@ static void
 dpni_poll_channel(void *arg, int count)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
-	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
