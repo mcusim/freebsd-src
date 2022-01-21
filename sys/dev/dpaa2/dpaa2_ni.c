@@ -131,7 +131,7 @@ __FBSDID("$FreeBSD$");
 
 /* Channel storage buffer configuration. */
 #define ETH_STORE_FRAMES	16
-#define ETH_STORE_SIZE		(ETH_STORE_FRAMES * sizeof(struct dpaa2_dq) + 64)
+#define ETH_STORE_SIZE		((ETH_STORE_FRAMES + 16) * sizeof(struct dpaa2_dq))
 #define ETH_STORE_ALIGN		64
 
 /* Buffers layout options. */
@@ -1925,9 +1925,6 @@ dpni_poll_channel(void *arg, int count)
 	int error, consumed = 0;
 
 	do {
-		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
-		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
-
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
 		if (error) {
@@ -1936,8 +1933,7 @@ dpni_poll_channel(void *arg, int count)
 			break;
 		}
 
-		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
-		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+		dsb(osh);
 
 		error = dpni_consume_frames(chan, &fq, &consumed);
 		if (error == ENOENT)
@@ -1972,15 +1968,12 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	int frames = 0, retries = 0;
 	int rc;
 
-	/*
-	 * Let's have a data synchronization barrier for the whole system to be
-	 * sure that QBMan's command execution result is transferred to memory.
-	 */
-	dsb(osh);
-
 	do {
 		rc = chan_storage_next(chan, &dq);
 		if (rc == EAGAIN) {
+			/* No valid dequeue response yet. */
+			dsb(osh);
+
 			if (retries >= DPAA2_SWP_BUSY_RETRIES) {
 				rc = ETIMEDOUT;
 				break;
@@ -2007,6 +2000,10 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 		}
 		retries = 0;
 	} while (true);
+
+	KASSERT(chan->store_idx < chan->store_sz,
+	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
+	    chan->store_idx, chan->store_sz));
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -2469,8 +2466,10 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME))
 			msg = NULL; /* Null response, FD is invalid */
 	}
-	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_FQEMPTY)
+	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_FQEMPTY) {
 		rc = ENOENT; /* FQ is empty */
+		chan->store_idx = 0;
+	}
 
 	if (dq != NULL)
 		*dq = msg;
