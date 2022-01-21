@@ -1926,13 +1926,11 @@ dpni_poll_channel(void *arg, int count)
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
-		if (error && error != EBUSY) {
+		if (error) {
 			device_printf(chan->ni_dev, "failed to pull frames: "
 			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
 		}
-
-		dsb(osh);
 
 		error = dpni_consume_frames(chan, &fq, &consumed);
 		if (error == ENOENT)
@@ -1956,6 +1954,7 @@ static int
 dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
     uint32_t *consumed)
 {
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq = NULL;
@@ -1963,6 +1962,9 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	struct dpaa2_fd *fd;
 	int frames = 0, retries = 0;
 	int rc;
+
+	bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	do {
 		rc = chan_storage_next(chan, &dq);
@@ -2000,6 +2002,9 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	KASSERT(chan->store_idx < chan->store_sz,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
+
+	bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
+	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
