@@ -58,7 +58,7 @@
  * unresponsive, but not give up too easily if the portal really is busy for
  * valid reasons.
  */
-#define DPAA2_SWP_BUSY_RETRIES		1000
+#define DPAA2_SWP_BUSY_RETRIES		10000
 
 /* Versions of the QBMan software portals. */
 #define DPAA2_SWP_REV_4000		0x04000000

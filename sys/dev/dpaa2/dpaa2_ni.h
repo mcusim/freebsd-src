@@ -221,7 +221,7 @@ struct dpaa2_ni_channel {
 	uint32_t		 buf_num;
 	struct dpaa2_ni_buf	 buf[DPAA2_NI_BUFS_PER_CHAN];
 
-	/* Channel storage (to keep responses from Volatile Dequeue Command). */
+	/* Channel storage (to keep responses from VDQ command). */
 	struct dpaa2_ni_sbuf	 store;
 	uint32_t		 store_sz; /* in frames */
 	uint32_t		 store_idx; /* frame index */

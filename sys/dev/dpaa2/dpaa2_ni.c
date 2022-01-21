@@ -1937,11 +1937,9 @@ dpni_poll_channel(void *arg, int count)
 		error = dpni_consume_frames(chan, &fq, &consumed);
 		if (error == ENOENT)
 			break;
-		if (error == ETIMEDOUT) {
+		if (error == ETIMEDOUT)
 			device_printf(chan->ni_dev, "timeout to consume frames: "
 			    "chan_id=%d\n", chan->id);
-			break;
-		}
 	} while (true);
 
 	/* Re-arm channel to generate CDAN. */
@@ -1969,13 +1967,11 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	do {
 		rc = chan_storage_next(chan, &dq);
 		if (rc == EAGAIN) {
-			/* No valid dequeue response yet. */
-			dsb(osh);
-
 			if (retries >= DPAA2_SWP_BUSY_RETRIES) {
 				rc = ETIMEDOUT;
 				break;
 			}
+			cpu_spinwait();
 			retries++;
 			continue;
 		} else if (rc == EINPROGRESS) {
@@ -1992,9 +1988,11 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 				fq->consume(chan, fq, fd);
 				frames++;
 			}
+			/* Make VDQ command available again. */
+			atomic_xchg(&swp->vdq.avail, 1);
 			break;
 		} else {
-			break;
+			/* Should not reach here. */
 		}
 		retries = 0;
 	} while (true);
@@ -2002,9 +2000,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	KASSERT(chan->store_idx < chan->store_sz,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
-
-	/* Make VDQ command available again. */
-	atomic_xchg(&swp->vdq.avail, 1);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -2472,10 +2467,6 @@ chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 	if (msg->fdr.desc.stat & DPAA2_DQ_STAT_EXPIRED) {
 		rc = EALREADY; /* VDQ command is expired */
 		chan->store_idx = 0;
-
-		/* Make VDQ command available again. */
-		atomic_xchg(&swp->vdq.avail, 1);
-
 		if (!(msg->fdr.desc.stat & DPAA2_DQ_STAT_VALIDFRAME))
 			msg = NULL; /* Null response, FD is invalid */
 	}
