@@ -2057,6 +2057,9 @@ dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
 
+	/* For debug purposes only. */
+	device_printf(sc->dev, "%s: invoked\n", __func__);
+
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
@@ -2084,6 +2087,9 @@ dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_bp_softc *bpsc;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
+
+	/* For debug purposes only. */
+	device_printf(sc->dev, "%s: invoked\n", __func__);
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
