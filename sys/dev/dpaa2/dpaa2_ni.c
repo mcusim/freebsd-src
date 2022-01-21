@@ -1944,9 +1944,6 @@ dpni_poll_channel(void *arg, int count)
 		}
 	} while (true);
 
-	/* Make VDQC available again. */
-	atomic_xchg(&swp->vdq.avail, 1);
-
 	/* Re-arm channel to generate CDAN. */
 	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, &chan->ctx);
 	if (error)
@@ -2003,6 +2000,9 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	KASSERT(chan->store_idx < chan->store_sz,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
+
+	/* Make VDQC available again. */
+	atomic_xchg(&swp->vdq.avail, 1);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
