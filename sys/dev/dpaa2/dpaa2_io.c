@@ -447,8 +447,8 @@ dpio_msi_intr(void *arg)
 
 	/* Enable software portal interrupts back. */
 	if (cdan_n == 0) {
-		dpaa2_swp_clear_intr_status(swp, 0xFFFFFFFFu);
-		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_IIR, 0);
+		dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 	}
 }
 
