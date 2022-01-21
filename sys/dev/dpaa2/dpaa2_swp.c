@@ -744,7 +744,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 	/* Write the response to this command into memory. */
 	cmd.verb |= 1 << QB_VDQCR_VERB_RLS_SHIFT;
 	/* Response writes will attempt to allocate into a cache. */
-	cmd.verb |= 1 << QB_VDQCR_VERB_WAE_SHIFT;
+	cmd.verb |= 0 << QB_VDQCR_VERB_WAE_SHIFT;
 	/*
 	 * Dequeue with priority precedence, and Intra-WQ class scheduling
 	 * respected.
