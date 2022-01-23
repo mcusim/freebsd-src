@@ -1437,8 +1437,11 @@ setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
 {
 	struct sysctl_oid *node;
 	struct sysctl_oid_list *chan_parent;
+	char buf[64];
 
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, chan->id,
+	snprintf(buf, 64, "%d", chan->id);
+
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, buf,
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
 	chan_parent = SYSCTL_CHILDREN(node);
 
