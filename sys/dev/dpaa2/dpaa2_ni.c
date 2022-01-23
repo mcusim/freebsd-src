@@ -398,7 +398,7 @@ static int dpni_consume_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
 static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 
-static int dpni_collect_stats(struct dpaa2_ni_softc *);
+static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
 
 /* ISRs */
 
