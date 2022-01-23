@@ -359,7 +359,9 @@ static int setup_rx_err_flow(device_t, struct dpaa2_cmd *, struct dpaa2_ni_fq *)
 static int setup_msi(struct dpaa2_ni_softc *);
 static int setup_if_caps(struct dpaa2_ni_softc *);
 static int setup_if_flags(struct dpaa2_ni_softc *);
-static void setup_sysctls(struct dpaa2_ni_softc *);
+static int setup_sysctls(struct dpaa2_ni_softc *);
+static int setup_chan_sysctls(struct dpaa2_ni_channel *,
+    struct sysctl_ctx_list *, struct sysctl_oid_list *);
 
 static int set_buf_layout(device_t, struct dpaa2_cmd *);
 static int set_pause_frame(device_t, struct dpaa2_cmd *);
@@ -543,8 +545,11 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_close_ni;
 	}
-
-	setup_sysctls(sc);
+	error = setup_sysctls(sc);
+	if (error) {
+		device_printf(dev, "Failed to setup sysctls: error=%d\n", error);
+		goto err_close_ni;
+	}
 
 	ether_ifattach(sc->ifp, sc->mac.addr);
 	callout_init(&sc->mii_callout, 0);
@@ -756,6 +761,9 @@ setup_channels(device_t dev)
 	struct dpaa2_io_notif_ctx *ctx;
 	struct dpaa2_con_notif_cfg notif_cfg;
 	int error;
+	struct sysctl_ctx_list *ctx;
+	struct sysctl_oid *node;
+	struct sysctl_oid_list *parent;
 
 	/* Calculate a number of channels based on the allocated resources. */
 	sc->num_chan = dpni_channels_num(sc);
@@ -798,6 +806,13 @@ setup_channels(device_t dev)
 		return (error);
 	}
 
+	ctx = device_get_sysctl_ctx(sc->dev);
+	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "channels",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channels");
+	parent = SYSCTL_CHILDREN(node);
+
 	/* Setup channels for the portal. */
 	for (uint32_t i = 0; i < sc->num_chan; i++) {
 		/* Select software portal. */
@@ -834,6 +849,8 @@ setup_channels(device_t dev)
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
 		channel->buf_num = 0;
+		channel->sb_frames = 0;
+		channel->sg_frames = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -868,17 +885,22 @@ setup_channels(device_t dev)
 			return (error);
 		}
 
-		/* Allocate and map buffers for the buffer pool. */
+		/* Allocate buffers and channel storage. */
 		error = seed_buf_pool(sc, channel);
 		if (error) {
 			device_printf(dev, "Failed to seed buffer pool\n");
 			return (error);
 		}
-
-		/* Allocate channel storage. */
 		error = seed_chan_storage(sc, channel);
 		if (error) {
 			device_printf(dev, "Failed to seed channel storage\n");
+			return (error);
+		}
+
+		/* Setup sysctls for this channel. */
+		error = setup_chan_sysctls(channel, ctx, parent);
+		if (error) {
+			device_printf(dev, "Failed to setup channel sysctls\n");
 			return (error);
 		}
 
@@ -1383,7 +1405,7 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 /**
  * @internal
  */
-static void
+static int
 setup_sysctls(struct dpaa2_ni_softc *sc)
 {
 	struct sysctl_ctx_list *ctx;
@@ -1402,6 +1424,25 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLTYPE_U64 | CTLFLAG_RD, sc, 0, dpni_collect_stats, "IU",
 		    dpni_stat_sysctls[i].desc);
 	}
+
+	return (0);
+}
+
+/**
+ * @internal
+ */
+static int
+setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
+    struct sysctl_oid_list *parent);
+{
+	SYSCTL_ADD_INT(ctx, parent, OID_AUTO, "sb_frames",
+	    CTLFLAG_RD, &chan->sb_frames, 0,
+	    "Frames that store data in a single buffer");
+	SYSCTL_ADD_INT(ctx, parent, OID_AUTO, "sg_frames",
+	    CTLFLAG_RD, &chan->sg_frames, 0,
+	    "Frames with data distributed in multiple buffers");
+
+	return (0);
 }
 
 /**
@@ -2004,10 +2045,12 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	struct dpaa2_dq *dq;
 	struct dpaa2_fd *fd;
 	int frames = 0, retries = 0;
-	int rc;
+	int rc, i;
 
-	bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
-	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(sc->st_dmat, chan->store.dmap, BUS_DMASYNC_POSTREAD);
+	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i++)
+		bus_dmamap_sync(sc->bp_dmat, chan->buf[i].dmap,
+		    BUS_DMASYNC_POSTREAD);
 
 	do {
 		rc = chan_storage_next(chan, &dq);
@@ -2046,8 +2089,10 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
 
-	bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
-	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(sc->st_dmat, chan->store.dmap, BUS_DMASYNC_PREREAD);
+	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i++)
+		bus_dmamap_sync(sc->bp_dmat, chan->buf[i].dmap,
+		    BUS_DMASYNC_PREREAD);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -2072,7 +2117,21 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
+	uint8_t fd_format = ((fd->off_fmt_sl) >> 12) & 0x3;
 	int error;
+
+	/* For debug purposes only! */
+	switch (fd_format) {
+	case 0: /* single buffer frame */
+		chan->sb_frames++;
+		break;
+	case 2: /* scatter/gather frame */
+		chan->sg_frames++;
+		break;
+	default:
+		/* Not interesting. */
+		break;
+	}
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
