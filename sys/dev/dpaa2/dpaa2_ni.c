@@ -849,6 +849,7 @@ setup_channels(device_t dev)
 		channel->con_dev = con_dev;
 		channel->id = consc->attr.chan_id;
 		channel->buf_num = 0;
+		channel->all_frames = 0;
 		channel->sb_frames = 0;
 		channel->sg_frames = 0;
 
@@ -1445,6 +1446,9 @@ setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
 	chan_parent = SYSCTL_CHILDREN(node);
 
+	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "all_frames",
+	    CTLFLAG_RD, &chan->all_frames, 0,
+	    "All frames received on this channel");
 	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sb_frames",
 	    CTLFLAG_RD, &chan->sb_frames, 0,
 	    "Frames that store data in a single buffer");
@@ -2142,6 +2146,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		/* Not interesting. */
 		break;
 	}
+	chan->all_frames++;
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);

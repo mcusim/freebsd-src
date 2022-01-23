@@ -217,6 +217,7 @@ struct dpaa2_ni_channel {
 	device_t		 con_dev;
 	uint16_t		 id;
 
+	int			 all_frames;
 	int			 sb_frames;
 	int			 sg_frames;
 
