@@ -543,11 +543,8 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_close_ni;
 	}
-	error = setup_sysctls(sc);
-	if (error) {
-		device_printf(dev, "Failed to setup sysctls: error=%d\n", error);
-		goto err_close_ni;
-	}
+
+	setup_sysctls(sc);
 
 	ether_ifattach(sc->ifp, sc->mac.addr);
 	callout_init(&sc->mii_callout, 0);
