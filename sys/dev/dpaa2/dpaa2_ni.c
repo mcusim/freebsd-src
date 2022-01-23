@@ -761,7 +761,7 @@ setup_channels(device_t dev)
 	struct dpaa2_io_notif_ctx *ctx;
 	struct dpaa2_con_notif_cfg notif_cfg;
 	int error;
-	struct sysctl_ctx_list *ctx;
+	struct sysctl_ctx_list *sysctl_ctx;
 	struct sysctl_oid *node;
 	struct sysctl_oid_list *parent;
 
@@ -806,10 +806,10 @@ setup_channels(device_t dev)
 		return (error);
 	}
 
-	ctx = device_get_sysctl_ctx(sc->dev);
+	sysctl_ctx = device_get_sysctl_ctx(sc->dev);
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "channels",
+	node = SYSCTL_ADD_NODE(sysctl_ctx, parent, OID_AUTO, "channels",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channels");
 	parent = SYSCTL_CHILDREN(node);
 
@@ -898,7 +898,7 @@ setup_channels(device_t dev)
 		}
 
 		/* Setup sysctls for this channel. */
-		error = setup_chan_sysctls(channel, ctx, parent);
+		error = setup_chan_sysctls(channel, sysctl_ctx, parent);
 		if (error) {
 			device_printf(dev, "Failed to setup channel sysctls\n");
 			return (error);
@@ -1433,7 +1433,7 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
  */
 static int
 setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
-    struct sysctl_oid_list *parent);
+    struct sysctl_oid_list *parent)
 {
 	SYSCTL_ADD_INT(ctx, parent, OID_AUTO, "sb_frames",
 	    CTLFLAG_RD, &chan->sb_frames, 0,
