@@ -217,6 +217,9 @@ struct dpaa2_ni_channel {
 	device_t		 con_dev;
 	uint16_t		 id;
 
+	int			 sb_frames;
+	int			 sg_frames;
+
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
 
