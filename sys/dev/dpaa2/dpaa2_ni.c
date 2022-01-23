@@ -2086,19 +2086,22 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
 				frames++;
-			}
+			} else
+				device_printf(chan->ni_dev, "stage 1\n");
 		} else if (rc == EALREADY || rc == ENOENT) {
 			if (dq != NULL) {
 				fd = &dq->fdr.fd;
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
 				frames++;
-			}
+			} else
+				device_printf(chan->ni_dev, "stage 2\n");
 			/* Make VDQ command available again. */
 			atomic_xchg(&swp->vdq.avail, 1);
 			break;
 		} else {
 			/* Should not reach here. */
+			device_printf(chan->ni_dev, "stage 3\n");
 		}
 		retries = 0;
 	} while (true);
