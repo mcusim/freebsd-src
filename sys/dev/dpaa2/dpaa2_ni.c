@@ -183,26 +183,26 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 availability interrupts, the DPCONs are used to identify the
 	 *	 network interface that has produced ingress data to that core.
 	 */
-#define IO_RES_NUM	(3u)
+#define IO_RES_NUM	(16u)
 #define IO_RID_OFF	(0u)
 #define IO_RID(rid)	((rid) + IO_RID_OFF)
 	/* --- */
 	{ DPAA2_DEV_IO,  IO_RID(0),    RF_ACTIVE | RF_SHAREABLE },
 	{ DPAA2_DEV_IO,  IO_RID(1),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	{ DPAA2_DEV_IO,  IO_RID(2),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
-	/* { DPAA2_DEV_IO,  IO_RID(3),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(4),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(5),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(6),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(7),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(8),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(9),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(10),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(11),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(12),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(13),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(14),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
-	/* { DPAA2_DEV_IO,  IO_RID(15),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL }, */
+	{ DPAA2_DEV_IO,  IO_RID(3),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(4),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(5),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(6),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(7),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(8),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(9),    RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(10),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(11),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(12),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(13),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(14),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	{ DPAA2_DEV_IO,  IO_RID(15),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 
 	/*
 	 * DPBP resources (buffer pools).
@@ -224,26 +224,26 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 different network interfaces arriving on the same core, the
 	 *	 DPCONs must be private to the DPNIs.
 	 */
-#define CON_RES_NUM	(3u)
+#define CON_RES_NUM	(16u)
 #define CON_RID_OFF	(BP_RID_OFF + BP_RES_NUM)
 #define CON_RID(rid)	((rid) + CON_RID_OFF)
 	/* --- */
 	{ DPAA2_DEV_CON, CON_RID(0),   RF_ACTIVE },
 	{ DPAA2_DEV_CON, CON_RID(1),   RF_ACTIVE | RF_OPTIONAL },
 	{ DPAA2_DEV_CON, CON_RID(2),   RF_ACTIVE | RF_OPTIONAL },
- 	/* { DPAA2_DEV_CON, CON_RID(3),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(4),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(5),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(6),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(7),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(8),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(9),   RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL }, */
- 	/* { DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL }, */
+ 	{ DPAA2_DEV_CON, CON_RID(3),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(4),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(5),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(6),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(7),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(8),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(9),   RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(10),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(11),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(12),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
+ 	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
 
 	/*
 	 * DPMCP resources.
@@ -852,6 +852,7 @@ setup_channels(device_t dev)
 		channel->all_frames = 0;
 		channel->sb_frames = 0;
 		channel->sg_frames = 0;
+		channel->consumed_frames = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -1455,6 +1456,9 @@ setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
 	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sg_frames",
 	    CTLFLAG_RD, &chan->sg_frames, 0,
 	    "Frames with data distributed in multiple buffers");
+	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "consumed_frames",
+	    CTLFLAG_RD, &chan->consumed_frames, 0,
+	    "All frames consumed on this channel");
 
 	return (0);
 }
@@ -2102,6 +2106,8 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	KASSERT(chan->store_idx < chan->store_sz,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
+
+	chan->consumed_frames += frames;
 
 	bus_dmamap_sync(sc->st_dmat, chan->store.dmap, BUS_DMASYNC_PREREAD);
 	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i++)

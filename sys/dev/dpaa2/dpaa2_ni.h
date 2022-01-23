@@ -220,6 +220,7 @@ struct dpaa2_ni_channel {
 	int			 all_frames;
 	int			 sb_frames;
 	int			 sg_frames;
+	int			 consumed_frames;
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
