@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/mbuf.h>
 #include <sys/taskqueue.h>
+#include <sys/sysctl.h>
 
 #include <vm/vm.h>
 
@@ -326,6 +327,24 @@ static const struct dpaa2_eth_dist_fields dist_fields[] = {
 	},
 };
 
+static struct dpni_stat {
+	int	 page;
+	int	 cnt;
+	char	*name;
+	char	*desc;
+} dpni_stat_sysctls[DPAA2_NI_STAT_SYSCTLS] = {
+	/* PAGE, COUNTER, NAME,         DESCRIPTION */
+	{  0, 0, "in_all_frames",	"All accepted ingress frames" },
+	{  0, 1, "in_all_bytes",	"Bytes in all accepted ingress frames" },
+	{  0, 2, "in_multi_frames",	"Multicast accepted ingress frames" },
+	{  1, 0, "eg_all_frames",	"All egress frames transmitted" },
+	{  1, 1, "eg_all_bytes",	"Bytes in all frames transmitted" },
+	{  1, 2, "eg_multi_frames",	"Multicast egress frames transmitted" },
+	{  2, 0, "in_filtered_frames",	"All ingress frames discarded due to filtering" },
+	{  2, 1, "in_discarded_frames",	"All frames discarded due to errors" },
+	{  2, 2, "in_nobuf_discards",	"Discards on ingress side due to buffer depletion in DPNI buffer pools" },
+};
+
 /* Forward declarations. */
 
 static int setup_dpni(device_t);
@@ -340,6 +359,7 @@ static int setup_rx_err_flow(device_t, struct dpaa2_cmd *, struct dpaa2_ni_fq *)
 static int setup_msi(struct dpaa2_ni_softc *);
 static int setup_if_caps(struct dpaa2_ni_softc *);
 static int setup_if_flags(struct dpaa2_ni_softc *);
+static void setup_sysctls(struct dpaa2_ni_softc *);
 
 static int set_buf_layout(device_t, struct dpaa2_cmd *);
 static int set_pause_frame(device_t, struct dpaa2_cmd *);
@@ -351,12 +371,9 @@ static int set_dist_key(device_t, enum dpaa2_ni_dist_mode, uint64_t);
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 
-static int calc_channels_num(struct dpaa2_ni_softc *);
+static int dpni_channels_num(struct dpaa2_ni_softc *);
 static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
-static int print_statistics(struct dpaa2_ni_softc *);
-
 static int prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
-
 static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq **);
 
 /* Callbacks. */
@@ -372,7 +389,6 @@ static void dpni_ifmedia_tick(void *);
 static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
-
 static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
     uint32_t *);
 static int dpni_consume_rx(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
@@ -381,6 +397,8 @@ static int dpni_consume_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
+
+static int dpni_collect_stats(struct dpaa2_ni_softc *);
 
 /* ISRs */
 
@@ -738,7 +756,7 @@ setup_channels(device_t dev)
 	int error;
 
 	/* Calculate a number of channels based on the allocated resources. */
-	sc->num_chan = calc_channels_num(sc);
+	sc->num_chan = dpni_channels_num(sc);
 	sc->num_chan = sc->num_chan > sc->attr.num.queues
 	    ? sc->attr.num.queues : sc->num_chan;
 
@@ -1362,6 +1380,30 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 
 /**
  * @internal
+ */
+static void
+setup_sysctls(struct dpaa2_ni_softc *sc)
+{
+	struct sysctl_ctx_list *ctx;
+	struct sysctl_oid *node;
+	struct sysctl_oid_list *parent;
+	int i;
+
+	ctx = device_get_sysctl_ctx(sc->dev);
+	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Statistics");
+	parent = SYSCTL_CHILDREN(node);
+	for (i = 0; i < DPAA2_NI_STAT_SYSCTLS; ++i) {
+		SYSCTL_ADD_PROC(ctx, parent, i, dpni_stat_sysctls[i].name,
+		    CTLTYPE_U64 | CTLFLAG_RD, sc, 0, dpni_collect_stats, "IU",
+		    dpni_stat_sysctls[i].desc);
+	}
+}
+
+/**
+ * @internal
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
@@ -1836,7 +1878,6 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				    changed & IFF_ALLMULTI) {
 					rc = setup_if_flags(sc);
 				}
-				print_statistics(sc);
 			} else {
 				DPNI_UNLOCK(sc);
 				if (bootverbose) {
@@ -2129,7 +2170,7 @@ cmp_api_version(struct dpaa2_ni_softc *sc, uint16_t major, uint16_t minor)
  * @brief Calculate number of channels based on the allocated resources.
  */
 static int
-calc_channels_num(struct dpaa2_ni_softc *sc)
+dpni_channels_num(struct dpaa2_ni_softc *sc)
 {
 	uint8_t i, num_chan;
 
@@ -2247,52 +2288,23 @@ seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 
 /**
  * @internal
- * @brief Print statistics of the network interface.
+ * @brief Collect statistics of the network interface.
  */
 static int
-print_statistics(struct dpaa2_ni_softc *sc)
+dpni_collect_stats(SYSCTL_HANDLER_ARGS)
 {
-	device_t dev = sc->dev;
+	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg1;
+	struct dpni_stat *stat = &dpni_stat_sysctls[oidp->oid_number];
 	uint64_t cnt[DPAA2_NI_STAT_COUNTERS];
-	int error, pages = 3;
+	uint64_t result = 0;
+	int error;
 
-	for (int i = 0; i < pages; i++) {
-		error = DPAA2_CMD_NI_GET_STATISTICS(dev,
-		    dpaa2_mcp_tk(sc->cmd, sc->ni_token), i, 0, cnt);
-		if (error) {
-			device_printf(dev, "Failed to get statistics: page=%d, "
-			    "error=%d\n", i, error);
-			continue;
-		}
+	error = DPAA2_CMD_NI_GET_STATISTICS(sc->dev,
+	    dpaa2_mcp_tk(sc->cmd, sc->ni_token), stat->page, 0, cnt);
+	if (!error)
+		result = cnt[stat->cnt];
 
-		switch (i) {
-		case 0:
-			device_printf(dev, "INGRESS_ALL_FRAMES=%lu\n", cnt[0]);
-			device_printf(dev, "INGRESS_ALL_BYTES=%lu\n", cnt[1]);
-			device_printf(dev, "INGRESS_MULTICAST_FRAMES=%lu\n",
-			    cnt[2]);
-			break;
-		case 1:
-			device_printf(dev, "EGRESS_ALL_FRAMES=%lu\n", cnt[0]);
-			device_printf(dev, "EGRESS_ALL_BYTES=%lu\n", cnt[1]);
-			device_printf(dev, "EGRESS_MULTICAST_FRAMES=%lu\n",
-			    cnt[2]);
-			break;
-		case 2:
-			device_printf(dev, "INGRESS_FILTERED_FRAMES=%lu\n",
-			    cnt[0]);
-			device_printf(dev, "INGRESS_DISCARDED_FRAMES=%lu\n",
-			    cnt[1]);
-			device_printf(dev, "INGRESS_NOBUFFER_DISCARDS=%lu\n",
-			    cnt[2]);
-			break;
-		default:
-			/* Other pages aren't interesting at the moment. */
-			break;
-		}
-	}
-
-	return (0);
+	return (sysctl_handle_64(oidp, &result, 0, req));
 }
 
 /**

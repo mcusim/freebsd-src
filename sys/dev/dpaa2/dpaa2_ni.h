@@ -66,6 +66,7 @@
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
+#define	DPAA2_NI_STAT_SYSCTLS	9u
 
 /* Error and status bits in the frame annotation status word. */
 #define DPAA2_NI_FAS_DISC	0x80000000 /* debug frame */
@@ -211,11 +212,13 @@ struct dpaa2_ni_sbuf {
  * NOTE: Several WQs are organized into a single WQ Channel.
  */
 struct dpaa2_ni_channel {
-	struct dpaa2_io_notif_ctx ctx;
 	device_t		 ni_dev;
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
+
+	/* Context to configure CDAN. */
+	struct dpaa2_io_notif_ctx ctx;
 
 	/* Buffers for buffer pool. */
 	uint32_t		 buf_num;
