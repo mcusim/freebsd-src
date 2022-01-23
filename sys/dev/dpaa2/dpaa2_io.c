@@ -216,6 +216,12 @@ dpaa2_io_attach(device_t dev)
 		    "error=%d\n", dinfo->id, error);
 		goto err_close_io;
 	}
+	error = DPAA2_CMD_IO_ENABLE(dev, sc->cmd);
+	if (error) {
+		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
+		    dinfo->id, error);
+		goto err_close_io;
+	}
 
 	/* Prepare helper object to work with the QBMan software portal. */
 	sc->swp_desc.dpio_dev = dev;
