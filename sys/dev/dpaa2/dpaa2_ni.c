@@ -1435,10 +1435,17 @@ static int
 setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
     struct sysctl_oid_list *parent)
 {
-	SYSCTL_ADD_INT(ctx, parent, OID_AUTO, "sb_frames",
+	struct sysctl_oid *node;
+	struct sysctl_oid_list *chan_parent;
+
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, chan->id,
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
+	chan_parent = SYSCTL_CHILDREN(node);
+
+	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sb_frames",
 	    CTLFLAG_RD, &chan->sb_frames, 0,
 	    "Frames that store data in a single buffer");
-	SYSCTL_ADD_INT(ctx, parent, OID_AUTO, "sg_frames",
+	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sg_frames",
 	    CTLFLAG_RD, &chan->sg_frames, 0,
 	    "Frames with data distributed in multiple buffers");
 
