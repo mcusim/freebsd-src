@@ -445,11 +445,9 @@ dpio_msi_intr(void *arg)
 	for (int i = 0; i < cdan_n; i++)
 		taskqueue_enqueue(ctx[i]->tq, ctx[i]->notif_task);
 
-	/* Enable software portal interrupts back. */
-	if (cdan_n == 0) {
-		dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
-	}
+	/* Enable software portal interrupts back */
+	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
+	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
 static device_method_t dpaa2_io_methods[] = {
