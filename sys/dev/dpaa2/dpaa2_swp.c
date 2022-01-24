@@ -111,6 +111,8 @@ __FBSDID("$FreeBSD$");
 #define RAR_VB(rar)			((rar) & 0x80u)
 #define RAR_SUCCESS(rar)		((rar) & 0x100u)
 
+#define PREFETCH_L1(ptr)  __asm__ __volatile__("prfm pldl1keep, %0" ::"Q"(*(ptr)))
+
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
 enum qbman_sdqcr_dct {
@@ -687,7 +689,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 
 	verb = bus_read_4(map, offset);
 	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) {
-		__builtin_prefetch((void *) (dqe_base + offset));
+		PREFETCH_L1(dqe_base + offset);
 		return (ENOENT);
 	}
 
@@ -711,7 +713,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	offset = swp->cfg.mem_backed
 	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
 	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
-	__builtin_prefetch((void *) (dqe_base + offset));
+	PREFETCH_L1(dqe_base + offset);
 
 	return (0);
 }
