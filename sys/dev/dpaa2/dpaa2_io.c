@@ -69,6 +69,11 @@ __FBSDID("$FreeBSD$");
 #define DPIO_IRQ_INDEX		0 /* index of the only DPIO IRQ */
 #define DPIO_POLL_MAX		32
 
+#define CMD_SLEEP_TIMEOUT	1u	/* ms */
+#define CMD_SLEEP_ATTEMPTS	2000u	/* max. 2000 ms */
+#define CMD_SPIN_TIMEOUT	100u	/* us */
+#define CMD_SPIN_ATTEMPTS	20000u	/* max. 2000 ms */
+
 /*
  * Memory:
  *	0: cache-enabled part of the QBMan software portal.
@@ -415,6 +420,7 @@ dpio_msi_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx[DPIO_POLL_MAX];
+	struct dpaa2_swp *swp = sc->swp;
 	struct dpaa2_dq dq;
 	uint32_t idx, status;
 	uint16_t flags;
