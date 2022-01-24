@@ -67,7 +67,6 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_io.h"
 
 #define DPIO_IRQ_INDEX		0 /* index of the only DPIO IRQ */
-#define DPIO_POLL_MAX		32
 
 #define CMD_SLEEP_TIMEOUT	1u	/* ms */
 #define CMD_SLEEP_ATTEMPTS	2000u	/* max. 2000 ms */
@@ -421,6 +420,9 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx[DPIO_POLL_MAX];
 	struct dpaa2_swp *swp = sc->swp;
+	const uint32_t attempts = swp->cfg.atomic
+	    ? CMD_SPIN_ATTEMPTS
+	    : CMD_SLEEP_ATTEMPTS;
 	struct dpaa2_dq dq;
 	uint32_t idx, status;
 	uint16_t flags;
@@ -437,9 +439,7 @@ dpio_msi_intr(void *arg)
 		return;
 	}
 
-	dsb(osh);
-
-	for (int i = 0; i < DPIO_POLL_MAX; i++) {
+	for (int i = 0; i < attempts; i++) {
 		rc = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
 		if (rc == EAGAIN) {
 			if (swp->cfg.atomic)

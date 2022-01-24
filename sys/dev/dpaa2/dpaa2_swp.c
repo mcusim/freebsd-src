@@ -643,7 +643,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 {
 	struct resource_map *map;
 	struct dpaa2_swp_rsp *rsp = (struct dpaa2_swp_rsp *) dq;
-	uint32_t verb, offset, pi; /* producer index */
+	uint32_t verb, ret, offset, pi; /* producer index */
 
 	if (swp == NULL || dq == NULL)
 		return (EINVAL);
@@ -652,6 +652,8 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	offset = swp->cfg.mem_backed
 	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
 	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
+
+	dsb(osh);
 
 	/*
 	 * Before using valid-bit to detect if something is there, we have to
@@ -694,9 +696,12 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	 * valid-bit behaviour is repaired and should tell us what we already
 	 * knew from reading PI.
 	 */
-	verb = bus_read_4(map, offset);
-	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit)
+	ret = bus_read_4(map, offset);
+	verb = ret & ~DPAA2_SWP_VALID_BIT; /* remove valid bit */
+	if (verb == 0u)
 		return (EAGAIN);
+	/* if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) */
+	/* 	return (EAGAIN); */
 
 	/* Read dequeue response message. */
 	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
