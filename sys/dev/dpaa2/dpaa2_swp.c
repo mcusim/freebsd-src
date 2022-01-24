@@ -643,13 +643,12 @@ int
 dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
     uint32_t *idx)
 {
-	struct resource_map *map = swp->cena_map;
+	struct resource_map *map = swp->cinh_map;
 	struct dpaa2_swp_rsp *rsp = (struct dpaa2_swp_rsp *) dq;
 	uint32_t verb, pi; /* producer index */
 	uint32_t offset = swp->cfg.mem_backed
 	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
 	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
-	uintptr_t dqe_base = (uintptr_t) rman_get_virtual(swp->cena_res);
 
 	if (swp == NULL || dq == NULL)
 		return (EINVAL);
@@ -688,10 +687,8 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	}
 
 	verb = bus_read_4(map, offset);
-	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) {
-		PREFETCH_L1(dqe_base + offset);
+	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit)
 		return (ENOENT);
-	}
 
 	/* Read dequeue response message. */
 	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
@@ -709,11 +706,6 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	swp->dqrr.next_idx &= swp->dqrr.ring_size - 1; /* wrap around */
 	if (swp->dqrr.next_idx == 0u)
 		swp->dqrr.valid_bit ^= DPAA2_SWP_VALID_BIT;
-
-	offset = swp->cfg.mem_backed
-	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
-	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
-	PREFETCH_L1(dqe_base + offset);
 
 	return (0);
 }
