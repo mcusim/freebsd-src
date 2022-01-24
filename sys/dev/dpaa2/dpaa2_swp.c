@@ -215,7 +215,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 		p->dqrr.reset_bug = 1;
 	} else {
 		p->dqrr.ring_size = 8;
-		p->dqrr.reset_bug = 1;
+		p->dqrr.reset_bug = 0;
 	}
 
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
@@ -249,7 +249,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 		    1, /* Dequeued frame data, annotation, and FQ context stashing priority */			/* SP */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
 		    1, /* Dequeue response ring (DQRR) entry stashing priority */				/* DP */
-		    1, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
+		    0, /* Dequeue response ring (DQRR) entry, or cacheable portal area, stashing enable. */	/* DE */
 		    0  /* EQCR_CI stashing priority */								/* EP */
 		);
 		/* TODO: Switch to memory-backed mode. */
@@ -684,9 +684,8 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 		 *	 increments one at a time), rather than on pi (which
 		 *	 can burst and wrap-around between our snapshots of it).
 		 */
-
-		/* if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1)) */
-		/* 	swp->dqrr.reset_bug = 0; */
+		if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1))
+			swp->dqrr.reset_bug = 0;
 	}
 
 	/* Read dequeue response message. */
