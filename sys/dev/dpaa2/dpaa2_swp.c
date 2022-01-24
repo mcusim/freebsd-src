@@ -295,8 +295,8 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	    & p->eqcr.pi_ci_mask;
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
-	/* Initialize the portal with an IRQ threshold and timeout of 1ms. */
-	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 1000);
+	/* Initialize the portal with an IRQ threshold and timeout of 0us. */
+	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 0);
 
 	*swp = p;
 
@@ -653,8 +653,6 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
 	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
 
-	dsb(osh);
-
 	/*
 	 * Before using valid-bit to detect if something is there, we have to
 	 * handle the case of the DQRR reset bug...
@@ -672,7 +670,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 
 		/* There are new entries if pi != next_idx */
 		if (pi == swp->dqrr.next_idx)
-			return (ENOENT);
+			return (EAGAIN);
 
 		/*
 		 * If next_idx is/was the last ring index, and 'pi' is
@@ -688,11 +686,6 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 			swp->dqrr.reset_bug = 0;
 	}
 
-	/* Read dequeue response message. */
-	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
-		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
-	verb = dq->common.verb;
-
 	/*
 	 * If the valid-bit isn't of the expected polarity, nothing there. Note,
 	 * in the DQRR reset bug workaround, we shouldn't need to skip these
@@ -701,8 +694,13 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	 * valid-bit behaviour is repaired and should tell us what we already
 	 * knew from reading PI.
 	 */
+	verb = bus_read_4(map, offset);
 	if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit)
-		return (ENOENT);
+		return (EAGAIN);
+
+	/* Read dequeue response message. */
+	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
+		rsp->params[i] = bus_read_8(map, offset + i * sizeof(uint64_t));
 
 	/* Return index of the current entry (if requested). */
 	if (idx != NULL)

@@ -418,7 +418,7 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_dq dq;
 	uint32_t idx, status;
 	uint16_t flags;
-	int error, cdan_n = 0;
+	int rc, cdan_n = 0;
 
 	status = dpaa2_swp_read_intr_status(sc->swp);
 	if (status == 0)
@@ -430,10 +430,22 @@ dpio_msi_intr(void *arg)
 		dpaa2_swp_unlock(sc->swp);
 		return;
 	}
+
+	dsb(osh);
+
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
-		error = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
-		if (error)
+		rc = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
+		if (rc == EAGAIN) {
+			if (swp->cfg.atomic)
+				DELAY(CMD_SPIN_TIMEOUT);
+			else
+				pause("dpaa2", CMD_SLEEP_TIMEOUT);
+			continue;
+		} else if (rc > 0) {
 			break;
+		} else {
+			/* rc == 0, DQRR entry is there. */
+		}
 
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN)
