@@ -684,8 +684,9 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 		 *	 increments one at a time), rather than on pi (which
 		 *	 can burst and wrap-around between our snapshots of it).
 		 */
-		if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1))
-			swp->dqrr.reset_bug = 0;
+
+		/* if (swp->dqrr.next_idx == (swp->dqrr.ring_size - 1)) */
+		/* 	swp->dqrr.reset_bug = 0; */
 	}
 
 	/* Read dequeue response message. */

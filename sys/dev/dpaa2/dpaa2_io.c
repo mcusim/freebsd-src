@@ -441,7 +441,7 @@ dpio_msi_intr(void *arg)
 		else
 			device_printf(sc->dev, "unknown DQRR entry\n");
 
-		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx & 0x7u);
+		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx);
 	}
 	dpaa2_swp_unlock(sc->swp);
 
