@@ -428,8 +428,11 @@ dpio_msi_intr(void *arg)
 	}
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
 		error = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
-		if (error)
+		if (error) {
+			device_printf(sc->dev, "dpaa2_swp_dqrr_next_locked: "
+			    "i=%d, error=%d\n", i, error);
 			continue;
+		}
 
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN)
