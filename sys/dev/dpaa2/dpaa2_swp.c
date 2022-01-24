@@ -641,19 +641,19 @@ int
 dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
     uint32_t *idx)
 {
-	struct resource_map *map;
+	const uint32_t attempts = swp->cfg.atomic
+	    ? CMD_SPIN_ATTEMPTS
+	    : CMD_SLEEP_ATTEMPTS;
+	struct resource_map *map = swp->cena_map;
 	struct dpaa2_swp_rsp *rsp = (struct dpaa2_swp_rsp *) dq;
-	uint32_t verb, ret, offset, pi; /* producer index */
+	uint32_t verb, ret, pi; /* producer index */
+	uint32_t offset = swp->cfg.mem_backed
+	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
+	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
+	int i;
 
 	if (swp == NULL || dq == NULL)
 		return (EINVAL);
-
-	map = swp->cena_map;
-	offset = swp->cfg.mem_backed
-	    ? DPAA2_SWP_CENA_DQRR_MEM(swp->dqrr.next_idx)
-	    : DPAA2_SWP_CENA_DQRR(swp->dqrr.next_idx);
-
-	dsb(osh);
 
 	/*
 	 * Before using valid-bit to detect if something is there, we have to
@@ -688,20 +688,36 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 			swp->dqrr.reset_bug = 0;
 	}
 
-	/*
-	 * If the valid-bit isn't of the expected polarity, nothing there. Note,
-	 * in the DQRR reset bug workaround, we shouldn't need to skip these
-	 * check, because we've already determined that a new entry is available
-	 * and we've invalidated the cacheline before reading it, so the
-	 * valid-bit behaviour is repaired and should tell us what we already
-	 * knew from reading PI.
-	 */
-	ret = bus_read_4(map, offset);
-	verb = ret & ~DPAA2_SWP_VALID_BIT; /* remove valid bit */
-	if (verb == 0u)
-		return (ENOENT);
-	/* if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) */
-	/* 	return (ENOENT); */
+	/* Wait for a command response from QBMan. */
+	for (i = 1; i <= attempts; i++) {
+		if (swp->cfg.mem_backed) {
+			verb = (uint32_t) (bus_read_4(map, offset) & 0xFFu);
+			if (swp->dqrr.valid_bit != (verb & DPAA2_SWP_VALID_BIT))
+				goto wait;
+			if (!(verb & ~DPAA2_SWP_VALID_BIT))
+				goto wait;
+		} else {
+			ret = bus_read_4(map, offset);
+			verb = ret & ~DPAA2_SWP_VALID_BIT; /* remove valid bit */
+			if (verb == 0u)
+				goto wait;
+		}
+		break;
+ wait:
+		if (swp->cfg.atomic)
+			DELAY(CMD_SPIN_TIMEOUT);
+		else
+			pause("dpaa2", CMD_SLEEP_TIMEOUT);
+		/*
+		 * Let's have a data synchronization barrier for the whole
+		 * system to be sure that QBMan's command execution result is
+		 * transferred to memory.
+		 */
+		dsb(osh);
+	}
+	/* Return an error on expired timeout. */
+	if (i > attempts)
+		return (ETIMEDOUT);
 
 	/* Read dequeue response message. */
 	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
