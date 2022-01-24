@@ -433,6 +433,9 @@ dpio_msi_intr(void *arg)
 
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
 		rc = dpaa2_swp_dqrr_next_locked(sc->swp, &dq, &idx);
+		if (rc == ETIMEDOUT)
+			device_printf(sc->dev, "dpaa2_swp_dqrr_next_locked(): "
+			    "timeout\n");
 		if (rc)
 			break;
 
