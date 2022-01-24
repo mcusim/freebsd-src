@@ -416,9 +416,13 @@ dpio_msi_intr(void *arg)
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx[DPIO_POLL_MAX];
 	struct dpaa2_dq dq;
-	uint32_t idx;
+	uint32_t idx, status;
 	uint16_t flags;
 	int error, cdan_n = 0;
+
+	status = dpaa2_swp_read_intr_status(sc->swp);
+	if (status == 0)
+		return;
 
 	dpaa2_swp_lock(sc->swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
@@ -446,7 +450,7 @@ dpio_msi_intr(void *arg)
 		taskqueue_enqueue(ctx[i]->tq, ctx[i]->notif_task);
 
 	/* Enable software portal interrupts back */
-	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
+	dpaa2_swp_clear_intr_status(sc->swp, status);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
 }
 
