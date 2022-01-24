@@ -215,7 +215,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 		p->dqrr.reset_bug = 1;
 	} else {
 		p->dqrr.ring_size = 8;
-		p->dqrr.reset_bug = 0;
+		p->dqrr.reset_bug = 1;
 	}
 
 	if ((desc->swp_version & DPAA2_SWP_REV_MASK) < DPAA2_SWP_REV_5000) {
