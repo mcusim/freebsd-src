@@ -672,7 +672,7 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 
 		/* There are new entries if pi != next_idx */
 		if (pi == swp->dqrr.next_idx)
-			return (EAGAIN);
+			return (ENOENT);
 
 		/*
 		 * If next_idx is/was the last ring index, and 'pi' is
@@ -699,9 +699,9 @@ dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
 	ret = bus_read_4(map, offset);
 	verb = ret & ~DPAA2_SWP_VALID_BIT; /* remove valid bit */
 	if (verb == 0u)
-		return (EAGAIN);
+		return (ENOENT);
 	/* if ((verb & DPAA2_SWP_VALID_BIT) != swp->dqrr.valid_bit) */
-	/* 	return (EAGAIN); */
+	/* 	return (ENOENT); */
 
 	/* Read dequeue response message. */
 	for (int i = 0; i < DPAA2_SWP_RSP_PARAMS_N; i++)
