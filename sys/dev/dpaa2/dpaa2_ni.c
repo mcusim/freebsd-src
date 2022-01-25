@@ -437,6 +437,8 @@ static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 
 static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
+/* For debug purposes only! */
+static int dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS);
 
 /* ISRs */
 
