@@ -345,6 +345,42 @@ static struct dpni_stat {
 	{  2, 2, "in_nobuf_discards",	"Discards on ingress side due to buffer depletion in DPNI buffer pools" },
 };
 
+/* For debug purposes only! */
+#define RX_FRAME_LOG_LEN	20
+#define RX_LOG_LOCK(lock) do {			\
+	mtx_assert(&(lock), MA_NOTOWNED);	\
+	mtx_lock(&(lock));			\
+} while (0)
+#define	RX_LOG_UNLOCK(lock)	mtx_unlock(&(lock))
+struct mtx dpni_rx_frames_log_lock;
+static uint32_t rx_frame_log_idx;
+static struct rx_frame_log {
+	uint64_t	 addr;
+	uint32_t	 length;
+	uint32_t	 offset;
+} dpni_rx_frame_log[RX_FRAME_LOG_LEN] = {
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+	{ 0, 0, 0 },
+};
+
 /* Forward declarations. */
 
 static int setup_dpni(device_t);
@@ -452,6 +488,11 @@ dpaa2_ni_attach(device_t dev)
 	sc->mac.dpmac_id = 0;
 	sc->mac.phy_dev = NULL;
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
+
+	/* For debug purposes only! */
+	mtx_init(&dpni_rx_frames_log_lock, device_get_nameunit(dev),
+	    "rxlog lock", MTX_DEF);
+	rx_frame_log_idx = 0;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
 	if (error) {
@@ -1412,6 +1453,7 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 	struct sysctl_ctx_list *ctx;
 	struct sysctl_oid *node;
 	struct sysctl_oid_list *parent;
+	char buf[64];
 	int i;
 
 	ctx = device_get_sysctl_ctx(sc->dev);
@@ -1424,6 +1466,22 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		SYSCTL_ADD_PROC(ctx, parent, i, dpni_stat_sysctls[i].name,
 		    CTLTYPE_U64 | CTLFLAG_RD, sc, 0, dpni_collect_stats, "IU",
 		    dpni_stat_sysctls[i].desc);
+	}
+
+	/* For debug purposes only! */
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "debug",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Debug information");
+	parent = SYSCTL_CHILDREN(node);
+
+	/* For debug purposes only! */
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "rx_frame_log",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Rx frames log");
+	parent = SYSCTL_CHILDREN(node);
+	for (i = 0; i < RX_FRAME_LOG_LEN; ++i) {
+		snprintf(buf, 64, "f%d", i);
+		SYSCTL_ADD_PROC(ctx, parent, i, buf,
+		    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+		    dpni_collect_rx_frame_log, "S", "Rx frame log entry");
 	}
 
 	return (0);
@@ -1458,12 +1516,6 @@ setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
 	SYSCTL_ADD_U64(ctx, chan_parent, OID_AUTO, "frame_datap",
 	    CTLFLAG_RD, &chan->frame_datap, 0,
 	    "Pointer to the frame data or S/G table");
-	SYSCTL_ADD_U64(ctx, chan_parent, OID_AUTO, "frame_datap",
-	    CTLFLAG_RD, &chan->frame_datap, 0,
-	    "Pointer to the frame data or S/G table");
-	SYSCTL_ADD_U32(ctx, chan_parent, OID_AUTO, "frame_datalen",
-	    CTLFLAG_RD, &chan->frame_datalen, 0,
-	    "Length of the frame data");
 
 	return (0);
 }
@@ -2165,8 +2217,14 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	}
 	chan->all_frames++;
 
-	chan->frame_datap = fd->addr;
-	chan->frame_datalen = fd->length;
+	/* For debug purposes only! */
+	RX_LOG_LOCK(dpni_rx_frames_log_lock);
+	dpni_rx_frame_log[rx_frame_log_idx].addr = fd->addr;
+	dpni_rx_frame_log[rx_frame_log_idx].length = fd->length;
+	dpni_rx_frame_log[rx_frame_log_idx].offset = fd->off_fmt_sl & 0xFFFu;
+	rx_frame_log_idx++;
+	rx_frame_log_idx &= RX_FRAME_LOG_LEN - 1; /* wrap around */
+	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2398,6 +2456,21 @@ dpni_collect_stats(SYSCTL_HANDLER_ARGS)
 		result = cnt[stat->cnt];
 
 	return (sysctl_handle_64(oidp, &result, 0, req));
+}
+
+/* For debug purposes only! */
+static int
+dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS)
+{
+	struct rx_frame_log le;
+
+	RX_LOG_LOCK(dpni_rx_frames_log_lock);
+	le.addr = dpni_rx_frame_log[oidp->oid_number].addr;
+	le.length = dpni_rx_frame_log[oidp->oid_number].length;
+	le.offset = dpni_rx_frame_log[oidp->oid_number].offset;
+	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
+
+	return sysctl_handle_opaque(oidp, &le, sizeof(le), req);
 }
 
 /**
