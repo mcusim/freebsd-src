@@ -746,11 +746,11 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 	 * 3 - Dequeue with active FQ precedence, and override Intra-WQ class
 	 * scheduling.
 	 */
-	cmd.verb |= 2 << QB_VDQCR_VERB_DCT_SHIFT;
+	cmd.verb |= 1 << QB_VDQCR_VERB_DCT_SHIFT;
 	/* Dequeue from a specific software portal channel. */
 	cmd.verb |= 0 << QB_VDQCR_VERB_DT_SHIFT;
 	/* Reschedule the FQ after dequeue (valid only if the RLS bit is 1). */
-	cmd.verb |= 1 << QB_VDQCR_VERB_RAD_SHIFT;
+	/* cmd.verb |= 1 << QB_VDQCR_VERB_RAD_SHIFT; */
 
 	/* Retry while portal is busy */
 	do {

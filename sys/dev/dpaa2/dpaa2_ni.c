@@ -852,7 +852,6 @@ setup_channels(device_t dev)
 		channel->all_frames = 0;
 		channel->sb_frames = 0;
 		channel->sg_frames = 0;
-		channel->consumed_frames = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -1456,9 +1455,15 @@ setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
 	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sg_frames",
 	    CTLFLAG_RD, &chan->sg_frames, 0,
 	    "Frames with data distributed in multiple buffers");
-	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "consumed_frames",
-	    CTLFLAG_RD, &chan->consumed_frames, 0,
-	    "All frames consumed on this channel");
+	SYSCTL_ADD_U64(ctx, chan_parent, OID_AUTO, "frame_datap",
+	    CTLFLAG_RD, &chan->frame_datap, 0,
+	    "Pointer to the frame data or S/G table");
+	SYSCTL_ADD_U64(ctx, chan_parent, OID_AUTO, "frame_datap",
+	    CTLFLAG_RD, &chan->frame_datap, 0,
+	    "Pointer to the frame data or S/G table");
+	SYSCTL_ADD_U32(ctx, chan_parent, OID_AUTO, "frame_datalen",
+	    CTLFLAG_RD, &chan->frame_datalen, 0,
+	    "Length of the frame data");
 
 	return (0);
 }
@@ -2020,10 +2025,23 @@ static void
 dpni_poll_channel(void *arg, int count)
 {
 	struct dpaa2_ni_channel *chan = (struct dpaa2_ni_channel *) arg;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
 	int error, consumed = 0;
+	int i, j;
+
+	/*
+	 * Synchronize all buffers in the buffer pool.
+	 *
+	 * NOTE: There should be a clever way to synchronize buffers only for
+	 * 	 the given channel (or the only required buffer at all).
+	 */
+	for (i = 0; i < sc->num_chan; i++)
+		for (j = 0; j < DPAA2_NI_BUFS_PER_CHAN; j++)
+			bus_dmamap_sync(sc->bp_dmat, sc->channel[i]->buf[j].dmap,
+			    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
@@ -2033,6 +2051,10 @@ dpni_poll_channel(void *arg, int count)
 			    "chan_id=%d, error=%d\n", chan->id, error);
 			break;
 		}
+
+		/* Let's sync DQRR response from QBMan. */
+		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 		error = dpni_consume_frames(chan, &fq, &consumed);
 		if (error == ENOENT)
@@ -2065,11 +2087,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	int frames = 0, retries = 0;
 	int rc, i;
 
-	bus_dmamap_sync(sc->st_dmat, chan->store.dmap, BUS_DMASYNC_POSTREAD);
-	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i++)
-		bus_dmamap_sync(sc->bp_dmat, chan->buf[i].dmap,
-		    BUS_DMASYNC_POSTREAD);
-
 	do {
 		rc = chan_storage_next(chan, &dq);
 		if (rc == EAGAIN) {
@@ -2077,7 +2094,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 				rc = ETIMEDOUT;
 				break;
 			}
-			cpu_spinwait();
 			retries++;
 			continue;
 		} else if (rc == EINPROGRESS) {
@@ -2109,13 +2125,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 	KASSERT(chan->store_idx < chan->store_sz,
 	    ("channel store should have idx < size: store_idx=%d, store_sz=%d",
 	    chan->store_idx, chan->store_sz));
-
-	chan->consumed_frames += frames;
-
-	bus_dmamap_sync(sc->st_dmat, chan->store.dmap, BUS_DMASYNC_PREREAD);
-	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i++)
-		bus_dmamap_sync(sc->bp_dmat, chan->buf[i].dmap,
-		    BUS_DMASYNC_PREREAD);
 
 	/*
 	 * A dequeue operation pulls frames from a single queue into the store.
@@ -2156,6 +2165,9 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		break;
 	}
 	chan->all_frames++;
+
+	chan->frame_datap = fd->addr;
+	chan->frame_datalen = fd->length;
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2294,7 +2306,8 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 
 	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
 		/* Allocate enough buffers to release in one QBMan command. */
-		for (int j = bufn = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
+		bufn = 0;
+		for (int j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf = &chan->buf[i + j];
 
 			error = bus_dmamem_alloc(sc->bp_dmat, &buf->vaddr,
