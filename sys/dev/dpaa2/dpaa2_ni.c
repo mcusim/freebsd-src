@@ -1458,7 +1458,6 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 	struct sysctl_ctx_list *ctx;
 	struct sysctl_oid *node;
 	struct sysctl_oid_list *parent;
-	char buf[64];
 	int i;
 
 	ctx = device_get_sysctl_ctx(sc->dev);
