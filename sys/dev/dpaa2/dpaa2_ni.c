@@ -346,7 +346,7 @@ static struct dpni_stat {
 };
 
 /* For debug purposes only! */
-#define RX_FRAME_LOG_LEN	20
+#define RX_FRAME_LOG_LEN	16
 #define RX_LOG_LOCK(lock) do {			\
 	mtx_assert(&(lock), MA_NOTOWNED);	\
 	mtx_lock(&(lock));			\
@@ -359,10 +359,6 @@ static struct rx_frame_log {
 	uint32_t	 length;
 	uint32_t	 offset;
 } dpni_rx_frame_log[RX_FRAME_LOG_LEN] = {
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
 	{ 0, 0, 0 },
 	{ 0, 0, 0 },
 	{ 0, 0, 0 },
@@ -1469,6 +1465,8 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLTYPE_U64 | CTLFLAG_RD, sc, 0, dpni_collect_stats, "IU",
 		    dpni_stat_sysctls[i].desc);
 	}
+
+	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
 	/* For debug purposes only! */
 	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "debug",
