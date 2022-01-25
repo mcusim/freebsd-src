@@ -2226,17 +2226,19 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	rx_frame_log_idx &= RX_FRAME_LOG_LEN - 1; /* wrap around */
 	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
 
+	/* NOTE: Do not release a buffer back to the pool for now. */
+
 	/* There's only one buffer pool for now. */
-	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
-	bpsc = device_get_softc(bp_dev);
+	/* bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]); */
+	/* bpsc = device_get_softc(bp_dev); */
 
 	/* Release buffer to QBMan buffer pool. */
-	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
-	if (error) {
-		device_printf(sc->dev, "failed to release frame buffer to the "
-		    "pool: error=%d\n", error);
-		return (error);
-	}
+	/* error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1); */
+	/* if (error) { */
+	/* 	device_printf(sc->dev, "failed to release frame buffer to the " */
+	/* 	    "pool: error=%d\n", error); */
+	/* 	return (error); */
+	/* } */
 
 	return (0);
 }
