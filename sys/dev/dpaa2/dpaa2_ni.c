@@ -345,6 +345,7 @@ static struct dpni_stat {
 	{  2, 2, "in_nobuf_discards",	"Discards on ingress side due to buffer depletion in DPNI buffer pools" },
 };
 
+#if 0
 /* For debug purposes only! */
 #define RX_FRAME_LOG_LEN	16
 #define RX_LOG_LOCK(lock) do {			\
@@ -376,6 +377,7 @@ static struct rx_frame_log {
 	{ 0, 0, 0 },
 	{ 0, 0, 0 },
 };
+#endif
 
 /* Forward declarations. */
 
@@ -433,8 +435,11 @@ static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 
 static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
+
+#if 0
 /* For debug purposes only! */
 static int dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS);
+#endif
 
 /* ISRs */
 
@@ -487,10 +492,12 @@ dpaa2_ni_attach(device_t dev)
 	sc->mac.phy_dev = NULL;
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
 
+#if 0
 	/* For debug purposes only! */
 	mtx_init(&dpni_rx_frames_log_lock, device_get_nameunit(dev),
 	    "rxlog lock", MTX_DEF);
 	rx_frame_log_idx = 0;
+#endif
 
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
 	if (error) {
@@ -1468,6 +1475,7 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
+#if 0
 	/* For debug purposes only! */
 	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "debug",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Debug information");
@@ -1483,6 +1491,7 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
 		    dpni_collect_rx_frame_log, "S", "Rx frame log entry");
 	}
+#endif
 
 	return (0);
 }
@@ -2196,12 +2205,12 @@ static int
 dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	/* device_t bp_dev; */
-	/* struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev); */
-	/* struct dpaa2_bp_softc *bpsc; */
-	/* bus_addr_t paddr = (bus_addr_t) fd->addr; */
+	device_t bp_dev;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
+	struct dpaa2_bp_softc *bpsc;
+	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	uint8_t fd_format = ((fd->off_fmt_sl) >> 12) & 0x3;
-	/* int error; */
+	int error;
 
 	/* For debug purposes only! */
 	switch (fd_format) {
@@ -2217,6 +2226,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	}
 	chan->all_frames++;
 
+#if 0
 	/* For debug purposes only! */
 	RX_LOG_LOCK(dpni_rx_frames_log_lock);
 	dpni_rx_frame_log[rx_frame_log_idx].addr = fd->addr;
@@ -2225,20 +2235,19 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	rx_frame_log_idx++;
 	rx_frame_log_idx &= RX_FRAME_LOG_LEN - 1; /* wrap around */
 	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
-
-	/* NOTE: Do not release a buffer back to the pool for now. */
+#endif
 
 	/* There's only one buffer pool for now. */
-	/* bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]); */
-	/* bpsc = device_get_softc(bp_dev); */
+	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+	bpsc = device_get_softc(bp_dev);
 
 	/* Release buffer to QBMan buffer pool. */
-	/* error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1); */
-	/* if (error) { */
-	/* 	device_printf(sc->dev, "failed to release frame buffer to the " */
-	/* 	    "pool: error=%d\n", error); */
-	/* 	return (error); */
-	/* } */
+	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
+	if (error) {
+		device_printf(sc->dev, "failed to release frame buffer to the "
+		    "pool: error=%d\n", error);
+		return (error);
+	}
 
 	return (0);
 }
@@ -2460,6 +2469,7 @@ dpni_collect_stats(SYSCTL_HANDLER_ARGS)
 	return (sysctl_handle_64(oidp, &result, 0, req));
 }
 
+#if 0
 /* For debug purposes only! */
 static int
 dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS)
@@ -2474,6 +2484,7 @@ dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS)
 
 	return sysctl_handle_opaque(oidp, &le, sizeof(le), req);
 }
+#endif
 
 /**
  * @internal
