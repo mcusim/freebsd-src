@@ -1488,7 +1488,7 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Rx frames log");
 	parent = SYSCTL_CHILDREN(node);
 	for (i = 0; i < RX_FRAME_LOG_LEN; ++i) {
-		snprintf(buf, 64, "f%d", i);
+		snprintf(buf, 64, "f%2d", i);
 		SYSCTL_ADD_PROC(ctx, parent, i, buf,
 		    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
 		    dpni_collect_rx_frame_log, "S", "Rx frame log entry");
