@@ -132,7 +132,7 @@ __FBSDID("$FreeBSD$");
 
 /* Channel storage buffer configuration. */
 #define ETH_STORE_FRAMES	16
-#define ETH_STORE_SIZE		((ETH_STORE_FRAMES + 16) * sizeof(struct dpaa2_dq))
+#define ETH_STORE_SIZE		((ETH_STORE_FRAMES + 1) * sizeof(struct dpaa2_dq))
 #define ETH_STORE_ALIGN		64
 
 /* Buffers layout options. */
@@ -822,7 +822,7 @@ setup_channels(device_t dev)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR_40BIT,	/* low restricted addr */
 	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
@@ -890,10 +890,12 @@ setup_channels(device_t dev)
 
 		sc->channel[i] = channel;
 
+		channel->id = consc->attr.chan_id;
+		channel->idx = i;
+
 		channel->ni_dev = dev;
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
-		channel->id = consc->attr.chan_id;
 		channel->buf_num = 0;
 		channel->all_frames = 0;
 		channel->sb_frames = 0;
@@ -2161,22 +2163,19 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
 				frames++;
-			} else
-				device_printf(chan->ni_dev, "stage 1\n");
+			}
 		} else if (rc == EALREADY || rc == ENOENT) {
 			if (dq != NULL) {
 				fd = &dq->fdr.fd;
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
 				frames++;
-			} else
-				device_printf(chan->ni_dev, "stage 2\n");
+			}
 			/* Make VDQ command available again. */
 			atomic_xchg(&swp->vdq.avail, 1);
 			break;
 		} else {
 			/* Should not reach here. */
-			device_printf(chan->ni_dev, "stage 3\n");
 		}
 		retries = 0;
 	} while (true);
@@ -2361,7 +2360,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
-	int error, bufn;
+	int i, j, error, bufn, buf_idx;
 
 	/* DMA tag for buffer pool must already be created. */
 	if (sc->bp_dmat == NULL)
@@ -2371,11 +2370,16 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
 
-	for (int i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
+	KASSERT(DPAA2_NI_BUFS_PER_CHAN <= DPAA2_NI_MAX_BPC,
+	    ("maximum buffers per channel must be <= %d: buffers=%d",
+	    DPAA2_NI_MAX_BPC, DPAA2_NI_BUFS_PER_CHAN));
+
+	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
 		/* Allocate enough buffers to release in one QBMan command. */
 		bufn = 0;
-		for (int j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
-			buf = &chan->buf[i + j];
+		for (j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
+			buf_idx = i + j;
+			buf = &chan->buf[buf_idx];
 
 			error = bus_dmamem_alloc(sc->bp_dmat, &buf->vaddr,
 			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
@@ -2394,6 +2398,22 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 				    "buffer for buffer pool\n");
 				return (error);
 			}
+
+			/*
+			 * Write a channel index and a buffer index to the
+			 * ADDR_TOK (63-49 msb) which is not used by WRIOP.
+			 *
+			 * NOTE: lowaddr and highaddr of the window which cannot
+			 *	 be accessed by WRIOP must be configured in
+			 *	 DMA tag accordingly.
+			 */
+			buf->paddr =
+			    ((chan->idx & DPAA2_NI_BUF_CHAN_MASK) <<
+				DPAA2_NI_BUF_CHAN_SHIFT) |
+			    ((buf_idx & DPAA2_NI_BUF_IDX_MASK) <<
+				DPAA2_NI_BUF_IDX_SHIFT) |
+			    (buf->paddr & DPAA2_NI_BUF_ADDR_MASK);
+
 			paddr[bufn] = buf->paddr;
 			bufn++;
 		}

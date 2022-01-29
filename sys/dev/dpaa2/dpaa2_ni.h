@@ -62,7 +62,14 @@
     DPAA2_NI_MAX_RXEQ)
 
 /* Maximum number of buffers allocated per channel. */
-#define DPAA2_NI_BUFS_PER_CHAN	(50 * DPAA2_SWP_BUFS_PER_CMD)
+#define DPAA2_NI_BUFS_PER_CHAN	(50u * DPAA2_SWP_BUFS_PER_CMD)
+#define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
+
+#define DPAA2_NI_BUF_ADDR_MASK	(0x1FFFFFFFFFFFFul) /* 49-bit addresses max. */
+#define DPAA2_NI_BUF_CHAN_MASK	(0xFu)
+#define DPAA2_NI_BUF_CHAN_SHIFT	(60)
+#define DPAA2_NI_BUF_IDX_MASK	(0x7FFu)
+#define DPAA2_NI_BUF_IDX_SHIFT	(49)
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
@@ -216,6 +223,7 @@ struct dpaa2_ni_channel {
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
+	uint16_t		 idx;
 
 	/* For debug purposes only! */
 	uint64_t		 frame_datap;
