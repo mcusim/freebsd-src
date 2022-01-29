@@ -2207,9 +2207,9 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
-	/* bus_addr_t paddr = (bus_addr_t) fd->addr; */
+	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	uint8_t fd_format = ((fd->off_fmt_sl) >> 12) & 0x3;
-	/* int error; */
+	int error;
 
 	/* For debug purposes only! */
 	switch (fd_format) {
@@ -2241,12 +2241,12 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bpsc = device_get_softc(bp_dev);
 
 	/* Release buffer to QBMan buffer pool. */
-	/* error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1); */
-	/* if (error) { */
-	/* 	device_printf(sc->dev, "failed to release frame buffer to the " */
-	/* 	    "pool: error=%d\n", error); */
-	/* 	return (error); */
-	/* } */
+	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
+	if (error) {
+		device_printf(sc->dev, "failed to release frame buffer to the "
+		    "pool: error=%d\n", error);
+		return (error);
+	}
 
 	return (0);
 }
