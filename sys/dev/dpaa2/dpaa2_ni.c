@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
 #include <sys/rman.h>
@@ -120,7 +121,7 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_HWA_SIZE		64 /* HW annotation area in RX/TX buffers */
 
 /* Rx buffer configuration. */
-#define ETH_RX_BUF_RAW_SIZE	PAGE_SIZE
+#define ETH_RX_BUF_RAW_SIZE	(MJUM9BYTES)
 #define ETH_RX_BUF_TAILROOM	CACHE_LINE_ALIGN(sizeof(struct mbuf))
 #define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
 
@@ -822,7 +823,7 @@ setup_channels(device_t dev)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_40BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
 	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
@@ -2360,8 +2361,11 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	device_t bp_dev;
 	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_buf *buf;
+	struct mbuf *m;
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
-	int i, j, error, bufn, buf_idx;
+	bus_dma_segment_t segs;
+	bus_dmamap_t dmap;
+	int i, j, error, bufn, buf_idx, nsegs;
 
 	/* DMA tag for buffer pool must already be created. */
 	if (sc->bp_dmat == NULL)
@@ -2376,29 +2380,54 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	    DPAA2_NI_MAX_BPC, DPAA2_NI_BUFS_PER_CHAN));
 
 	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
-		/* Allocate enough buffers to release in one QBMan command. */
+		/* Reset buffers counter. */
 		bufn = 0;
+
+		/* Allocate enough buffers to release in one QBMan command. */
 		for (j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf_idx = i + j;
-			buf = &chan->buf[buf_idx];
 
-			error = bus_dmamem_alloc(sc->bp_dmat, &buf->vaddr,
-			    BUS_DMA_ZERO | BUS_DMA_COHERENT, &buf->dmap);
+			/* Initialize RX buffer. */
+			buf = &chan->buf[buf_idx];
+			buf->dmap = NULL;
+			buf->m = NULL;
+			buf->paddr = 0;
+			buf->vaddr = NULL;
+
+			/* Create DMA map. */
+			error = bus_dmamap_create(sc->bp_dmat, 0, &dmap);
 			if (error) {
+				device_printf(sc->dev, "Failed to create DMA "
+				    "map for a buffer for buffer pool: "
+				    "buf_idx=%d\n", buf_idx);
+				return (error);
+			}
+
+			/* Allocate mbuf. */
+			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR,
+			    ETH_RX_BUF_RAW_SIZE);
+			if (__predict_false(m == NULL)) {
 				device_printf(sc->dev, "Failed to allocate a "
 				    "buffer for buffer pool\n");
+				return (ENOMEM);
+			}
+			m->m_len = m->m_ext.ext_size;
+			m->m_pkthdr.len = m->m_ext.ext_size;
+
+			/* Load mbuf mapping. */
+			error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
+			    m, &segs, &nsegs, BUS_DMA_NOWAIT);
+			if (__predict_false(error != 0 || nsegs != 1)) {
+				KASSERT(1, ("Failed to map a buffer for buffer "
+				    "pool"));
+				m_freem(m);
 				return (error);
 			}
 
-			error = bus_dmamap_load(sc->bp_dmat, buf->dmap,
-			    buf->vaddr, ETH_RX_BUF_RAW_SIZE,
-			    dpni_single_seg_dmamap_cb, &buf->paddr,
-			    BUS_DMA_NOWAIT);
-			if (error) {
-				device_printf(sc->dev, "Failed to map a "
-				    "buffer for buffer pool\n");
-				return (error);
-			}
+			buf->dmap = dmap;
+			buf->m = m;
+			buf->paddr = segs.ds_addr;
+			buf->vaddr = m->m_data;
 
 			/*
 			 * Write a channel index and a buffer index to the
