@@ -2420,9 +2420,10 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
 			    m, &segs, &nsegs, BUS_DMA_NOWAIT);
 			if (__predict_false(error != 0 || nsegs != 1)) {
-				KASSERT(1, ("Failed to map a buffer for buffer "
-				    "pool"));
-				m_freem(m);
+				device_printf(sc->dev, "Failed to map a buffer "
+				    "for buffer pool");
+				if (error == 0)
+					m_freem(m);
 				return (error);
 			}
 			buf->paddr = segs.ds_addr;
