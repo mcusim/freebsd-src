@@ -819,7 +819,12 @@ setup_channels(device_t dev)
 
 	device_printf(dev, "channels=%d\n", sc->num_chan);
 
-	/* DMA tag to allocate buffers for buffer pool. */
+	/*
+	 * DMA tag to allocate buffers for buffer pool.
+	 *
+	 * NOTE: QBMan supports DMA addresses up to 49-bits maximum.
+	 *	 Bits 63-49 are not used by QBMan.
+	 */
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
@@ -2208,9 +2213,11 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
+	struct dpaa2_ni_channel	*buf_chan;
+	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	uint8_t fd_format = ((fd->off_fmt_sl) >> 12) & 0x3;
-	int error;
+	int error, chan_idx, buf_idx;
 
 	/* For debug purposes only! */
 	switch (fd_format) {
@@ -2236,6 +2243,15 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	rx_frame_log_idx &= RX_FRAME_LOG_LEN - 1; /* wrap around */
 	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
 /* #endif */
+
+	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
+	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
+	buf_chan = &sc->channel[chan_idx];
+	buf = &buf_chan->buf[buf_idx];
+
+	KASSERT(paddr == buf->paddr,
+	    ("frame address should be == buf->paddr: fd_addr=%jx, "
+	    "buf->paddr=%jx", paddr, buf->paddr));
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2422,8 +2438,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			if (__predict_false(error != 0 || nsegs != 1)) {
 				device_printf(sc->dev, "Failed to map a buffer "
 				    "for buffer pool\n");
-				if (error == 0)
-					m_freem(m);
+				m_freem(m);
 				return (error);
 			}
 			buf->paddr = segs.ds_addr;
