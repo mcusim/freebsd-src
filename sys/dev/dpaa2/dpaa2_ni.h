@@ -33,6 +33,7 @@
 #include <sys/bus.h>
 #include <sys/queue.h>
 #include <sys/taskqueue.h>
+#include <sys/mbuf.h>
 
 #include <net/ethernet.h>
 
@@ -199,6 +200,7 @@ struct dpaa2_ni_attr {
  * @brief DMA-mapped buffer (for buffer pool, etc.).
  */
 struct dpaa2_ni_buf {
+	struct mbuf		*m; /* pointer to related mbuf */
 	bus_dmamap_t		 dmap;
 	bus_addr_t		 paddr;
 	void			*vaddr;
