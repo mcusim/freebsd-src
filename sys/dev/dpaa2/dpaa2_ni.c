@@ -823,7 +823,7 @@ setup_channels(device_t dev)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR_40BIT,	/* low restricted addr */
 	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
@@ -2421,7 +2421,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			    m, &segs, &nsegs, BUS_DMA_NOWAIT);
 			if (__predict_false(error != 0 || nsegs != 1)) {
 				device_printf(sc->dev, "Failed to map a buffer "
-				    "for buffer pool");
+				    "for buffer pool\n");
 				if (error == 0)
 					m_freem(m);
 				return (error);
