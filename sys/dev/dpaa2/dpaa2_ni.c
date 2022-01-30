@@ -2246,7 +2246,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
 	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
-	buf_chan = &sc->channel[chan_idx];
+	buf_chan = sc->channel[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
 	KASSERT(paddr == buf->paddr,
