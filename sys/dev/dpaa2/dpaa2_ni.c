@@ -2402,6 +2402,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 				    "buf_idx=%d\n", buf_idx);
 				return (error);
 			}
+			buf->dmap = dmap;
 
 			/* Allocate mbuf. */
 			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR,
@@ -2413,6 +2414,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			}
 			m->m_len = m->m_ext.ext_size;
 			m->m_pkthdr.len = m->m_ext.ext_size;
+			buf->m = m;
 
 			/* Load mbuf mapping. */
 			error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
@@ -2423,9 +2425,6 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 				m_freem(m);
 				return (error);
 			}
-
-			buf->dmap = dmap;
-			buf->m = m;
 			buf->paddr = segs.ds_addr;
 			buf->vaddr = m->m_data;
 
