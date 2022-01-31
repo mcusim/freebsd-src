@@ -2052,7 +2052,6 @@ dpni_poll_channel(void *arg, int count)
 	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq;
 	int error, consumed = 0;
-	int i, j;
 
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
@@ -2158,22 +2157,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_channel	*buf_chan;
 	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	uint8_t fd_format = ((fd->off_fmt_sl) >> 12) & 0x3;
 	int error, chan_idx, buf_idx;
-
-	/* For debug purposes only! */
-	switch (fd_format) {
-	case 0: /* single buffer frame */
-		chan->sb_frames++;
-		break;
-	case 2: /* scatter/gather frame */
-		chan->sg_frames++;
-		break;
-	default:
-		/* Not interesting. */
-		break;
-	}
-	chan->all_frames++;
 
 /* #if 0 */
 	/* For debug purposes only! */
