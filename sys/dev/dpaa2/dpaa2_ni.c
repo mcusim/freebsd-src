@@ -121,9 +121,7 @@ __FBSDID("$FreeBSD$");
 #define ETH_RX_HWA_SIZE		64 /* HW annotation area in RX/TX buffers */
 
 /* Rx buffer configuration. */
-#define ETH_RX_BUF_RAW_SIZE	(MJUM9BYTES)
-#define ETH_RX_BUF_TAILROOM	CACHE_LINE_ALIGN(sizeof(struct mbuf))
-#define ETH_RX_BUF_SIZE		(ETH_RX_BUF_RAW_SIZE - ETH_RX_BUF_TAILROOM)
+#define ETH_RX_BUF_SIZE		(MJUM9BYTES)
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
@@ -395,8 +393,6 @@ static int setup_msi(struct dpaa2_ni_softc *);
 static int setup_if_caps(struct dpaa2_ni_softc *);
 static int setup_if_flags(struct dpaa2_ni_softc *);
 static int setup_sysctls(struct dpaa2_ni_softc *);
-static int setup_chan_sysctls(struct dpaa2_ni_channel *,
-    struct sysctl_ctx_list *, struct sysctl_oid_list *);
 
 static int set_buf_layout(device_t, struct dpaa2_cmd *);
 static int set_pause_frame(device_t, struct dpaa2_cmd *);
@@ -831,8 +827,8 @@ setup_channels(device_t dev)
 	    BUS_SPACE_MAXADDR_40BIT,	/* low restricted addr */
 	    BUS_SPACE_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
-	    ETH_RX_BUF_RAW_SIZE, 1,	/* maxsize, nsegments */
-	    ETH_RX_BUF_RAW_SIZE, 0,	/* maxsegsize, flags */
+	    ETH_RX_BUF_SIZE, 1,		/* maxsize, nsegments */
+	    ETH_RX_BUF_SIZE, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->bp_dmat);
 	if (error) {
@@ -903,9 +899,6 @@ setup_channels(device_t dev)
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->buf_num = 0;
-		channel->all_frames = 0;
-		channel->sb_frames = 0;
-		channel->sg_frames = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -949,13 +942,6 @@ setup_channels(device_t dev)
 		error = seed_chan_storage(sc, channel);
 		if (error) {
 			device_printf(dev, "Failed to seed channel storage\n");
-			return (error);
-		}
-
-		/* Setup sysctls for this channel. */
-		error = setup_chan_sysctls(channel, sysctl_ctx, parent);
-		if (error) {
-			device_printf(dev, "Failed to setup channel sysctls\n");
 			return (error);
 		}
 
@@ -1500,39 +1486,6 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		    dpni_collect_rx_frame_log, "S", "Rx frame log entry");
 	}
 /* #endif */
-
-	return (0);
-}
-
-/**
- * @internal
- */
-static int
-setup_chan_sysctls(struct dpaa2_ni_channel *chan, struct sysctl_ctx_list *ctx,
-    struct sysctl_oid_list *parent)
-{
-	struct sysctl_oid *node;
-	struct sysctl_oid_list *chan_parent;
-	char buf[64];
-
-	snprintf(buf, 64, "%d", chan->id);
-
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, buf,
-	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
-	chan_parent = SYSCTL_CHILDREN(node);
-
-	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "all_frames",
-	    CTLFLAG_RD, &chan->all_frames, 0,
-	    "All frames received on this channel");
-	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sb_frames",
-	    CTLFLAG_RD, &chan->sb_frames, 0,
-	    "Frames that store data in a single buffer");
-	SYSCTL_ADD_INT(ctx, chan_parent, OID_AUTO, "sg_frames",
-	    CTLFLAG_RD, &chan->sg_frames, 0,
-	    "Frames with data distributed in multiple buffers");
-	SYSCTL_ADD_U64(ctx, chan_parent, OID_AUTO, "frame_datap",
-	    CTLFLAG_RD, &chan->frame_datap, 0,
-	    "Pointer to the frame data or S/G table");
 
 	return (0);
 }
@@ -2101,17 +2054,6 @@ dpni_poll_channel(void *arg, int count)
 	int error, consumed = 0;
 	int i, j;
 
-	/*
-	 * Synchronize all buffers in the buffer pool.
-	 *
-	 * NOTE: There should be a clever way to synchronize buffers only for
-	 * 	 the given channel (or the only required buffer at all).
-	 */
-	for (i = 0; i < sc->num_chan; i++)
-		for (j = 0; j < DPAA2_NI_BUFS_PER_CHAN; j++)
-			bus_dmamap_sync(sc->bp_dmat, sc->channel[i]->buf[j].dmap,
-			    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
-
 	do {
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
@@ -2422,7 +2364,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 
 			/* Allocate mbuf. */
 			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR,
-			    ETH_RX_BUF_RAW_SIZE);
+			    ETH_RX_BUF_SIZE);
 			if (__predict_false(m == NULL)) {
 				device_printf(sc->dev, "Failed to allocate a "
 				    "buffer for buffer pool\n");
@@ -2446,10 +2388,10 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 
 			/*
 			 * Write a channel index and a buffer index to the
-			 * ADDR_TOK (63-49 msb) which is not used by WRIOP.
+			 * ADDR_TOK (63-49 msb) which is not used by QBMan.
 			 *
 			 * NOTE: lowaddr and highaddr of the window which cannot
-			 *	 be accessed by WRIOP must be configured in
+			 *	 be accessed by QBMan must be configured in the
 			 *	 DMA tag accordingly.
 			 */
 			buf->paddr =
@@ -2463,7 +2405,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			bufn++;
 		}
 
-		/* Release buffer to QBMan buffer pool. */
+		/* Release buffer to the buffer pool. */
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    paddr, bufn);
 		if (error) {
