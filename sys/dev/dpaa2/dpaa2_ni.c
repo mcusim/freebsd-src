@@ -105,7 +105,7 @@ __FBSDID("$FreeBSD$");
 #define DPNI_IRQ_EP_CHANGED	0x2 /* DPAA2 endpoint dis/connected */
 
 /* Maximum frame length and MTU. */
-#define DPAA2_ETH_MFL		(10 * 1024)
+#define DPAA2_ETH_MFL		(MJUM9BYTES)
 #define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
 #define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
 
@@ -122,6 +122,10 @@ __FBSDID("$FreeBSD$");
 
 /* Rx buffer configuration. */
 #define ETH_RX_BUF_SIZE		(MJUM9BYTES)
+
+/* DMA addresses limitation for Rx buffers. */
+#define	ETH_RX_BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
+#define	ETH_RX_BUF_MAXADDR		BUS_SPACE_MAXADDR
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
@@ -824,8 +828,8 @@ setup_channels(device_t dev)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_40BIT,	/* low restricted addr */
-	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    ETH_RX_BUF_MAXADDR_49BIT,	/* low restricted addr */
+	    ETH_RX_BUF_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    ETH_RX_BUF_SIZE, 1,		/* maxsize, nsegments */
 	    ETH_RX_BUF_SIZE, 0,		/* maxsegsize, flags */
