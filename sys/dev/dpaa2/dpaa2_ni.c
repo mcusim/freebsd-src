@@ -517,7 +517,7 @@ dpaa2_ni_attach(device_t dev)
 	if_initname(ifp, DPAA2_NI_IFNAME, device_get_unit(sc->dev));
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
-	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM;
+	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM | IFCAP_JUMBO_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
 
 	ifp->if_init =	dpni_if_init;
@@ -1956,29 +1956,16 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 				changed = ifp->if_flags ^ sc->if_flags;
-
-				if (bootverbose)
-					device_printf(sc->dev, "SIOCSIFFLAGS: "
-					    "up and running (changed=0x%x)\n",
-					    changed);
-
 				if (changed & IFF_PROMISC ||
 				    changed & IFF_ALLMULTI) {
 					rc = setup_if_flags(sc);
 				}
 			} else {
 				DPNI_UNLOCK(sc);
-				if (bootverbose) {
-					printf("%s: SIOCSIFFLAGS: starting up\n",
-					    __func__);
-				}
 				dpni_if_init(sc);
 				DPNI_LOCK(sc);
 			}
 		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
-			if (bootverbose)
-				printf("%s: SIOCSIFFLAGS: shutting down\n",
-				    __func__);
 			/* dpni_if_stop(sc); */
 		}
 
