@@ -2064,7 +2064,7 @@ dpni_poll_channel(void *arg, int count)
 
 		/* Let's sync DQRR response from QBMan. */
 		bus_dmamap_sync(sc->st_dmat, chan->store.dmap,
-		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+		    BUS_DMASYNC_POSTREAD);
 
 		error = dpni_consume_frames(chan, &fq, &consumed);
 		if (error == ENOENT)
@@ -2156,8 +2156,12 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_channel	*buf_chan;
 	struct dpaa2_ni_buf *buf;
+	struct ifnet *ifp = sc->ifp;
+	struct mbuf *m;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	int error, chan_idx, buf_idx;
+	bool short_len = ((fd->off_fmt_sl >> 14) & 1) == 1;
+	void *buf_data;
+	int error, chan_idx, buf_idx, buf_len;
 
 #if 0
 	/* For debug purposes only! */
@@ -2179,17 +2183,39 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	    ("frame address should be == buf->paddr: fd_addr=%jx, "
 	    "buf->paddr=%jx", paddr, buf->paddr));
 
+	m = buf->m;
+	bus_dmamap_sync(sc->bp_dmat, buf->dmap, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_unload(sc->bp_dmat, buf->dmap);
+
+	/* Drop desc with error status or not in a single buffer. */
+	/* ... */
+
+	buf_len = (short_len) ? (fd->length & 0x3FFFFu) : (fd->length);
+	buf_data = (uint8_t *)(buf->vaddr + (fd->off_fmt_sl & 0x0FFFu));
+
+	/* Prefetch mbuf data. */
+	__builtin_prefetch(buf_data);
+
+	/* Write value to mbuf (avoid read). */
+	m->m_data = buf_data;
+	m->m_len = buf_len;
+	m->m_pkthdr.len = buf_len;
+	m->m_pkthdr.rcvif = ifp;
+
+	(*ifp->if_input)(ifp, m);
+
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
 
 	/* Release buffer to QBMan buffer pool. */
-	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
-	if (error) {
-		device_printf(sc->dev, "failed to release frame buffer to the "
-		    "pool: error=%d\n", error);
-		return (error);
-	}
+
+	/* error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1); */
+	/* if (error) { */
+	/* 	device_printf(sc->dev, "failed to release frame buffer to the " */
+	/* 	    "pool: error=%d\n", error); */
+	/* 	return (error); */
+	/* } */
 
 	return (0);
 }
@@ -2360,9 +2386,14 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			/* Load mbuf mapping. */
 			error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
 			    m, &segs, &nsegs, BUS_DMA_NOWAIT);
+			KASSERT(nsegs == 1, ("More than one segment (nsegs=%d)",
+			    nsegs));
+			KASSERT(error == 0, ("DMA error (error=%d)", error));
 			if (__predict_false(error != 0 || nsegs != 1)) {
 				device_printf(sc->dev, "Failed to map a buffer "
-				    "for buffer pool\n");
+				    "for buffer pool: error=%d, nsegs=%d\n",
+				    error, nsegs);
+				bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 				m_freem(m);
 				return (error);
 			}
