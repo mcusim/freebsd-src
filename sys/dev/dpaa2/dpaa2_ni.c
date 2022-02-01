@@ -100,9 +100,9 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-#define DPNI_IRQ_INDEX		0   /* Index of the only DPNI IRQ. */
-#define DPNI_IRQ_LINK_CHANGED	0x1 /* Link state changed */
-#define DPNI_IRQ_EP_CHANGED	0x2 /* DPAA2 endpoint dis/connected */
+#define DPNI_IRQ_INDEX		0 /* Index of the only DPNI IRQ. */
+#define DPNI_IRQ_LINK_CHANGED	1 /* Link state changed */
+#define DPNI_IRQ_EP_CHANGED	2 /* DPAA2 endpoint dis/connected */
 
 /* Maximum frame length and MTU. */
 #define DPAA2_ETH_MFL		(MJUM9BYTES)
@@ -113,19 +113,15 @@ __FBSDID("$FreeBSD$");
 #define DPNI_VER_MAJOR		7U
 #define DPNI_VER_MINOR		0U
 
-/* RX buffer data alignment. */
-#define ETH_RX_BUF_ALIGN_V1	256 /* limitation of the WRIOP v1.0.0 */
-#define ETH_RX_BUF_ALIGN	64
+/* RX buffer configuration. */
+#define RX_BUF_ALIGN_V1		256 /* limitation of the WRIOP v1.0.0 */
+#define RX_BUF_ALIGN		64
+#define RX_BUF_SIZE		(MJUM9BYTES)
+#define	RX_BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
+#define	RX_BUF_MAXADDR		BUS_SPACE_MAXADDR
 
 #define ETH_SWA_SIZE		64 /* SW annotation area (limited to 0 or 64) */
 #define ETH_RX_HWA_SIZE		64 /* HW annotation area in RX/TX buffers */
-
-/* Rx buffer configuration. */
-#define ETH_RX_BUF_SIZE		(MJUM9BYTES)
-
-/* DMA addresses limitation for Rx buffers. */
-#define	ETH_RX_BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
-#define	ETH_RX_BUF_MAXADDR		BUS_SPACE_MAXADDR
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
@@ -555,7 +551,7 @@ dpaa2_ni_attach(device_t dev)
 		goto err_close_rc;
 	}
 
-	/* Create a private taskqueue thread for handling driver events */
+	/* Create a private taskqueue thread for handling driver events. */
 	sc->tq = taskqueue_create("dpaa2_ni_tq", M_WAITOK,
 	    taskqueue_thread_enqueue, &sc->tq);
 	if (sc->tq == NULL) {
@@ -642,7 +638,7 @@ setup_dpni(device_t dev)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_ep_desc ep1_desc, ep2_desc;
+	struct dpaa2_ep_desc ep1_desc, ep2_desc; /* endpoint descriptors */
 	struct dpaa2_cmd *cmd = sc->cmd;
 	uint8_t eth_bca[ETHER_ADDR_LEN]; /* broadcast physical address */
 	uint16_t rc_token = sc->rc_token;
@@ -828,11 +824,11 @@ setup_channels(device_t dev)
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    ETH_RX_BUF_MAXADDR_49BIT,	/* low restricted addr */
-	    ETH_RX_BUF_MAXADDR,		/* high restricted addr */
+	    RX_BUF_MAXADDR_49BIT,	/* low restricted addr */
+	    RX_BUF_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
-	    ETH_RX_BUF_SIZE, 1,		/* maxsize, nsegments */
-	    ETH_RX_BUF_SIZE, 0,		/* maxsegsize, flags */
+	    RX_BUF_SIZE, 1,		/* maxsize, nsegments */
+	    RX_BUF_SIZE, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->bp_dmat);
 	if (error) {
@@ -1512,13 +1508,13 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 */
 	sc->rx_buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
 	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
-	    ? ETH_RX_BUF_ALIGN_V1 : ETH_RX_BUF_ALIGN;
+	    ? RX_BUF_ALIGN_V1 : RX_BUF_ALIGN;
 
 	/*
 	 * We need to ensure that the buffer size seen by WRIOP is a multiple
 	 * of 64 or 256 bytes depending on the WRIOP version.
 	 */
-	sc->rx_bufsz = ALIGN_DOWN(ETH_RX_BUF_SIZE, sc->rx_buf_align);
+	sc->rx_bufsz = ALIGN_DOWN(RX_BUF_SIZE, sc->rx_buf_align);
 	if (bootverbose)
 		device_printf(dev, "RX buffer: size=%d, alignment=%d\n",
 		    sc->rx_bufsz, sc->rx_buf_align);
@@ -2351,8 +2347,7 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			buf->dmap = dmap;
 
 			/* Allocate mbuf. */
-			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR,
-			    ETH_RX_BUF_SIZE);
+			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, RX_BUF_SIZE);
 			if (__predict_false(m == NULL)) {
 				device_printf(sc->dev, "Failed to allocate a "
 				    "buffer for buffer pool\n");
