@@ -2161,7 +2161,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	bool short_len = ((fd->off_fmt_sl >> 14) & 1) == 1;
 	void *buf_data;
-	int error, chan_idx, buf_idx, buf_len;
+	int chan_idx, buf_idx, buf_len;
 
 #if 0
 	/* For debug purposes only! */
@@ -2191,7 +2191,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	/* ... */
 
 	buf_len = (short_len) ? (fd->length & 0x3FFFFu) : (fd->length);
-	buf_data = (uint8_t *)(buf->vaddr + (fd->off_fmt_sl & 0x0FFFu));
+	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
 
 	/* Prefetch mbuf data. */
 	__builtin_prefetch(buf_data);
