@@ -402,6 +402,8 @@ static int set_hash(device_t, uint64_t);
 static int set_dist_key(device_t, enum dpaa2_ni_dist_mode, uint64_t);
 
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
+static int seed_buf(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *,
+    struct dpaa2_ni_buf *, int);
 static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 
 static int dpni_channels_num(struct dpaa2_ni_softc *);
@@ -899,6 +901,7 @@ setup_channels(device_t dev)
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->buf_num = 0;
+		channel->recycle_bufn = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -2133,6 +2136,7 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 
 /**
  * @internal
+ * @brief Main routine to consume Rx frames.
  */
 static int
 dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
@@ -2146,9 +2150,10 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct ifnet *ifp = sc->ifp;
 	struct mbuf *m;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
+	bus_addr_t recycled[DPAA2_SWP_BUFS_PER_CMD];
 	bool short_len = ((fd->off_fmt_sl >> 14) & 1) == 1;
 	void *buf_data;
-	int chan_idx, buf_idx, buf_len;
+	int error, chan_idx, buf_idx, buf_len, recycled_n = 0;
 
 #if 0
 	/* For debug purposes only! */
@@ -2161,6 +2166,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
 #endif
 
+	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
 	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
 	buf_chan = sc->channel[chan_idx];
@@ -2171,11 +2177,12 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	    "buf->paddr=%jx", paddr, buf->paddr));
 
 	m = buf->m;
+	buf->m = NULL;
 	bus_dmamap_sync(sc->bp_dmat, buf->dmap, BUS_DMASYNC_POSTREAD);
 	bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 
 	/* Drop desc with error status or not in a single buffer. */
-	/* ... */
+	/* ... TBD ... */
 
 	buf_len = (short_len) ? (fd->length & 0x3FFFFu) : (fd->length);
 	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
@@ -2191,24 +2198,55 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	(*ifp->if_input)(ifp, m);
 
-	/* There's only one buffer pool for now. */
-	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
-	bpsc = device_get_softc(bp_dev);
+	/* Keep buffer to be recycled. */
+	chan->recycle_buf[chan->recycle_bufn++] = paddr;
 
-	/* Release buffer to QBMan buffer pool. */
+	/* Re-seed and release recycled buffers back to the pool. */
+	if (chan->recycle_bufn == DPAA2_SWP_BUFS_PER_CMD) {
+		for (int i = 0; i < chan->recycle_bufn; i++) {
+			paddr = chan->recycle_buf[i];
 
-	/* error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1); */
-	/* if (error) { */
-	/* 	device_printf(sc->dev, "failed to release frame buffer to the " */
-	/* 	    "pool: error=%d\n", error); */
-	/* 	return (error); */
-	/* } */
+			/* Parse ADDR_TOK of the recycled buffer. */
+			chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT)
+			    & DPAA2_NI_BUF_CHAN_MASK;
+			buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT)
+			    & DPAA2_NI_BUF_IDX_MASK;
+			buf_chan = sc->channel[chan_idx];
+			buf = &buf_chan->buf[buf_idx];
+
+			/* Re-seed recycled buffer. */
+			error = seed_buf(sc, buf_chan, buf, buf_idx);
+			KASSERT(error == 0, ("Failed to seed recycled buffer: "
+			    "error=%d", error));
+			if (__predict_false(error != 0)) {
+				device_printf(sc->dev, "Failed to seed recycled "
+				    "buffer: error=%d\n", error);
+				continue;
+			}
+
+			recycled[recycled_n++] = buf->paddr;
+		}
+
+		/* There's only one buffer pool for now. */
+		bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
+		bpsc = device_get_softc(bp_dev);
+
+		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
+		    recycled, recycled_n);
+		if (__predict_false(error != 0)) {
+			device_printf(sc->dev, "failed to release buffers to "
+			    "the pool: error=%d\n", error);
+			return (error);
+		}
+		chan->recycle_bufn = 0;
+	}
 
 	return (0);
 }
 
 /**
  * @internal
+ * @brief Main routine to consume Rx error frames.
  */
 static int
 dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
@@ -2240,6 +2278,7 @@ dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 /**
  * @internal
+ * @brief Main routine to consume Tx confirmation frames.
  */
 static int
 dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
@@ -2316,11 +2355,9 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	device_t bp_dev;
 	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_buf *buf;
-	struct mbuf *m;
 	bus_addr_t paddr[DPAA2_SWP_BUFS_PER_CMD];
-	bus_dma_segment_t segs;
-	bus_dmamap_t dmap;
-	int i, j, error, bufn, buf_idx, nsegs;
+	int i, j, error, bufn, chan_bufn, buf_idx;
+	bool stop = false;
 
 	/* DMA tag for buffer pool must already be created. */
 	if (sc->bp_dmat == NULL)
@@ -2334,78 +2371,30 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	    ("maximum buffers per channel must be <= %d: buffers=%d",
 	    DPAA2_NI_MAX_BPC, DPAA2_NI_BUFS_PER_CHAN));
 
-	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
-		/* Reset buffers counter. */
-		bufn = 0;
+	chan_bufn = 0;
 
+	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
+		/* Reset counter to accumulate buffers for a single command. */
+		bufn = 0;
 		/* Allocate enough buffers to release in one QBMan command. */
 		for (j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf_idx = i + j;
-
-			/* Initialize RX buffer. */
 			buf = &chan->buf[buf_idx];
 			buf->dmap = NULL;
 			buf->m = NULL;
 			buf->paddr = 0;
 			buf->vaddr = NULL;
 
-			/* Create DMA map. */
-			error = bus_dmamap_create(sc->bp_dmat, 0, &dmap);
+			error = seed_buf(sc, chan, buf, buf_idx);
 			if (error) {
-				device_printf(sc->dev, "Failed to create DMA "
-				    "map for a buffer for buffer pool: "
-				    "buf_idx=%d\n", buf_idx);
-				return (error);
+				/* Release some buffers to the pool at least. */
+				stop = true;
+				break;
 			}
-			buf->dmap = dmap;
-
-			/* Allocate mbuf. */
-			m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, RX_BUF_SIZE);
-			if (__predict_false(m == NULL)) {
-				device_printf(sc->dev, "Failed to allocate a "
-				    "buffer for buffer pool\n");
-				return (ENOMEM);
-			}
-			m->m_len = m->m_ext.ext_size;
-			m->m_pkthdr.len = m->m_ext.ext_size;
-			buf->m = m;
-
-			/* Load mbuf mapping. */
-			error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
-			    m, &segs, &nsegs, BUS_DMA_NOWAIT);
-			KASSERT(nsegs == 1, ("More than one segment (nsegs=%d)",
-			    nsegs));
-			KASSERT(error == 0, ("DMA error (error=%d)", error));
-			if (__predict_false(error != 0 || nsegs != 1)) {
-				device_printf(sc->dev, "Failed to map a buffer "
-				    "for buffer pool: error=%d, nsegs=%d\n",
-				    error, nsegs);
-				bus_dmamap_unload(sc->bp_dmat, buf->dmap);
-				m_freem(m);
-				return (error);
-			}
-			buf->paddr = segs.ds_addr;
-			buf->vaddr = m->m_data;
-
-			/*
-			 * Write a channel index and a buffer index to the
-			 * ADDR_TOK (63-49 msb) which is not used by QBMan.
-			 *
-			 * NOTE: lowaddr and highaddr of the window which cannot
-			 *	 be accessed by QBMan must be configured in the
-			 *	 DMA tag accordingly.
-			 */
-			buf->paddr =
-			    ((uint64_t)(chan->idx & DPAA2_NI_BUF_CHAN_MASK) <<
-				DPAA2_NI_BUF_CHAN_SHIFT) |
-			    ((uint64_t)(buf_idx & DPAA2_NI_BUF_IDX_MASK) <<
-				DPAA2_NI_BUF_IDX_SHIFT) |
-			    (buf->paddr & DPAA2_NI_BUF_ADDR_MASK);
-
 			paddr[bufn] = buf->paddr;
 			bufn++;
+			chan_bufn++;
 		}
-
 		/* Release buffer to the buffer pool. */
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    paddr, bufn);
@@ -2414,7 +2403,80 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			    "the buffer pool\n");
 			return (error);
 		}
+		/* Do not continue seeding buffers after error. */
+		if (stop)
+			break;
 	}
+
+	chan->buf_num = chan_bufn;
+
+	return (0);
+}
+
+/**
+ * @internal
+ * @brief Prepares a buffer to be released to the buffer pool.
+ */
+static int
+seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
+    struct dpaa2_ni_buf *buf, int buf_idx)
+{
+	struct mbuf *m;
+	bus_dmamap_t dmap;
+	int error;
+
+	/* Create a DMA map for the giving buffer if it doesn't exist yet. */
+	if (buf->dmap == NULL) {
+		error = bus_dmamap_create(sc->bp_dmat, 0, &dmap);
+		if (error) {
+			device_printf(sc->dev, "Failed to create DMA map for "
+			    "buffer: buf_idx=%d, error=%d\n", buf_idx, error);
+			return (error);
+		}
+		buf->dmap = dmap;
+	}
+
+	/* Allocate mbuf if needed. */
+	if (buf->m == NULL) {
+		m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, RX_BUF_SIZE);
+		if (__predict_false(m == NULL)) {
+			device_printf(sc->dev, "Failed to allocate mbuf for "
+			    "buffer\n");
+			return (ENOMEM);
+		}
+		m->m_len = m->m_ext.ext_size;
+		m->m_pkthdr.len = m->m_ext.ext_size;
+		buf->m = m;
+	}
+
+	error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
+	    m, &segs, &nsegs, BUS_DMA_NOWAIT);
+	KASSERT(nsegs == 1, ("More than one segment: nsegs=%d", nsegs));
+	KASSERT(error == 0, ("Failed to map mbuf: error=%d", error));
+	if (__predict_false(error != 0 || nsegs != 1)) {
+		device_printf(sc->dev, "Failed to map mbuf: error=%d, "
+		    "nsegs=%d\n", error, nsegs);
+		bus_dmamap_unload(sc->bp_dmat, buf->dmap);
+		m_freem(m);
+		return (error);
+	}
+	buf->paddr = segs.ds_addr;
+	buf->vaddr = m->m_data;
+
+	/*
+	 * Write channel and buffer indices to the ADDR_TOK (bits 63-49) which
+	 * is not used by QBMan and is supposed to assist in physical to virtual
+	 * address translation.
+	 *
+	 * NOTE: "lowaddr" and "highaddr" of the window which cannot be accessed
+	 * 	 by QBMan must be configured in the DMA tag accordingly.
+	 */
+	buf->paddr =
+	    ((uint64_t)(chan->idx & DPAA2_NI_BUF_CHAN_MASK) <<
+		DPAA2_NI_BUF_CHAN_SHIFT) |
+	    ((uint64_t)(buf_idx & DPAA2_NI_BUF_IDX_MASK) <<
+		DPAA2_NI_BUF_IDX_SHIFT) |
+	    (buf->paddr & DPAA2_NI_BUF_ADDR_MASK);
 
 	return (0);
 }
