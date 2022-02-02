@@ -2448,7 +2448,8 @@ seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 		m->m_len = m->m_ext.ext_size;
 		m->m_pkthdr.len = m->m_ext.ext_size;
 		buf->m = m;
-	}
+	} else
+		m = buf->m;
 
 	error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, buf->dmap,
 	    m, &segs, &nsegs, BUS_DMA_NOWAIT);
