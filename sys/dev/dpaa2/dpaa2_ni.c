@@ -2423,7 +2423,8 @@ seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 {
 	struct mbuf *m;
 	bus_dmamap_t dmap;
-	int error;
+	bus_dma_segment_t segs;
+	int error, nsegs;
 
 	/* Create a DMA map for the giving buffer if it doesn't exist yet. */
 	if (buf->dmap == NULL) {
