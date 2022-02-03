@@ -242,8 +242,9 @@ struct dpaa2_ni_channel {
 	/* Task to poll frames when CDAN is received. */
 	struct task		 poll_task;
 
-	uint32_t		 recycle_bufn;
-	bus_addr_t		 recycle_buf[DPAA2_SWP_BUFS_PER_CMD];
+	/* Recycled buffers to release back to the pool. */
+	uint32_t		 recycled_n;
+	bus_addr_t		 recycled[DPAA2_SWP_BUFS_PER_CMD];
 };
 
 /**

@@ -901,7 +901,7 @@ setup_channels(device_t dev)
 		channel->io_dev = io_dev;
 		channel->con_dev = con_dev;
 		channel->buf_num = 0;
-		channel->recycle_bufn = 0;
+		channel->recycled_n = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -2150,10 +2150,10 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct ifnet *ifp = sc->ifp;
 	struct mbuf *m;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	bus_addr_t recycled[DPAA2_SWP_BUFS_PER_CMD];
+	bus_addr_t released[DPAA2_SWP_BUFS_PER_CMD];
 	bool short_len = ((fd->off_fmt_sl >> 14) & 1) == 1;
 	void *buf_data;
-	int error, chan_idx, buf_idx, buf_len, recycled_n = 0;
+	int error, chan_idx, buf_idx, buf_len, released_n = 0;
 
 #if 0
 	/* For debug purposes only! */
@@ -2181,7 +2181,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bus_dmamap_sync(sc->bp_dmat, buf->dmap, BUS_DMASYNC_POSTREAD);
 	bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 
-	/* Drop desc with error status or not in a single buffer. */
+	/* Drop FD with error status or not in a single buffer. */
 	/* ... TBD ... */
 
 	buf_len = (short_len) ? (fd->length & 0x3FFFFu) : (fd->length);
@@ -2190,7 +2190,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	/* Prefetch mbuf data. */
 	__builtin_prefetch(buf_data);
 
-	/* Write value to mbuf (avoid read). */
+	/* Write value to mbuf (avoid reading). */
 	m->m_data = buf_data;
 	m->m_len = buf_len;
 	m->m_pkthdr.len = buf_len;
@@ -2199,12 +2199,12 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	(*ifp->if_input)(ifp, m);
 
 	/* Keep buffer to be recycled. */
-	chan->recycle_buf[chan->recycle_bufn++] = paddr;
+	chan->recycled[chan->recycled_n++] = paddr;
 
 	/* Re-seed and release recycled buffers back to the pool. */
-	if (chan->recycle_bufn == DPAA2_SWP_BUFS_PER_CMD) {
-		for (int i = 0; i < chan->recycle_bufn; i++) {
-			paddr = chan->recycle_buf[i];
+	if (chan->recycled_n == DPAA2_SWP_BUFS_PER_CMD) {
+		for (int i = 0; i < chan->recycled_n; i++) {
+			paddr = chan->recycled[i];
 
 			/* Parse ADDR_TOK of the recycled buffer. */
 			chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT)
@@ -2214,7 +2214,7 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 			buf_chan = sc->channel[chan_idx];
 			buf = &buf_chan->buf[buf_idx];
 
-			/* Re-seed recycled buffer. */
+			/* Seed recycled buffer. */
 			error = seed_buf(sc, buf_chan, buf, buf_idx);
 			KASSERT(error == 0, ("Failed to seed recycled buffer: "
 			    "error=%d", error));
@@ -2224,7 +2224,8 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 				continue;
 			}
 
-			recycled[recycled_n++] = buf->paddr;
+			/* Prepare buffer to be released in a single command. */
+			released[released_n++] = buf->paddr;
 		}
 
 		/* There's only one buffer pool for now. */
@@ -2232,13 +2233,15 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		bpsc = device_get_softc(bp_dev);
 
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
-		    recycled, recycled_n);
+		    released, released_n);
 		if (__predict_false(error != 0)) {
 			device_printf(sc->dev, "failed to release buffers to "
 			    "the pool: error=%d\n", error);
 			return (error);
 		}
-		chan->recycle_bufn = 0;
+
+		/* Be ready to recycle the next portion of the buffers. */
+		chan->recycled_n = 0;
 	}
 
 	return (0);
