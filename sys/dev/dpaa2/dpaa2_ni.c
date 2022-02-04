@@ -332,51 +332,19 @@ static struct dpni_stat {
 	char	*name;
 	char	*desc;
 } dpni_stat_sysctls[DPAA2_NI_STAT_SYSCTLS] = {
-	/* PAGE, COUNTER, NAME,         DESCRIPTION */
+	/* PAGE, COUNTER, NAME, DESCRIPTION */
 	{  0, 0, "in_all_frames",	"All accepted ingress frames" },
 	{  0, 1, "in_all_bytes",	"Bytes in all accepted ingress frames" },
 	{  0, 2, "in_multi_frames",	"Multicast accepted ingress frames" },
 	{  1, 0, "eg_all_frames",	"All egress frames transmitted" },
 	{  1, 1, "eg_all_bytes",	"Bytes in all frames transmitted" },
 	{  1, 2, "eg_multi_frames",	"Multicast egress frames transmitted" },
-	{  2, 0, "in_filtered_frames",	"All ingress frames discarded due to filtering" },
+	{  2, 0, "in_filtered_frames",	"All ingress frames discarded due to "
+	   				"filtering" },
 	{  2, 1, "in_discarded_frames",	"All frames discarded due to errors" },
-	{  2, 2, "in_nobuf_discards",	"Discards on ingress side due to buffer depletion in DPNI buffer pools" },
+	{  2, 2, "in_nobuf_discards",	"Discards on ingress side due to buffer "
+	   				"depletion in DPNI buffer pools" },
 };
-
-#if 0
-/* For debug purposes only! */
-#define RX_FRAME_LOG_LEN	16
-#define RX_LOG_LOCK(lock) do {			\
-	mtx_assert(&(lock), MA_NOTOWNED);	\
-	mtx_lock(&(lock));			\
-} while (0)
-#define	RX_LOG_UNLOCK(lock)	mtx_unlock(&(lock))
-struct mtx dpni_rx_frames_log_lock;
-static uint32_t rx_frame_log_idx;
-static struct rx_frame_log {
-	uint64_t	 addr;
-	uint32_t	 length;
-	uint32_t	 offset;
-} dpni_rx_frame_log[RX_FRAME_LOG_LEN] = {
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-	{ 0, 0, 0 },
-};
-#endif
 
 /* Forward declarations. */
 
@@ -435,11 +403,6 @@ static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
 
 static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
 
-#if 0
-/* For debug purposes only! */
-static int dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS);
-#endif
-
 /* ISRs */
 
 static void dpni_msi_intr(void *);
@@ -490,13 +453,6 @@ dpaa2_ni_attach(device_t dev)
 	sc->mac.dpmac_id = 0;
 	sc->mac.phy_dev = NULL;
 	memset(sc->mac.addr, 0, ETHER_ADDR_LEN);
-
-#if 0
-	/* For debug purposes only! */
-	mtx_init(&dpni_rx_frames_log_lock, device_get_nameunit(dev),
-	    "rxlog lock", MTX_DEF);
-	rx_frame_log_idx = 0;
-#endif
 
 	error = bus_alloc_resources(sc->dev, dpaa2_ni_spec, sc->res);
 	if (error) {
@@ -727,10 +683,6 @@ setup_dpni(device_t dev)
 			error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev,
 			    sc->mac.dpmac_id);
 			if (error == 0) {
-#if 0
-				device_printf(dev, "MAC PHY device is '%s'\n",
-				    device_get_nameunit(sc->mac.phy_dev));
-#endif
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
 				    dpni_ifmedia_change, dpni_ifmedia_status,
@@ -1471,25 +1423,6 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
-#if 0
-	char buf[64];
-	/* For debug purposes only! */
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "debug",
-	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Debug information");
-	parent = SYSCTL_CHILDREN(node);
-
-	/* For debug purposes only! */
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "rx_frame_log",
-	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Rx frames log");
-	parent = SYSCTL_CHILDREN(node);
-	for (i = 0; i < RX_FRAME_LOG_LEN; ++i) {
-		snprintf(buf, 64, "f%2d", i);
-		SYSCTL_ADD_PROC(ctx, parent, i, buf,
-		    CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
-		    dpni_collect_rx_frame_log, "S", "Rx frame log entry");
-	}
-#endif
-
 	return (0);
 }
 
@@ -2155,17 +2088,6 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	void *buf_data;
 	int error, chan_idx, buf_idx, buf_len, released_n = 0;
 
-#if 0
-	/* For debug purposes only! */
-	RX_LOG_LOCK(dpni_rx_frames_log_lock);
-	dpni_rx_frame_log[rx_frame_log_idx].addr = fd->addr;
-	dpni_rx_frame_log[rx_frame_log_idx].length = fd->length;
-	dpni_rx_frame_log[rx_frame_log_idx].offset = fd->off_fmt_sl & 0xFFFu;
-	rx_frame_log_idx++;
-	rx_frame_log_idx &= RX_FRAME_LOG_LEN - 1; /* wrap around */
-	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
-#endif
-
 	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
 	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
@@ -2542,23 +2464,6 @@ dpni_collect_stats(SYSCTL_HANDLER_ARGS)
 
 	return (sysctl_handle_64(oidp, &result, 0, req));
 }
-
-#if 0
-/* For debug purposes only! */
-static int
-dpni_collect_rx_frame_log(SYSCTL_HANDLER_ARGS)
-{
-	struct rx_frame_log le;
-
-	RX_LOG_LOCK(dpni_rx_frames_log_lock);
-	le.addr = dpni_rx_frame_log[oidp->oid_number].addr;
-	le.length = dpni_rx_frame_log[oidp->oid_number].length;
-	le.offset = dpni_rx_frame_log[oidp->oid_number].offset;
-	RX_LOG_UNLOCK(dpni_rx_frames_log_lock);
-
-	return sysctl_handle_opaque(oidp, &le, sizeof(le), req);
-}
-#endif
 
 /**
  * @internal
