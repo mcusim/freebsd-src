@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_types.h>
+#include <net/if_var.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/mii/mii.h>
@@ -110,8 +111,8 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
 
 /* Minimally supported version of the DPNI API. */
-#define DPNI_VER_MAJOR		7U
-#define DPNI_VER_MINOR		0U
+#define DPNI_VER_MAJOR		7
+#define DPNI_VER_MINOR		0
 
 /* RX buffer configuration. */
 #define RX_BUF_ALIGN_V1		256 /* limitation of the WRIOP v1.0.0 */
@@ -133,6 +134,8 @@ __FBSDID("$FreeBSD$");
 #define ETH_STORE_FRAMES	16
 #define ETH_STORE_SIZE		((ETH_STORE_FRAMES + 1) * sizeof(struct dpaa2_dq))
 #define ETH_STORE_ALIGN		64
+
+#define TX_QUEUE_LEN		256
 
 /* Buffers layout options. */
 #define BUF_LOPT_TIMESTAMP	0x1
@@ -381,24 +384,24 @@ static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq **);
 
 /* Callbacks. */
 
-static void dpni_if_init(void *);
-static void dpni_if_start(struct ifnet *);
-static int  dpni_if_ioctl(struct ifnet *, u_long, caddr_t);
+static void dpni_init(void *);
+static void dpni_start(struct ifnet *);
+static int  dpni_ioctl(struct ifnet *, u_long, caddr_t);
 
-static int  dpni_ifmedia_change(struct ifnet *);
-static void dpni_ifmedia_status(struct ifnet *, struct ifmediareq *);
-static void dpni_ifmedia_tick(void *);
+static int  dpni_media_change(struct ifnet *);
+static void dpni_media_status(struct ifnet *, struct ifmediareq *);
+static void dpni_media_tick(void *);
 
-static void dpni_single_seg_dmamap_cb(void *, bus_dma_segment_t *, int, int);
+static void dpni_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
 static void dpni_poll_channel(void *, int);
 static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
     uint32_t *);
-static int dpni_consume_rx(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+static int dpni_rx(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
-static int dpni_consume_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+static int dpni_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
-static int dpni_consume_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
+static int dpni_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 
 static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
@@ -436,6 +439,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->media_status = 0;
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
+	sc->tx_mbufn = 0;
 
 	sc->bp_dmat = NULL;
 	sc->st_dmat = NULL;
@@ -469,20 +473,19 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to allocate network interface\n");
 		return (ENXIO);
 	}
-
 	sc->ifp = ifp;
-
 	if_initname(ifp, DPAA2_NI_IFNAME, device_get_unit(sc->dev));
+
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
 	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM | IFCAP_JUMBO_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
 
-	ifp->if_init =	dpni_if_init;
-	ifp->if_start = dpni_if_start;
-	ifp->if_ioctl = dpni_if_ioctl;
+	ifp->if_init =	dpni_init;
+	ifp->if_start = dpni_start;
+	ifp->if_ioctl = dpni_ioctl;
 
-	ifp->if_snd.ifq_drv_maxlen = 64; /* arbitrary length for now */
+	ifp->if_snd.ifq_drv_maxlen = TX_QUEUE_LEN;
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
 	IFQ_SET_READY(&ifp->if_snd);
 
@@ -685,7 +688,7 @@ setup_dpni(device_t dev)
 			if (error == 0) {
 				error = mii_attach(sc->mac.phy_dev,
 				    &sc->miibus, sc->ifp,
-				    dpni_ifmedia_change, dpni_ifmedia_status,
+				    dpni_media_change, dpni_media_status,
 				    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
 				if (error != 0)
 					device_printf(dev, "Failed to attach "
@@ -926,7 +929,7 @@ setup_frame_queues(device_t dev)
 	for (i = 0; i < sc->num_chan; i++) {
 		sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_TX_CONF;
 		sc->fq[sc->num_fqs].flowid = (uint16_t) i;
-		sc->fq[sc->num_fqs].consume = dpni_consume_tx_conf;
+		sc->fq[sc->num_fqs].consume = dpni_tx_conf;
 		sc->num_fqs++;
 	}
 	txc_fqs = sc->num_chan;
@@ -937,7 +940,7 @@ setup_frame_queues(device_t dev)
 			sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX;
 			sc->fq[sc->num_fqs].tc = (uint8_t) j;
 			sc->fq[sc->num_fqs].flowid = (uint16_t) i;
-			sc->fq[sc->num_fqs].consume = dpni_consume_rx;
+			sc->fq[sc->num_fqs].consume = dpni_rx;
 			sc->num_fqs++;
 		}
 	}
@@ -947,7 +950,7 @@ setup_frame_queues(device_t dev)
 	sc->fq[sc->num_fqs].type = DPAA2_NI_QUEUE_RX_ERR;
 	sc->fq[sc->num_fqs].tc = 0; /* ignored */
 	sc->fq[sc->num_fqs].flowid = 0; /* ignored */
-	sc->fq[sc->num_fqs].consume = dpni_consume_rx_err;
+	sc->fq[sc->num_fqs].consume = dpni_rx_err;
 	sc->num_fqs++;
 	rx_err_fqs = 1;
 
@@ -1421,6 +1424,9 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 		    dpni_stat_sysctls[i].desc);
 	}
 
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "tx_mbufn",
+	    CTLFLAG_RD, &sc->tx_mbufn, "Tx mbuf counter");
+
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
 	return (0);
@@ -1611,8 +1617,8 @@ set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	}
 
 	error = bus_dmamap_load(sc->qos_dmat, sc->qos_kcfg.dmap,
-	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE,
-	    dpni_single_seg_dmamap_cb, &sc->qos_kcfg.paddr, BUS_DMA_NOWAIT);
+	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE, dpni_dmamap_cb,
+	    &sc->qos_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(dev, "Failed to map QoS key configuration buffer "
 		    "into bus space\n");
@@ -1706,7 +1712,7 @@ set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
  * @brief Callback function to process media change request.
  */
 static int
-dpni_ifmedia_change(struct ifnet *ifp)
+dpni_media_change(struct ifnet *ifp)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 
@@ -1725,7 +1731,7 @@ dpni_ifmedia_change(struct ifnet *ifp)
  * @brief Callback function to process media status request.
  */
 static void
-dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
+dpni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_mac_link_state mac_link = {0};
@@ -1789,7 +1795,7 @@ dpni_ifmedia_status(struct ifnet *ifp, struct ifmediareq *ifmr)
  * @brief Callout function to check and update media status.
  */
 static void
-dpni_ifmedia_tick(void *arg)
+dpni_media_tick(void *arg)
 {
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 
@@ -1799,19 +1805,19 @@ dpni_ifmedia_tick(void *arg)
 		if (sc->media_status != sc->mii->mii_media.ifm_media) {
 			printf("%s: media type changed (ifm_media=%x)\n",
 			    __func__, sc->mii->mii_media.ifm_media);
-			dpni_ifmedia_change(sc->ifp);
+			dpni_media_change(sc->ifp);
 		}
 	}
 
 	/* Schedule another timeout one second from now */
-	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
+	callout_reset(&sc->mii_callout, hz, dpni_media_tick, sc);
 }
 
 /**
  * @internal
  */
 static void
-dpni_if_init(void *arg)
+dpni_init(void *arg)
 {
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	struct ifnet *ifp = sc->ifp;
@@ -1832,7 +1838,7 @@ dpni_if_init(void *arg)
 	DPNI_LOCK(sc);
 	if (sc->mii)
 		mii_mediachg(sc->mii);
-	callout_reset(&sc->mii_callout, hz, dpni_ifmedia_tick, sc);
+	callout_reset(&sc->mii_callout, hz, dpni_media_tick, sc);
 
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
@@ -1845,19 +1851,27 @@ dpni_if_init(void *arg)
  * @internal
  */
 static void
-dpni_if_start(struct ifnet *ifp)
+dpni_start(struct ifnet *ifp)
 {
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+	struct mbuf *m;
+
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
 		return;
 
-	/* ... enqueue frames here ... */
+	while (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)) {
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
+		if (m == NULL)
+			break;
+		sc->tx_mbufn++;
+	}
 }
 
 /**
  * @internal
  */
 static int
-dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
+dpni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *) data;
@@ -1898,7 +1912,7 @@ dpni_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				}
 			} else {
 				DPNI_UNLOCK(sc);
-				dpni_if_init(sc);
+				dpni_init(sc);
 				DPNI_LOCK(sc);
 			}
 		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1955,7 +1969,7 @@ dpni_msi_intr(void *arg)
  * @brief Callback to obtain a physical address of the only DMA segment mapped.
  */
 static void
-dpni_single_seg_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
+dpni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 {
 	if (err)
 		return;
@@ -2069,10 +2083,10 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 
 /**
  * @internal
- * @brief Main routine to consume Rx frames.
+ * @brief Main routine to receive frames.
  */
 static int
-dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+dpni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
 	device_t bp_dev;
@@ -2171,10 +2185,10 @@ dpni_consume_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 /**
  * @internal
- * @brief Main routine to consume Rx error frames.
+ * @brief Main routine to receive Rx error frames.
  */
 static int
-dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+dpni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
 	device_t bp_dev;
@@ -2182,9 +2196,6 @@ dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_bp_softc *bpsc;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
-
-	/* For debug purposes only. */
-	device_printf(sc->dev, "%s: invoked\n", __func__);
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2203,10 +2214,10 @@ dpni_consume_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 /**
  * @internal
- * @brief Main routine to consume Tx confirmation frames.
+ * @brief Main routine to receive Tx confirmation frames.
  */
 static int
-dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
+dpni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
 	device_t bp_dev;
@@ -2214,9 +2225,6 @@ dpni_consume_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_bp_softc *bpsc;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
-
-	/* For debug purposes only. */
-	device_printf(sc->dev, "%s: invoked\n", __func__);
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2299,7 +2307,6 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	chan_bufn = 0;
 
 	for (i = 0; i < DPAA2_NI_BUFS_PER_CHAN; i += DPAA2_SWP_BUFS_PER_CMD) {
-		/* Reset counter to accumulate buffers for a single command. */
 		bufn = 0;
 		/* Allocate enough buffers to release in one QBMan command. */
 		for (j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
@@ -2320,7 +2327,8 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			bufn++;
 			chan_bufn++;
 		}
-		/* Release buffer to the buffer pool. */
+
+		/* Release buffer back to the buffer pool. */
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    paddr, bufn);
 		if (error) {
@@ -2328,9 +2336,9 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 			    "the buffer pool\n");
 			return (error);
 		}
-		/* Do not continue seeding buffers after error. */
+
 		if (stop)
-			break;
+			break; /* Stop seeding buffers after error. */
 	}
 
 	chan->buf_num = chan_bufn;
@@ -2431,8 +2439,7 @@ seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	}
 
 	error = bus_dmamap_load(sc->st_dmat, store->dmap, (void *) store->vaddr,
-	    ETH_STORE_SIZE, dpni_single_seg_dmamap_cb, &store->paddr,
-	    BUS_DMA_NOWAIT);
+	    ETH_STORE_SIZE, dpni_dmamap_cb, &store->paddr, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(sc->dev, "Failed to map channel storage\n");
 		return (error);
@@ -2543,8 +2550,8 @@ set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags)
 
 	/* Prepare for setting the Rx dist. */
 	err = bus_dmamap_load(sc->rxd_dmat, sc->rxd_kcfg.dmap,
-	    sc->rxd_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE,
-	    dpni_single_seg_dmamap_cb, &sc->rxd_kcfg.paddr, BUS_DMA_NOWAIT);
+	    sc->rxd_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE, dpni_dmamap_cb,
+	    &sc->rxd_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (err) {
 		device_printf(sc->dev, "Failed to map a buffer for Rx traffic "
 		    "distribution key configuration\n");
