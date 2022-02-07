@@ -249,7 +249,8 @@ struct dpaa2_ni_channel {
 
 /**
  * @brief A Frame Queue is the basic queuing structure used by the QMan.
- * It comprises a list of FDs, so it can be thought of as a queue of frames.
+ * It comprises a list of frame descriptors (FDs), so it can be thought of
+ * as a queue of frames.
  *
  * NOTE: When frames on a FQ are ready to be processed, the FQ is enqueued
  *	 onto a work queue (WQ).
@@ -490,15 +491,6 @@ struct dpni_ext_set_rx_tc_dist {
 
 /**
  * @brief Software context for the DPAA2 Network Interface driver.
- *
- * dev:		Device associated with this software context.
- * api_major:	Major version of the DPNI API.
- * api_minor:	Minor version of the DPNI API.
- * rx_bufsz:	Size of a buffer to receive frames.
- * tx_data_off: ...
- * attr:	Attributes of the DPNI object.
- * mac:		Details about DPMAC connected to this DPNI object (if exists).
- * link_state:	Link state of the network interface.
  */
 struct dpaa2_ni_softc {
 	device_t		 dev;
@@ -514,6 +506,9 @@ struct dpaa2_ni_softc {
 	int			 link_state;
 
 	struct dpaa2_ni_attr	 attr;
+
+	/* For debug purposes only! */
+	uint64_t		 tx_mbufn;
 
 	/* Helps to send commands to MC. */
 	struct dpaa2_cmd	*cmd;
