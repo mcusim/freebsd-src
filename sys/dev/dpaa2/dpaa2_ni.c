@@ -1856,8 +1856,12 @@ dpni_start(struct ifnet *ifp)
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct mbuf *m;
 
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0)
+	DPNI_LOCK(sc);
+	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+		DPNI_UNLOCK(sc);
 		return;
+	}
+	DPNI_UNLOCK(sc);
 
 	while (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)) {
 		IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
