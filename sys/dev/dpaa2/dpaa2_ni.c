@@ -1848,7 +1848,7 @@ dpni_transmit(struct ifnet *ifp, struct mbuf *m)
 	DPNI_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		DPNI_UNLOCK(sc);
-		return;
+		return (0);
 	}
 	DPNI_UNLOCK(sc);
 
