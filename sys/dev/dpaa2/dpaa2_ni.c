@@ -119,9 +119,7 @@ __FBSDID("$FreeBSD$");
 #define BUF_ALIGN		64
 #define TXBUF_SWA_SIZE		64 /* SW annotation size (for Tx buffer) */
 #define BUF_HWA_SIZE		64 /* HW annotation size */
-#define BUF_AUX_SIZE		256 /* SWA + HWA + headroom + tailroom */
-#define BUF_FRAME_DATA_SIZE	(MJUM9BYTES)
-#define BUF_SIZE		(BUF_FRAME_DATA_SIZE + BUF_AUX_SIZE)
+#define BUF_SIZE		(MJUM9BYTES)
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
