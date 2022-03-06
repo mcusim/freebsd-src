@@ -114,15 +114,17 @@ __FBSDID("$FreeBSD$");
 #define DPNI_VER_MAJOR		7
 #define DPNI_VER_MINOR		0
 
-/* RX buffer configuration. */
-#define RX_BUF_ALIGN_V1		256 /* limitation of the WRIOP v1.0.0 */
-#define RX_BUF_ALIGN		64
-#define RX_BUF_SIZE		(MJUM9BYTES)
-#define	RX_BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
-#define	RX_BUF_MAXADDR		BUS_SPACE_MAXADDR
-
-#define ETH_SWA_SIZE		64 /* SW annotation area (limited to 0 or 64) */
-#define ETH_RX_HWA_SIZE		64 /* HW annotation area in RX/TX buffers */
+/* Rx/Tx buffers configuration. */
+#define BUF_ALIGN_V1		256 /* WRIOP v1.0.0 limitation */
+#define BUF_ALIGN		64
+#define BUF_SWA_SIZE		64 /* SW annotation size */
+#define BUF_HWA_SIZE		64 /* HW annotation size */
+#define BUF_HEAD_ROOM		64
+#define BUF_TAIL_ROOM		0
+#define BUF_SIZE_AUX		256 /* SWA + HWA + headroom + tailroom */
+#define BUF_SIZE		(MJUM9BYTES + BUF_SIZE_AUX)
+#define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
+#define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
@@ -134,8 +136,6 @@ __FBSDID("$FreeBSD$");
 #define ETH_STORE_FRAMES	16
 #define ETH_STORE_SIZE		((ETH_STORE_FRAMES + 1) * sizeof(struct dpaa2_dq))
 #define ETH_STORE_ALIGN		64
-
-#define TX_QUEUE_LEN		256
 
 /* Buffers layout options. */
 #define BUF_LOPT_TIMESTAMP	0x1
@@ -349,8 +349,7 @@ static struct dpni_stat {
 	   				"depletion in DPNI buffer pools" },
 };
 
-/* Forward declarations. */
-
+/* DPAA2 network interface setup and configuration */
 static int setup_dpni(device_t);
 static int setup_channels(device_t);
 static int setup_frame_queues(device_t);
@@ -365,6 +364,7 @@ static int setup_if_caps(struct dpaa2_ni_softc *);
 static int setup_if_flags(struct dpaa2_ni_softc *);
 static int setup_sysctls(struct dpaa2_ni_softc *);
 
+/* Configuration subroutines */
 static int set_buf_layout(device_t, struct dpaa2_cmd *);
 static int set_pause_frame(device_t, struct dpaa2_cmd *);
 static int set_qos_table(device_t, struct dpaa2_cmd *);
@@ -372,28 +372,42 @@ static int set_mac_addr(device_t, struct dpaa2_cmd *, uint16_t, uint16_t);
 static int set_hash(device_t, uint64_t);
 static int set_dist_key(device_t, enum dpaa2_ni_dist_mode, uint64_t);
 
+/* Buffers and pools */
 static int seed_buf_pool(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 static int seed_buf(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *,
     struct dpaa2_ni_buf *, int);
 static int seed_chan_storage(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *);
 
+/* Frame descriptors construction */
+static int build_single_fd(struct dpaa2_ni_softc *, struct mbuf *,
+    struct dpaa2_fd *);
+static int build_sg_fd(struct dpaa2_ni_softc *, struct mbuf *,
+    struct dpaa2_fd *);
+
+/* Various subroutines */
 static int dpni_channels_num(struct dpaa2_ni_softc *);
 static int cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
 static int prepare_key_cfg(struct dpkg_profile_cfg *, uint8_t *);
 static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq **);
 
-/* Callbacks. */
-
+/* Network interface handlers */
 static void dpni_init(void *);
-static void dpni_start(struct ifnet *);
+static void dpni_transmit(struct ifnet *, struct mbuf *);
+static void dpni_qflush(struct ifnet *);
 static int  dpni_ioctl(struct ifnet *, u_long, caddr_t);
 
+/* Interrupt handlers */
+static void dpni_msi_intr(void *);
+
+/* MII handlers */
 static int  dpni_media_change(struct ifnet *);
 static void dpni_media_status(struct ifnet *, struct ifmediareq *);
 static void dpni_media_tick(void *);
 
+/* DMA mapping callback */
 static void dpni_dmamap_cb(void *, bus_dma_segment_t *, int, int);
 
+/* Rx subroutines */
 static void dpni_poll_channel(void *, int);
 static int dpni_consume_frames(struct dpaa2_ni_channel *, struct dpaa2_ni_fq **,
     uint32_t *);
@@ -404,15 +418,8 @@ static int dpni_rx_err(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
 static int dpni_tx_conf(struct dpaa2_ni_channel *, struct dpaa2_ni_fq *,
     struct dpaa2_fd *);
 
+/* sysctl(9) */
 static int dpni_collect_stats(SYSCTL_HANDLER_ARGS);
-
-/* ISRs */
-
-static void dpni_msi_intr(void *);
-
-/*
- * Device interface.
- */
 
 static int
 dpaa2_ni_probe(device_t dev)
@@ -478,16 +485,13 @@ dpaa2_ni_attach(device_t dev)
 
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_SIMPLEX | IFF_MULTICAST | IFF_BROADCAST;
+	ifp->if_init =	dpni_init;
+	ifp->if_ioctl = dpni_ioctl;
+	ifp->if_transmit = dpni_transmit;
+	ifp->if_qflush = dpni_qflush;
+
 	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_HWCSUM | IFCAP_JUMBO_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
-
-	ifp->if_init =	dpni_init;
-	ifp->if_start = dpni_start;
-	ifp->if_ioctl = dpni_ioctl;
-
-	ifp->if_snd.ifq_drv_maxlen = TX_QUEUE_LEN;
-	IFQ_SET_MAXLEN(&ifp->if_snd, ifp->if_snd.ifq_drv_maxlen);
-	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
@@ -586,12 +590,7 @@ dpaa2_ni_detach(device_t dev)
 	return (0);
 }
 
-/*
- * Internal functions.
- */
-
 /**
- * @internal
  * @brief Configure DPAA2 network interface object.
  */
 static int
@@ -746,7 +745,6 @@ setup_dpni(device_t dev)
 }
 
 /**
- * @internal
  * @brief Сonfigure QBMan channels and register data availability notifications.
  */
 static int
@@ -784,8 +782,8 @@ setup_channels(device_t dev)
 	    RX_BUF_MAXADDR_49BIT,	/* low restricted addr */
 	    RX_BUF_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
-	    RX_BUF_SIZE, 1,		/* maxsize, nsegments */
-	    RX_BUF_SIZE, 0,		/* maxsegsize, flags */
+	    BUF_SIZE, 1,		/* maxsize, nsegments */
+	    BUF_SIZE, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->bp_dmat);
 	if (error) {
@@ -913,7 +911,6 @@ setup_channels(device_t dev)
 }
 
 /**
- * @internal
  * @brief Сonfigure frame queues.
  */
 static int
@@ -968,7 +965,6 @@ setup_frame_queues(device_t dev)
 }
 
 /**
- * @internal
  * @brief Bind DPNI to DPBPs, DPIOs, frame queues and channels.
  */
 static int
@@ -1055,7 +1051,6 @@ setup_dpni_binding(device_t dev)
 }
 
 /**
- * @internal
  * @brief Setup ingress traffic distribution.
  *
  * NOTE: Ingress traffic distribution is valid only when DPNI_OPT_NO_FS option
@@ -1090,9 +1085,6 @@ setup_rx_distribution(device_t dev)
 	return (set_hash(dev, DPAA2_RXH_DEFAULT));
 }
 
-/**
- * @internal
- */
 static int
 setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
@@ -1136,9 +1128,6 @@ setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 	return (0);
 }
 
-/**
- * @internal
- */
 static int
 setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
@@ -1207,9 +1196,6 @@ setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 	return (0);
 }
 
-/**
- * @internal
- */
 static int
 setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 {
@@ -1254,7 +1240,6 @@ setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd, struct dpaa2_ni_fq *fq)
 }
 
 /**
- * @internal
  * @brief Configure DPNI object to generate interrupts.
  */
 static int
@@ -1301,7 +1286,6 @@ setup_dpni_irqs(device_t dev)
 }
 
 /**
- * @internal
  * @brief Allocate MSI interrupts for DPNI.
  */
 static int
@@ -1325,7 +1309,6 @@ setup_msi(struct dpaa2_ni_softc *sc)
 }
 
 /**
- * @internal
  * @brief Update DPNI according to the updated interface capabilities.
  */
 static int
@@ -1372,7 +1355,6 @@ setup_if_caps(struct dpaa2_ni_softc *sc)
 }
 
 /**
- * @internal
  * @brief Update DPNI according to the updated interface flags.
  */
 static int
@@ -1401,9 +1383,6 @@ setup_if_flags(struct dpaa2_ni_softc *sc)
 	return (0);
 }
 
-/**
- * @internal
- */
 static int
 setup_sysctls(struct dpaa2_ni_softc *sc)
 {
@@ -1433,7 +1412,6 @@ setup_sysctls(struct dpaa2_ni_softc *sc)
 }
 
 /**
- * @internal
  * @brief Configure buffer layouts of the different DPNI queues.
  */
 static int
@@ -1444,86 +1422,109 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	int error;
 
 	/*
-	 * Select RX buffer alignment. It's necessary to ensure that the buffer
-	 * size seen by WRIOP is a multiple of 64 or 256 bytes depending on the
-	 * WRIOP version.
+	 * Select Rx/Tx buffer alignment. It's necessary to ensure that the
+	 * buffer size seen by WRIOP is a multiple of 64 or 256 bytes depending
+	 * on the WRIOP version.
 	 */
-	sc->rx_buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
+	sc->buf_align = (sc->attr.wriop_ver == WRIOP_VERSION(0, 0, 0) ||
 	    sc->attr.wriop_ver == WRIOP_VERSION(1, 0, 0))
-	    ? RX_BUF_ALIGN_V1 : RX_BUF_ALIGN;
+	    ? BUF_ALIGN_V1 : BUF_ALIGN;
 
 	/*
 	 * We need to ensure that the buffer size seen by WRIOP is a multiple
 	 * of 64 or 256 bytes depending on the WRIOP version.
 	 */
-	sc->rx_bufsz = ALIGN_DOWN(RX_BUF_SIZE, sc->rx_buf_align);
-	if (bootverbose)
-		device_printf(dev, "RX buffer: size=%d, alignment=%d\n",
-		    sc->rx_bufsz, sc->rx_buf_align);
+	sc->buf_sz = ALIGN_DOWN(BUF_SIZE, sc->buf_align);
 
-	/* TX buffer layout */
+	if (bootverbose)
+		device_printf(dev, "Rx/Tx buffers: size=%d, alignment=%d\n",
+		    sc->buf_sz, sc->buf_align);
+
+	/*
+	 *    Frame Descriptor       Tx buffer layout
+	 *
+	 *                ADDR -> |---------------------|
+	 *                        | SW FRAME ANNOTATION | - BUF_SWA_SIZE bytes
+	 *                        |---------------------|
+	 *                        | HW FRAME ANNOTATION |
+	 *                        |---------------------|
+	 *                        |    DATA HEADROOM    | - BUF_HEAD_ROOM bytes
+	 *       ADDR + OFFSET -> |---------------------|
+	 *                        |                     |
+	 *                        |                     |
+	 *                        |     FRAME DATA      |
+	 *                        |                     |
+	 *                        |                     |
+	 *                        |---------------------|
+	 *                        |    DATA TAILROOM    | - BUF_TAIL_ROOM bytes
+	 *                        |---------------------|
+	 *
+	 * NOTE: It's for a single buffer frame only.
+	 */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
-	buf_layout.pd_size = ETH_SWA_SIZE;
+	buf_layout.pd_size = BUF_SWA_SIZE;
+	buf_layout.fd_align = sc->buf_align;
+	buf_layout.head_size = BUF_HEAD_ROOM;
+	buf_layout.tail_size = BUF_TAIL_ROOM;
 	buf_layout.pass_timestamp = true;
 	buf_layout.pass_frame_status = true;
 	buf_layout.options =
 	    BUF_LOPT_PRIV_DATA_SZ |
+	    BUF_LOPT_DATA_ALIGN |
+	    BUF_LOPT_DATA_HEAD_ROOM |
+	    BUF_LOPT_DATA_TAIL_ROOM |
 	    BUF_LOPT_TIMESTAMP |
 	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set TX buffer layout\n");
+		device_printf(dev, "Failed to set Tx buffer layout\n");
 		return (error);
 	}
 
-	/* TX-confirmation buffer layout */
+	/* Tx-confirmation buffer layout */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX_CONF;
 	buf_layout.options =
 	    BUF_LOPT_TIMESTAMP |
 	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set TX_CONF buffer layout\n");
+		device_printf(dev, "Failed to set TxConf buffer layout\n");
 		return (error);
 	}
 
-	/*
-	 * Now that we've set our TX buffer layout, retrieve the minimum
-	 * required TX data offset.
-	 */
+	/* Retrieve minimum required Tx data offset. */
 	error = DPAA2_CMD_NI_GET_TX_DATA_OFF(dev, cmd, &sc->tx_data_off);
 	if (error) {
-		device_printf(dev, "Failed to obtain TX data offset\n");
+		device_printf(dev, "Failed to obtain Tx data offset\n");
 		return (error);
 	}
 
 	if (bootverbose)
-		device_printf(dev, "TX data offset=%d\n", sc->tx_data_off);
+		device_printf(dev, "Tx data offset=%d\n", sc->tx_data_off);
 	if ((sc->tx_data_off % 64) != 0)
-		device_printf(dev, "TX data offset (%d) is not a multiplication "
+		device_printf(dev, "Tx data offset (%d) is not a multiplication "
 		    "of 64 bytes\n", sc->tx_data_off);
 
-	/* RX buffer */
-	/*
-	 * Extra headroom space requested to hardware, in order to make sure
-	 * there's no realloc'ing in forwarding scenarios.
-	 */
+	/* Rx buffer */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_RX;
-	buf_layout.head_size = sc->tx_data_off - ETH_RX_HWA_SIZE;
-	buf_layout.fd_align = sc->rx_buf_align;
+	buf_layout.pd_size = BUF_SWA_SIZE;
+	buf_layout.fd_align = sc->buf_align;
+	buf_layout.head_size = BUF_HEAD_ROOM;
+	buf_layout.tail_size = BUF_TAIL_ROOM;
 	buf_layout.pass_frame_status = true;
 	buf_layout.pass_parser_result = true;
 	buf_layout.pass_timestamp = true;
-	buf_layout.pd_size = 0;
 	buf_layout.options =
-	    BUF_LOPT_DATA_HEAD_ROOM |
+	    BUF_LOPT_PRIV_DATA_SZ |
 	    BUF_LOPT_DATA_ALIGN |
+	    BUF_LOPT_DATA_HEAD_ROOM |
+	    BUF_LOPT_DATA_TAIL_ROOM |
 	    BUF_LOPT_FRAME_STATUS |
 	    BUF_LOPT_PARSER_RESULT |
 	    BUF_LOPT_TIMESTAMP;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set RX buffer layout\n");
+		device_printf(dev, "Failed to set Rx buffer layout\n");
 		return (error);
 	}
 
@@ -1531,7 +1532,6 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 }
 
 /**
- * @internal
  * @brief Enable Rx/Tx pause frames.
  *
  * NOTE: DPNI stops sending when a pause frame is received (Rx frame) or DPNI
@@ -1568,7 +1568,6 @@ set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 }
 
 /**
- * @internal
  * @brief Configure QoS table to determine the traffic class for the received
  * frame.
  */
@@ -1708,7 +1707,6 @@ set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 }
 
 /**
- * @internal
  * @brief Callback function to process media change request.
  */
 static int
@@ -1727,7 +1725,6 @@ dpni_media_change(struct ifnet *ifp)
 }
 
 /**
- * @internal
  * @brief Callback function to process media status request.
  */
 static void
@@ -1791,7 +1788,6 @@ dpni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 /**
- * @internal
  * @brief Callout function to check and update media status.
  */
 static void
@@ -1813,9 +1809,6 @@ dpni_media_tick(void *arg)
 	callout_reset(&sc->mii_callout, hz, dpni_media_tick, sc);
 }
 
-/**
- * @internal
- */
 static void
 dpni_init(void *arg)
 {
@@ -1847,11 +1840,8 @@ dpni_init(void *arg)
 	return;
 }
 
-/**
- * @internal
- */
 static void
-dpni_start(struct ifnet *ifp)
+dpni_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct mbuf *m;
@@ -1871,9 +1861,13 @@ dpni_start(struct ifnet *ifp)
 	}
 }
 
-/**
- * @internal
- */
+static void
+dpni_qflush(struct ifnet *ifp)
+{
+	/* TODO: Find a way to drain Tx queues in QBMan. */
+	if_qflush(ifp);
+}
+
 static int
 dpni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
@@ -1944,9 +1938,6 @@ dpni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return (rc);
 }
 
-/**
- * @internal
- */
 static void
 dpni_msi_intr(void *arg)
 {
@@ -1969,7 +1960,6 @@ dpni_msi_intr(void *arg)
 }
 
 /**
- * @internal
  * @brief Callback to obtain a physical address of the only DMA segment mapped.
  */
 static void
@@ -1981,7 +1971,6 @@ dpni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 }
 
 /**
- * @internal
  * @brief Task to poll frames from a specific channel when CDAN is received.
  */
 static void
@@ -2022,9 +2011,6 @@ dpni_poll_channel(void *arg, int count)
 		    "error=%d\n", chan->id, error);
 }
 
-/**
- * @internal
- */
 static int
 dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
     uint32_t *consumed)
@@ -2086,7 +2072,6 @@ dpni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 }
 
 /**
- * @internal
  * @brief Main routine to receive frames.
  */
 static int
@@ -2188,7 +2173,6 @@ dpni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 }
 
 /**
- * @internal
  * @brief Main routine to receive Rx error frames.
  */
 static int
@@ -2217,7 +2201,6 @@ dpni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 }
 
 /**
- * @internal
  * @brief Main routine to receive Tx confirmation frames.
  */
 static int
@@ -2246,7 +2229,6 @@ dpni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 }
 
 /**
- * @internal
  * @brief Compare versions of the DPAA2 network interface API.
  */
 static int
@@ -2258,7 +2240,6 @@ cmp_api_version(struct dpaa2_ni_softc *sc, uint16_t major, uint16_t minor)
 }
 
 /**
- * @internal
  * @brief Calculate number of channels based on the allocated resources.
  */
 static int
@@ -2283,7 +2264,6 @@ dpni_channels_num(struct dpaa2_ni_softc *sc)
 }
 
 /**
- * @internal
  * @brief Allocate buffers visible to QBMan and release them to the buffer pool.
  */
 static int
@@ -2351,7 +2331,6 @@ seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 }
 
 /**
- * @internal
  * @brief Prepares a buffer to be released to the buffer pool.
  */
 static int
@@ -2376,7 +2355,7 @@ seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 
 	/* Allocate mbuf if needed. */
 	if (buf->m == NULL) {
-		m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, RX_BUF_SIZE);
+		m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, BUF_SIZE);
 		if (__predict_false(m == NULL)) {
 			device_printf(sc->dev, "Failed to allocate mbuf for "
 			    "buffer\n");
@@ -2421,9 +2400,7 @@ seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 }
 
 /**
- * @internal
  * @brief Allocate channel storage visible to QBMan.
- *
  */
 static int
 seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
@@ -2455,8 +2432,25 @@ seed_chan_storage(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	return (0);
 }
 
+/*
+ * @brief Build a single buffer frame descriptor.
+ */
+static int
+build_single_fd(struct dpaa2_ni_softc *sc, struct mbuf *m, struct dpaa2_fd *fd)
+{
+	return (0);
+}
+
+/*
+ * @brief Build a scatter/gather frame descriptor.
+ */
+static int
+build_sg_fd(struct dpaa2_ni_softc *sc, struct mbuf *m, struct dpaa2_fd *fd)
+{
+	return (0);
+}
+
 /**
- * @internal
  * @brief Collect statistics of the network interface.
  */
 static int
@@ -2476,9 +2470,6 @@ dpni_collect_stats(SYSCTL_HANDLER_ARGS)
 	return (sysctl_handle_64(oidp, &result, 0, req));
 }
 
-/**
- * @internal
- */
 static int
 set_hash(device_t dev, uint64_t flags)
 {
@@ -2497,7 +2488,6 @@ set_hash(device_t dev, uint64_t flags)
 }
 
 /**
- * @internal
  * @brief Set Rx distribution (hash or flow classification) key flags is a
  * combination of RXH_ bits.
  */
