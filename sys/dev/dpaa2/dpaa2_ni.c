@@ -117,8 +117,9 @@ __FBSDID("$FreeBSD$");
 /* Rx/Tx buffers configuration. */
 #define BUF_ALIGN_V1		256 /* WRIOP v1.0.0 limitation */
 #define BUF_ALIGN		64
-#define TXBUF_SWA_SIZE		64 /* SW annotation size (for Tx buffer) */
-#define BUF_HWA_SIZE		64 /* HW annotation size */
+#define BUF_SWA_SIZE		64  /* SW annotation size */
+#define BUF_RX_HWA_SIZE		64  /* HW annotation size */
+#define BUF_TX_HWA_SIZE		128 /* HW annotation size */
 #define BUF_SIZE		(MJUM9BYTES)
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
@@ -1441,9 +1442,9 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 *    Frame Descriptor       Tx buffer layout
 	 *
 	 *                ADDR -> |---------------------|
-	 *                        | SW FRAME ANNOTATION | TXBUF_SWA_SIZE bytes
+	 *                        | SW FRAME ANNOTATION | BUF_SWA_SIZE bytes
 	 *                        |---------------------|
-	 *                        | HW FRAME ANNOTATION |
+	 *                        | HW FRAME ANNOTATION | BUF_TX_HWA_SIZE bytes
 	 *                        |---------------------|
 	 *                        |    DATA HEADROOM    |
 	 *       ADDR + OFFSET -> |---------------------|
@@ -1459,12 +1460,12 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 * NOTE: It's for a single buffer frame only.
 	 */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
-	buf_layout.pd_size = TXBUF_SWA_SIZE;
+	buf_layout.pd_size = BUF_SWA_SIZE;
 	buf_layout.pass_timestamp = true;
 	buf_layout.pass_frame_status = true;
 	buf_layout.options =
 	    BUF_LOPT_PRIV_DATA_SZ |
-	    BUF_LOPT_TIMESTAMP |
+	    BUF_LOPT_TIMESTAMP | /* requires 128 bytes in HWA */
 	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
@@ -1502,9 +1503,9 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 *                ADDR -> |---------------------|
 	 *                        | SW FRAME ANNOTATION | 0 bytes
 	 *                        |---------------------|
-	 *                        | HW FRAME ANNOTATION | BUF_HWA_SIZE bytes
+	 *                        | HW FRAME ANNOTATION | BUF_RX_HWA_SIZE bytes
 	 *                        |---------------------|
-	 *                        |    DATA HEADROOM    | OFFSET - BUF_HWA_SIZE
+	 *                        |    DATA HEADROOM    | OFFSET-BUF_RX_HWA_SIZE
 	 *       ADDR + OFFSET -> |---------------------|
 	 *                        |                     |
 	 *                        |                     |
@@ -1520,7 +1521,7 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	buf_layout.queue_type = DPAA2_NI_QUEUE_RX;
 	buf_layout.pd_size = 0;
 	buf_layout.fd_align = sc->buf_align;
-	buf_layout.head_size = sc->tx_data_off - BUF_HWA_SIZE;
+	buf_layout.head_size = sc->tx_data_off - BUF_RX_HWA_SIZE;
 	buf_layout.tail_size = 0;
 	buf_layout.pass_frame_status = true;
 	buf_layout.pass_parser_result = true;
