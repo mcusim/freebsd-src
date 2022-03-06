@@ -353,7 +353,7 @@ struct dpaa2_ni_queue_cfg {
 /**
  * @brief Buffer layout attributes.
  *
- * pd_size:		Size kept for private data (in bytes, max. 64)
+ * pd_size:		Size kept for private data (in bytes).
  * fd_align:		Frame data alignment.
  * head_size:		Data head room.
  * tail_size:		Data tail room.
@@ -497,14 +497,16 @@ struct dpaa2_ni_softc {
 	struct resource 	*res[DPAA2_NI_MAX_RESOURCES];
 	uint16_t		 api_major;
 	uint16_t		 api_minor;
-	uint16_t		 rx_bufsz;
-	uint16_t		 rx_buf_align;
 	uint64_t		 rx_hash_fields;
 	uint16_t		 tx_data_off;
 	uint16_t		 tx_qdid;
 	uint32_t		 link_options;
 	int			 link_state;
 
+	uint16_t		 buf_align;
+	uint16_t		 buf_sz;
+
+	/* Attributes of the DPAA2 network interface. */
 	struct dpaa2_ni_attr	 attr;
 
 	/* For debug purposes only! */
