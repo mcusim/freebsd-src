@@ -1463,14 +1463,14 @@ set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 */
 	buf_layout.queue_type = DPAA2_NI_QUEUE_TX;
 	buf_layout.pd_size = BUF_SWA_SIZE;
-	buf_layout.fd_align = sc->buf_align;
+	/* buf_layout.fd_align = sc->buf_align; */
 	buf_layout.head_size = BUF_HEAD_ROOM;
 	buf_layout.tail_size = BUF_TAIL_ROOM;
 	buf_layout.pass_timestamp = true;
 	buf_layout.pass_frame_status = true;
 	buf_layout.options =
 	    BUF_LOPT_PRIV_DATA_SZ |
-	    BUF_LOPT_DATA_ALIGN |
+	    /* BUF_LOPT_DATA_ALIGN | */
 	    BUF_LOPT_DATA_HEAD_ROOM |
 	    BUF_LOPT_DATA_TAIL_ROOM |
 	    BUF_LOPT_TIMESTAMP |
