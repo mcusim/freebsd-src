@@ -392,7 +392,7 @@ static int chan_storage_next(struct dpaa2_ni_channel *, struct dpaa2_dq **);
 
 /* Network interface handlers */
 static void dpni_init(void *);
-static void dpni_transmit(struct ifnet *, struct mbuf *);
+static int dpni_transmit(struct ifnet *, struct mbuf *);
 static void dpni_qflush(struct ifnet *);
 static int  dpni_ioctl(struct ifnet *, u_long, caddr_t);
 
@@ -778,9 +778,9 @@ setup_channels(device_t dev)
 	 */
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
-	    sc->rx_buf_align, 0,	/* alignment, boundary */
-	    RX_BUF_MAXADDR_49BIT,	/* low restricted addr */
-	    RX_BUF_MAXADDR,		/* high restricted addr */
+	    sc->buf_align, 0,		/* alignment, boundary */
+	    BUF_MAXADDR_49BIT,		/* low restricted addr */
+	    BUF_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
 	    BUF_SIZE, 1,		/* maxsize, nsegments */
 	    BUF_SIZE, 0,		/* maxsegsize, flags */
@@ -987,7 +987,7 @@ setup_dpni_binding(device_t dev)
 	pools_cfg.pools_num = 1;
 	pools_cfg.pools[0].bp_obj_id = bp_info->id;
 	pools_cfg.pools[0].backup_flag = 0;
-	pools_cfg.pools[0].buf_sz = sc->rx_bufsz;
+	pools_cfg.pools[0].buf_sz = sc->buf_sz;
 	error = DPAA2_CMD_NI_SET_POOLS(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    &pools_cfg);
 	if (error) {
@@ -1840,11 +1840,10 @@ dpni_init(void *arg)
 	return;
 }
 
-static void
+static int
 dpni_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	struct mbuf *m;
 
 	DPNI_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -1853,12 +1852,9 @@ dpni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	DPNI_UNLOCK(sc);
 
-	while (!IFQ_DRV_IS_EMPTY(&ifp->if_snd)) {
-		IFQ_DRV_DEQUEUE(&ifp->if_snd, m);
-		if (m == NULL)
-			break;
-		sc->tx_mbufn++;
-	}
+	sc->tx_mbufn++;
+
+	return (0);
 }
 
 static void
@@ -2109,7 +2105,7 @@ dpni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	/* Drop FD with error status or not in a single buffer. */
 	/* ... TBD ... */
 
-	buf_len = (short_len) ? (fd->length & 0x3FFFFu) : (fd->length);
+	buf_len = (short_len) ? (fd->data_length & 0x3FFFFu) : (fd->data_length);
 	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
 
 	/* Prefetch mbuf data. */
@@ -2123,7 +2119,7 @@ dpni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	(*ifp->if_input)(ifp, m);
 
-	/* Keep buffer to be recycled. */
+	/* Keep the buffer to be recycled. */
 	chan->recycled[chan->recycled_n++] = paddr;
 
 	/* Re-seed and release recycled buffers back to the pool. */
