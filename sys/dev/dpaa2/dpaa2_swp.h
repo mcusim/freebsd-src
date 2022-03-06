@@ -267,7 +267,7 @@ struct dpaa2_scn {
  *
  * addr:	Memory address of the start of the buffer holding the frame
  *		data or the buffer containing the scatter/gather list.
- * length:	Length of the frame data (in bytes).
+ * data_length:	Length of the frame data (in bytes).
  * bpid:	Buffer pool ID (14 bit + BMT bit + IVP bit)
  * off_fmt_sl:	Frame data offset, frame format and short-length fields.
  * frame_ctx:   This field allows the sender of a frame to communicate some
@@ -279,7 +279,7 @@ struct dpaa2_scn {
  */
 struct dpaa2_fd {
 	uint64_t	addr;
-	uint32_t	length;
+	uint32_t	data_length;
 	uint16_t	bpid;
 	uint16_t	off_fmt_sl;
 	uint32_t	frame_ctx;
