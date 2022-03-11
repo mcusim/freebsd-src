@@ -209,6 +209,38 @@ struct dpaa2_ni_sbuf {
 };
 
 /**
+ * @brief A Frame Queue is the basic queuing structure used by the QMan.
+ * It comprises a list of frame descriptors (FDs), so it can be thought of
+ * as a queue of frames.
+ *
+ * NOTE: When frames on a FQ are ready to be processed, the FQ is enqueued
+ *	 onto a work queue (WQ).
+ *
+ * fqid:	Frame queue ID, can be used to enqueue/dequeue or execute other
+ *		commands on the queue through DPIO.
+ * txq_n:	Number of configured Tx queues.
+ * tx_fqid:	Frame queue IDs of the Tx queues which belong to the same flowid.
+ *		Note that Tx queues are logical queues and not all management
+ *		commands are available on these queue types.
+ * qdbin:	Queue destination bin. Can be used with the DPIO enqueue
+ *		operation based on QDID, QDBIN and QPRI. Note that all Tx queues
+ *		with the same flowid have the same destination bin.
+ */
+struct dpaa2_ni_fq {
+	struct dpaa2_ni_channel	*channel;
+	uint32_t		 fqid;
+	uint32_t		 txq_n;
+	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
+	uint32_t		 tx_qdbin;
+	uint16_t		 flowid;
+	uint8_t			 tc;
+	enum dpaa2_ni_queue_type type;
+
+	int (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
+	    struct dpaa2_fd *fd);
+};
+
+/**
  * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
  *
  * NOTE: Several WQs are organized into a single WQ Channel.
@@ -243,38 +275,6 @@ struct dpaa2_ni_channel {
 	uint32_t		 rxq_n;
 	struct dpaa2_ni_fq	 rx_queues[DPAA2_NI_MAX_TCS];
 	struct dpaa2_ni_fq	 txc_queue;
-};
-
-/**
- * @brief A Frame Queue is the basic queuing structure used by the QMan.
- * It comprises a list of frame descriptors (FDs), so it can be thought of
- * as a queue of frames.
- *
- * NOTE: When frames on a FQ are ready to be processed, the FQ is enqueued
- *	 onto a work queue (WQ).
- *
- * fqid:	Frame queue ID, can be used to enqueue/dequeue or execute other
- *		commands on the queue through DPIO.
- * txq_n:	Number of configured Tx queues.
- * tx_fqid:	Frame queue IDs of the Tx queues which belong to the same flowid.
- *		Note that Tx queues are logical queues and not all management
- *		commands are available on these queue types.
- * qdbin:	Queue destination bin. Can be used with the DPIO enqueue
- *		operation based on QDID, QDBIN and QPRI. Note that all Tx queues
- *		with the same flowid have the same destination bin.
- */
-struct dpaa2_ni_fq {
-	struct dpaa2_ni_channel	*channel;
-	uint32_t		 fqid;
-	uint32_t		 txq_n;
-	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
-	uint32_t		 tx_qdbin;
-	uint16_t		 flowid;
-	uint8_t			 tc;
-	enum dpaa2_ni_queue_type type;
-
-	int (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
-	    struct dpaa2_fd *fd);
 };
 
 /**
