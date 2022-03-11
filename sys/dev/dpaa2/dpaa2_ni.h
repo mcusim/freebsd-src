@@ -55,13 +55,6 @@
 #define DPAA2_NI_MAX_TCS	8  /* traffic classes per DPNI */
 #define DPAA2_NI_MAX_POOLS	8  /* buffer pools per DPNI */
 
-#define DPAA2_NI_MAX_RXQ_PER_TC	16 /* Rx queues per traffic class */
-#define DPAA2_NI_MAX_RXQ	(DPAA2_NI_MAX_RXQ_PER_TC * DPAA2_NI_MAX_TCS)
-#define DPAA2_NI_MAX_RXEQ	1 /* Rx error queue */
-#define DPAA2_NI_MAX_TXQ	16
-#define DPAA2_NI_MAX_QUEUES	(DPAA2_NI_MAX_RXQ + DPAA2_NI_MAX_TXQ + \
-    DPAA2_NI_MAX_RXEQ)
-
 /* Maximum number of buffers allocated per channel. */
 #define DPAA2_NI_BUFS_PER_CHAN	(50u * DPAA2_SWP_BUFS_PER_CMD)
 #define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
@@ -225,7 +218,7 @@ struct dpaa2_ni_channel {
 	device_t		 io_dev;
 	device_t		 con_dev;
 	uint16_t		 id;
-	uint16_t		 idx;
+	uint16_t		 flowid;
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
@@ -245,6 +238,11 @@ struct dpaa2_ni_channel {
 	/* Recycled buffers to release back to the pool. */
 	uint32_t		 recycled_n;
 	bus_addr_t		 recycled[DPAA2_SWP_BUFS_PER_CMD];
+
+	/* Frame queues */
+	uint32_t		 rxq_n;
+	struct dpaa2_ni_fq	 rx_queues[DPAA2_NI_MAX_TCS];
+	struct dpaa2_ni_fq	 txc_queue;
 };
 
 /**
@@ -257,6 +255,7 @@ struct dpaa2_ni_channel {
  *
  * fqid:	Frame queue ID, can be used to enqueue/dequeue or execute other
  *		commands on the queue through DPIO.
+ * txq_n:	Number of configured Tx queues.
  * tx_fqid:	Frame queue IDs of the Tx queues which belong to the same flowid.
  *		Note that Tx queues are logical queues and not all management
  *		commands are available on these queue types.
@@ -267,6 +266,7 @@ struct dpaa2_ni_channel {
 struct dpaa2_ni_fq {
 	struct dpaa2_ni_channel	*channel;
 	uint32_t		 fqid;
+	uint32_t		 txq_n;
 	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
 	uint32_t		 tx_qdbin;
 	uint16_t		 flowid;
@@ -534,13 +534,12 @@ struct dpaa2_ni_softc {
 	struct dpaa2_ni_buf	 qos_kcfg; /* QoS table key config. */
 	struct dpaa2_ni_buf	 rxd_kcfg; /* Rx distribution key config. */
 
-	/* Channels and frame queues */
-	uint8_t			 num_chan;
-	struct dpaa2_ni_channel	*channel[DPAA2_NI_MAX_CHANNELS];
-	uint32_t		 num_fqs;
-	struct dpaa2_ni_fq	 fq[DPAA2_NI_MAX_QUEUES];
+	/* Channels and RxError frame queue */
+	uint32_t		 chan_n;
+	struct dpaa2_ni_channel	*channels[DPAA2_NI_MAX_CHANNELS];
+	struct dpaa2_ni_fq	 rxe_queue; /* one per network interface */
 
-	/* Interrupts. */
+	/* Interrupts */
 	int			 irq_rid[DPAA2_NI_MSI_COUNT];
 	struct resource		*irq_res;
 	void			*intr; /* interrupt handle */
