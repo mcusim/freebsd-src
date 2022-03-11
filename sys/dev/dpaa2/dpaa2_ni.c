@@ -618,7 +618,7 @@ dpaa2_ni_setup(device_t dev)
 		device_printf(dev, "Failed to get DPNI API version\n");
 		return (error);
 	}
-	if (cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
+	if (dpaa2_ni_cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
 		device_printf(dev, "DPNI API version %u.%u not supported, "
 		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
 		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
@@ -781,14 +781,14 @@ dpaa2_ni_setup_channels(device_t dev)
 	num_chan = i < num_chan ? i : num_chan;
 
 	/* Limit maximum channels. */
-	sc->num_chan = num_chan > DPAA2_NI_MAX_CHANNELS
+	sc->chan_n = num_chan > DPAA2_NI_MAX_CHANNELS
 	    ? DPAA2_NI_MAX_CHANNELS : num_chan;
 
 	/* Limit channels by number of the queues. */
-	sc->num_chan = sc->num_chan > sc->attr.num.queues
-	    ? sc->attr.num.queues : sc->num_chan;
+	sc->chan_n = sc->chan_n > sc->attr.num.queues
+	    ? sc->attr.num.queues : sc->chan_n;
 
-	device_printf(dev, "channels=%d\n", sc->num_chan);
+	device_printf(dev, "channels=%d\n", sc->chan_n);
 
 	/*
 	 * DMA tag to allocate buffers for buffer pool.
@@ -837,7 +837,7 @@ dpaa2_ni_setup_channels(device_t dev)
 	parent = SYSCTL_CHILDREN(node);
 
 	/* Setup channels for the portal. */
-	for (uint32_t i = 0; i < sc->num_chan; i++) {
+	for (uint32_t i = 0; i < sc->chan_n; i++) {
 		/* Select software portal. */
 		io_dev = (device_t) rman_get_start(sc->res[IO_RID(i)]);
 		iosc = device_get_softc(io_dev);
@@ -865,7 +865,7 @@ dpaa2_ni_setup_channels(device_t dev)
 			return (ENOMEM);
 		}
 
-		sc->channel[i] = channel;
+		sc->channels[i] = channel;
 
 		channel->id = consc->attr.chan_id;
 		channel->flowid = i;
@@ -1704,7 +1704,7 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	}
 
 	error = bus_dmamap_load(sc->qos_dmat, sc->qos_kcfg.dmap,
-	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE, dpni_dmamap_cb,
+	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE, dpaa2_ni_dmamap_cb,
 	    &sc->qos_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(dev, "Failed to map QoS key configuration buffer "
@@ -1919,7 +1919,7 @@ dpaa2_ni_init(void *arg)
 	DPNI_LOCK(sc);
 	if (sc->mii)
 		mii_mediachg(sc->mii);
-	callout_reset(&sc->mii_callout, hz, dpni_media_tick, sc);
+	callout_reset(&sc->mii_callout, hz, dpaa2_ni_media_tick, sc);
 
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
@@ -1943,7 +1943,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	/* Select channel based on the mbuf's flowid. */
 	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
-		ch_idx = m->m_pkthdr.flowid % sc->num_chan;
+		ch_idx = m->m_pkthdr.flowid % sc->chan_n;
 
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
@@ -2003,11 +2003,11 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				changed = ifp->if_flags ^ sc->if_flags;
 				if (changed & IFF_PROMISC ||
 				    changed & IFF_ALLMULTI) {
-					rc = setup_if_flags(sc);
+					rc = dpaa2_ni_setup_if_flags(sc);
 				}
 			} else {
 				DPNI_UNLOCK(sc);
-				dpni_init(sc);
+				dpaa2_ni_init(sc);
 				DPNI_LOCK(sc);
 			}
 		} else if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -2192,7 +2192,7 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
 	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
-	buf_chan = sc->channel[chan_idx];
+	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
 	KASSERT(paddr == buf->paddr,
@@ -2234,7 +2234,7 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 			    & DPAA2_NI_BUF_CHAN_MASK;
 			buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT)
 			    & DPAA2_NI_BUF_IDX_MASK;
-			buf_chan = sc->channel[chan_idx];
+			buf_chan = sc->channels[chan_idx];
 			buf = &buf_chan->buf[buf_idx];
 
 			/* Seed recycled buffer. */
@@ -2465,7 +2465,7 @@ dpaa2_ni_seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 	 * 	 by QBMan must be configured in the DMA tag accordingly.
 	 */
 	buf->paddr =
-	    ((uint64_t)(chan->idx & DPAA2_NI_BUF_CHAN_MASK) <<
+	    ((uint64_t)(chan->flowid & DPAA2_NI_BUF_CHAN_MASK) <<
 		DPAA2_NI_BUF_CHAN_SHIFT) |
 	    ((uint64_t)(buf_idx & DPAA2_NI_BUF_IDX_MASK) <<
 		DPAA2_NI_BUF_IDX_SHIFT) |
@@ -2496,7 +2496,7 @@ dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *sc,
 	}
 
 	error = bus_dmamap_load(sc->st_dmat, store->dmap, (void *) store->vaddr,
-	    ETH_STORE_SIZE, dpni_dmamap_cb, &store->paddr, BUS_DMA_NOWAIT);
+	    ETH_STORE_SIZE, dpaa2_ni_dmamap_cb, &store->paddr, BUS_DMA_NOWAIT);
 	if (error) {
 		device_printf(sc->dev, "Failed to map channel storage\n");
 		return (error);
