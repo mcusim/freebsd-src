@@ -948,7 +948,8 @@ dpaa2_ni_setup_channels(device_t dev)
 	}
 
 	/* There is exactly one Rx error queue per DPNI. */
-	error = dpaa2_ni_prepare_fq(dev, NULL, DPAA2_NI_QUEUE_RX_ERR);
+	error = dpaa2_ni_prepare_fq(dev, &sc->channels[0],
+	    DPAA2_NI_QUEUE_RX_ERR);
 	if (error) {
 		device_printf(dev, "%s: failed to prepare RxError queue: "
 		    "error=%d\n", __func__, error);
@@ -998,7 +999,7 @@ dpaa2_ni_prepare_fq(device_t dev, struct dpaa2_ni_channel *chan,
 		sc->rxe_queue.tc = 0; /* ignored */
 		sc->rxe_queue.flowid = 0; /* ignored */
 		sc->rxe_queue.consume = dpaa2_ni_rx_err;
-		sc->rxe_queue.channel = NULL; /* prevent further usage */
+		sc->rxe_queue.channel = chan;
 		break;
 	default:
 		device_printf(dev, "%s: unexpected frame queue type: %d\n",
