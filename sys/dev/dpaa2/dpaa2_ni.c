@@ -948,8 +948,7 @@ dpaa2_ni_setup_channels(device_t dev)
 	}
 
 	/* There is exactly one Rx error queue per DPNI. */
-	error = dpaa2_ni_prepare_fq(dev, &sc->channels[0],
-	    DPAA2_NI_QUEUE_RX_ERR);
+	error = dpaa2_ni_prepare_fq(dev, sc->channels[0], DPAA2_NI_QUEUE_RX_ERR);
 	if (error) {
 		device_printf(dev, "%s: failed to prepare RxError queue: "
 		    "error=%d\n", __func__, error);
