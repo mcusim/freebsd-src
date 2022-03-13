@@ -1948,7 +1948,11 @@ static int
 dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	uint8_t ch_idx = 0;
+	struct dpaa2_ni_channel *chan;
+	struct dpaa2_ni_buf txb;
+	struct dpaa2_fd fd;
+	bus_dma_segment_t segs;
+	int error, nsegs;
 
 	DPNI_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -1959,17 +1963,47 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	/* Select channel based on the mbuf's flowid. */
 	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
-		ch_idx = m->m_pkthdr.flowid % sc->chan_n;
+		chan = &sc->channels[m->m_pkthdr.flowid % sc->chan_n];
+	else
+		chan = &sc->channels[0];
+
+	sc->tx_mbufn++;
+
+	/* Reset frame descriptor fields. */
+	memset(&fd, 0, sizeof(fd));
 
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
 	if (m == NULL) {
 		device_printf(sc->dev, "%s: reserve Tx headroom failed\n",
 		    __func__);
-		return ENOBUFS;
+		return (ENOBUFS);
 	}
 
-	sc->tx_mbufn++;
+	/* Setup Tx buffer. */
+	txb.m = m;
+	error = bus_dmamap_create(sc->bp_dmat, 0, &txb.dmap);
+	if (error) {
+		device_printf(sc->dev, "%s: failed to create Tx DMA map: "
+		    "error=%d\n", __func__, error);
+		return (error);
+	}
+
+	/* Map mbuf to transmit */
+	error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, txb.dmap,
+	    txb.m, &segs, &nsegs, BUS_DMA_NOWAIT);
+	KASSERT(nsegs == 1, ("too many segments to transmit: nsegs=%d", nsegs));
+	KASSERT(error == 0, ("failed to map Tx mbuf: error=%d", error));
+
+	if (__predict_false(error != 0 || nsegs != 1)) {
+		device_printf(sc->dev, "%s: failed to map Tx mbuf: error=%d, "
+		    "nsegs=%d\n", __func__, error, nsegs);
+		bus_dmamap_unload(sc->bp_dmat, txb.dmap);
+		m_freem(txb.m);
+		return (error);
+	}
+	txb.paddr = segs.ds_addr;
+	txb.vaddr = txb.m->m_data;
 
 	return (0);
 }
