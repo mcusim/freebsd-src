@@ -1030,8 +1030,6 @@ dpaa2_ni_bind(device_t dev)
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bp_info = device_get_ivars(bp_dev);
 
-	device_printf(dev, "%s: stage 1\n", __func__);
-
 	/* Configure buffers pool. */
 	pools_cfg.pools_num = 1;
 	pools_cfg.pools[0].bp_obj_id = bp_info->id;
@@ -1044,8 +1042,6 @@ dpaa2_ni_bind(device_t dev)
 		return (error);
 	}
 
-	device_printf(dev, "%s: stage 2\n", __func__);
-
 	/* Setup ingress traffic distribution. */
 	error = dpaa2_ni_setup_rx_dist(dev);
 	if (error && error != EOPNOTSUPP) {
@@ -1057,8 +1053,6 @@ dpaa2_ni_bind(device_t dev)
 		device_printf(dev, "Ingress traffic distribution not "
 		    "supported\n");
 
-	device_printf(dev, "%s: stage 3\n", __func__);
-
 	/* Configure handling of error frames. */
 	err_cfg.err_mask = DPAA2_NI_FAS_RX_ERR_MASK;
 	err_cfg.set_err_fas = false;
@@ -1068,8 +1062,6 @@ dpaa2_ni_bind(device_t dev)
 		device_printf(dev, "Failed to set errors behavior\n");
 		return (error);
 	}
-
-	device_printf(dev, "%s: stage 4\n", __func__);
 
 	/* Configure channel queues to generate CDANs. */
 	for (uint32_t i = 0; i < sc->chan_n; i++) {
@@ -1086,8 +1078,6 @@ dpaa2_ni_bind(device_t dev)
 			}
 		}
 
-		device_printf(dev, "%s: stage 5: channel %d\n", __func__, i);
-
 		/* Setup Tx flow. */
 		error = dpaa2_ni_setup_tx_flow(dev, cmd, &chan->txc_queue);
 		if (error) {
@@ -1095,11 +1085,7 @@ dpaa2_ni_bind(device_t dev)
 			    "flow: error=%d\n", __func__, error);
 			return (error);
 		}
-
-		device_printf(dev, "%s: stage 6: channel %d\n", __func__, i);
 	}
-
-	device_printf(dev, "%s: stage 7\n", __func__);
 
 	/* Configure RxError queue to generate CDAN. */
 	error = dpaa2_ni_setup_rx_err_flow(dev, cmd, &sc->rxe_queue);
@@ -1108,8 +1094,6 @@ dpaa2_ni_bind(device_t dev)
 		    "error=%d\n", __func__, error);
 		return (error);
 	}
-
-	device_printf(dev, "%s: stage 8\n", __func__);
 
 	/*
 	 * Get the Queuing Destination ID (QDID) that should be used for frame
@@ -1183,10 +1167,12 @@ dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
 
 	fq->fqid = queue_cfg.fqid;
 
+#if 0
 	if (bootverbose)
 		device_printf(dev, "Rx queue: tc=%d, flowid=%d, fqid=%d, "
 		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx, queue_cfg.fqid,
 		    con_info->id);
+#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
@@ -1236,10 +1222,12 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 		}
 		fq->tx_fqid[i] = queue_cfg.fqid;
 
+#if 0
 		if (bootverbose)
 			device_printf(dev, "Tx queue: tc=%d, flowid=%d, "
 			    "fqid=%d, dpcon_id=%d\n", queue_cfg.tc,
 			    queue_cfg.idx, queue_cfg.fqid, con_info->id);
+#endif
 	}
 
 	/* All Tx queues which belong to the same flowid have the same qdbin. */
@@ -1258,10 +1246,12 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 
 	fq->fqid = queue_cfg.fqid;
 
+#if 0
 	if (bootverbose)
 		device_printf(dev, "TxConf queue: tc=%d, flowid=%d, fqid=%d, "
 		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
 		    queue_cfg.fqid, con_info->id);
+#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
