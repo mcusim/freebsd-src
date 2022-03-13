@@ -1963,9 +1963,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	/* Select channel based on the mbuf's flowid. */
 	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
-		chan = &sc->channels[m->m_pkthdr.flowid % sc->chan_n];
+		chan = sc->channels[m->m_pkthdr.flowid % sc->chan_n];
 	else
-		chan = &sc->channels[0];
+		chan = sc->channels[0];
 
 	sc->tx_mbufn++;
 
