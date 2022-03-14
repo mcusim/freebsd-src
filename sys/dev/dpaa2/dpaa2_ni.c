@@ -1979,20 +1979,32 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		return (error);
 	}
 
-	/* Map mbuf to transmit */
-	error = bus_dmamap_load_mbuf_sg(sc->bp_dmat, txb.dmap,
-	    txb.m, &segs, &nsegs, BUS_DMA_NOWAIT);
-	KASSERT(nsegs == 1, ("too many segments to transmit: nsegs=%d", nsegs));
-	KASSERT(error == 0, ("failed to map Tx mbuf: error=%d", error));
-
-	if (__predict_false(error != 0 || nsegs != 1)) {
-		device_printf(sc->dev, "%s: failed to map Tx mbuf: error=%d, "
-		    "nsegs=%d\n", __func__, error, nsegs);
-		bus_dmamap_unload(sc->bp_dmat, txb.dmap);
-		m_freem(txb.m);
+	/* DMA load */
+	error = bus_dmamap_load_mbuf(sc->bp_dmat, txb.dmap, txb.m,
+	    dpaa2_ni_dmamap_cb, &txb.paddr, BUS_DMA_NOWAIT);
+	if (error && error != EFBIG) {
+		device_printf(sc->dev, "%s: can't load TX buffer (1): "
+		    "error=%d\n", __func__, error);
 		return (error);
 	}
-	txb.paddr = segs.ds_addr;
+
+	if (error) {	/* error == EFBIG */
+		txb.m = m_defrag(m, M_NOWAIT);
+		if (txb.m == NULL) {
+			device_printf(sc->dev, "%s: can't defrag TX buffer\n",
+			    __func__);
+			return (ENOBUFS);
+		}
+
+		error = bus_dmamap_load_mbuf(sc->bp_dmat, txb.dmap, txb.m,
+		    dpaa2_ni_dmamap_cb, &txb.paddr, BUS_DMA_NOWAIT);
+		if (error) {
+			device_printf(sc->dev, "%s: can't load TX buffer (2): "
+			    "error=%d\n", __func__, error);
+			return (ENOBUFS);
+		}
+	}
+
 	txb.vaddr = txb.m->m_data;
 
 	return (0);
