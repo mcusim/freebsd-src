@@ -1296,10 +1296,12 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 
 	fq->fqid = queue_cfg.fqid;
 
+#if 0
 	if (bootverbose)
 		device_printf(dev, "RxErr queue: tc=%d, flowid=%d, fqid=%d, "
 		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
 		    queue_cfg.fqid, con_info->id);
+#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
