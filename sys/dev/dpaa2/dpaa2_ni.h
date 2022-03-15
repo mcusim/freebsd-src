@@ -252,6 +252,9 @@ struct dpaa2_ni_channel {
 	uint16_t		 id;
 	uint16_t		 flowid;
 
+	/* For debug purposes only! */
+	uint64_t		 tx_mbufn;
+
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
 
@@ -508,9 +511,6 @@ struct dpaa2_ni_softc {
 
 	/* Attributes of the DPAA2 network interface. */
 	struct dpaa2_ni_attr	 attr;
-
-	/* For debug purposes only! */
-	uint64_t		 tx_mbufn;
 
 	/* Helps to send commands to MC. */
 	struct dpaa2_cmd	*cmd;

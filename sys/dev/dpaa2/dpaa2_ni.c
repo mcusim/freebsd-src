@@ -876,6 +876,7 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->con_dev = con_dev;
 		channel->buf_num = 0;
 		channel->recycled_n = 0;
+		channel->tx_mbufn = 0; /* For debug purposes only! */
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
@@ -1468,13 +1469,15 @@ static int
 dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 {
 	struct sysctl_ctx_list *ctx;
-	struct sysctl_oid *node;
-	struct sysctl_oid_list *parent;
+	struct sysctl_oid *node, *node2;
+	struct sysctl_oid_list *parent, *parent2;
+	char cbuf[128];
 	int i;
 
 	ctx = device_get_sysctl_ctx(sc->dev);
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
+	/* Add DPNI statistics. */
 	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
 	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Statistics");
 	parent = SYSCTL_CHILDREN(node);
@@ -1484,10 +1487,22 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		    "IU", dpni_stat_sysctls[i].desc);
 	}
 
-	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "tx_mbufn",
-	    CTLFLAG_RD, &sc->tx_mbufn, "Tx mbuf counter");
+ 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
-	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+	/* Add channels statistics. */
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "channels",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channels");
+	parent = SYSCTL_CHILDREN(node);
+	for (int i = 0; i < sc->chan_n; i++) {
+		snprintf(cbuf, sizeof(cbuf), "%d", i);
+
+		node2 = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, cbuf,
+		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
+		parent2 = SYSCTL_CHILDREN(node2);
+
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_mbufn",
+		    CTLFLAG_RD, &sc->channels[i]->tx_mbufn, "Tx mbuf counter");
+	}
 
 	return (0);
 }
@@ -1944,6 +1959,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_ni_channel *chan;
 	struct dpaa2_ni_buf txb;
+	/* struct dpaa2_ni_fq *fq; */
 	struct dpaa2_fd fd;
 	int error;
 
@@ -1960,15 +1976,14 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	else
 		chan = sc->channels[0];
 
-	sc->tx_mbufn++;
-
-	/* Reset frame descriptor fields. */
-	memset(&fd, 0, sizeof(fd));
+	chan->tx_mbufn++;
+	/* fq = &chan->txc_queue; */
+	memset(&fd, 0, sizeof(fd)); /* Reset FD fields */
 
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
 	if (m == NULL) {
-		device_printf(sc->dev, "%s: reserve Tx headroom failed\n",
+		device_printf(sc->dev, "%s: Tx headroom reservation failed\n",
 		    __func__);
 		return (ENOBUFS);
 	}
