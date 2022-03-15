@@ -416,6 +416,8 @@ static void dpaa2_ni_media_tick(void *);
 
 /* DMA mapping callback */
 static void dpaa2_ni_dmamap_cb(void *, bus_dma_segment_t *, int, int);
+static void dpaa2_ni_dmamap_cb2(void *, bus_dma_segment_t *, int, bus_size_t,
+    int);
 
 /* Rx subroutines */
 static void dpaa2_ni_poll_channel(void *, int);
@@ -1941,8 +1943,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_channel *chan;
 	struct dpaa2_ni_buf txb;
 	struct dpaa2_fd fd;
-	bus_dma_segment_t segs;
-	int error, nsegs;
+	int error;
 
 	DPNI_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -1981,7 +1982,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	/* DMA load */
 	error = bus_dmamap_load_mbuf(sc->bp_dmat, txb.dmap, txb.m,
-	    dpaa2_ni_dmamap_cb, &txb.paddr, BUS_DMA_NOWAIT);
+	    dpaa2_ni_dmamap_cb2, &txb.paddr, BUS_DMA_NOWAIT);
 	if (error && error != EFBIG) {
 		device_printf(sc->dev, "%s: can't load TX buffer (1): "
 		    "error=%d\n", __func__, error);
@@ -1997,7 +1998,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		}
 
 		error = bus_dmamap_load_mbuf(sc->bp_dmat, txb.dmap, txb.m,
-		    dpaa2_ni_dmamap_cb, &txb.paddr, BUS_DMA_NOWAIT);
+		    dpaa2_ni_dmamap_cb2, &txb.paddr, BUS_DMA_NOWAIT);
 		if (error) {
 			device_printf(sc->dev, "%s: can't load TX buffer (2): "
 			    "error=%d\n", __func__, error);
@@ -2113,6 +2114,19 @@ dpaa2_ni_intr(void *arg)
  */
 static void
 dpaa2_ni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
+{
+	if (!err) {
+		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
+		*(bus_addr_t *) arg = segs[0].ds_addr;
+	}
+}
+
+/**
+ * @brief Callback to obtain a physical address of the only DMA segment mapped.
+ */
+static void
+dpaa2_ni_dmamap_cb2(void *arg, bus_dma_segment_t *seg, int nseg,
+    bus_size_t mapsz __unused, int err)
 {
 	if (!err) {
 		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
