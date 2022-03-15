@@ -458,7 +458,6 @@ dpaa2_ni_attach(device_t dev)
 	sc->media_status = 0;
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
-	sc->tx_mbufn = 0;
 
 	sc->bp_dmat = NULL;
 	sc->st_dmat = NULL;
