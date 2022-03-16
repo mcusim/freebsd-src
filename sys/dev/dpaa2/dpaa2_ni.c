@@ -875,7 +875,11 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->con_dev = con_dev;
 		channel->buf_num = 0;
 		channel->recycled_n = 0;
-		channel->tx_mbufn = 0; /* For debug purposes only! */
+
+		/* For debug purposes only! */
+		channel->tx_mbufn = 0;
+		channel->tx_frames = 0;
+		channel->tx_dropped = 0;
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
@@ -1501,6 +1505,12 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_mbufn",
 		    CTLFLAG_RD, &sc->channels[i]->tx_mbufn, "Tx mbuf counter");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_frames",
+		    CTLFLAG_RD, &sc->channels[i]->tx_frames,
+		    "Tx frames counter");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_dropped",
+		    CTLFLAG_RD, &sc->channels[i]->tx_dropped,
+		    "Tx dropped counter");
 	}
 
 	return (0);
@@ -1958,9 +1968,10 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_ni_channel *chan;
 	struct dpaa2_ni_buf txb;
-	/* struct dpaa2_ni_fq *fq; */
+	struct dpaa2_ni_fq *fq;
 	struct dpaa2_fd fd;
-	int error;
+	int32_t data_len;
+	int error, rc;
 
 	DPNI_LOCK(sc);
 	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
@@ -1975,14 +1986,19 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	else
 		chan = sc->channels[0];
 
+	/* Update channel statistics */
 	chan->tx_mbufn++;
-	/* fq = &chan->txc_queue; */
-	memset(&fd, 0, sizeof(fd)); /* Reset FD fields */
+
+	fq = &chan->txc_queue;
+	data_len = m->m_len;
+
+	/* Reset frame descriptor fields. */
+	memset(&fd, 0, sizeof(fd));
 
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
 	if (m == NULL) {
-		device_printf(sc->dev, "%s: Tx headroom reservation failed\n",
+		device_printf(sc->dev, "%s: can't reserve Tx headroom\n",
 		    __func__);
 		return (ENOBUFS);
 	}
@@ -2023,6 +2039,28 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 
 	txb.vaddr = txb.m->m_data;
+
+	fd.addr = txb.paddr;
+	fd.data_length = (uint32_t) data_len;
+	fd.bpid = 0; /* BMT bit? */
+	fd.off_fmt_sl = sc->tx_data_off;
+	fd.ctrl = 0x00800000; /* PTA bit */
+
+	/*
+	 * Everything that happens after this enqueues might race with the
+	 * Tx confirmation callback for this frame.
+	 */
+	for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
+		rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(chan->io_dev, fq->tx_fqid[0],
+		    &fd, 1);
+		if (rc == 1)
+			break; /* One frame has been enqueued. */
+	}
+
+	if (rc != 1)
+		chan->tx_dropped++;
+	else
+		chan->tx_frames++;
 
 	return (0);
 }

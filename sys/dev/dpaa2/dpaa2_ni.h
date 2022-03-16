@@ -122,6 +122,12 @@
 #define DPAA2_NI_LINK_OPT_ASYM_PAUSE	((uint64_t) 0x08u)
 #define DPAA2_NI_LINK_OPT_PFC_PAUSE	((uint64_t) 0x10u)
 
+/*
+ * Number of times to retry a frame enqueue before giving up. Value determined
+ * empirically, in order to minimize the number of frames dropped on Tx.
+ */
+#define DPAA2_NI_ENQUEUE_RETRIES	10
+
 enum dpaa2_ni_queue_type {
 	DPAA2_NI_QUEUE_RX = 0,
 	DPAA2_NI_QUEUE_TX,
@@ -254,6 +260,8 @@ struct dpaa2_ni_channel {
 
 	/* For debug purposes only! */
 	uint64_t		 tx_mbufn;
+	uint64_t		 tx_frames;
+	uint64_t		 tx_dropped;
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
