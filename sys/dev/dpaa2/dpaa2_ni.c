@@ -2403,6 +2403,8 @@ dpaa2_ni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
 
+	device_printf(sc->dev, "%s: called\n", __func__);
+
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
 	bpsc = device_get_softc(bp_dev);
@@ -2430,6 +2432,8 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_bp_softc *bpsc;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int error;
+
+	device_printf(sc->dev, "%s: called\n", __func__);
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
