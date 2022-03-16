@@ -759,7 +759,7 @@ dpaa2_swp_enq(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
     struct dpaa2_fd *fd)
 {
 	uint32_t flags = 0;
-	int rc = swp_enq_mult(swp, ed, fd, &flags, 1);
+	int rc = dpaa2_swp_enq_mult(swp, ed, fd, &flags, 1);
 
 	return (rc >= 0 ? 0 : EBUSY);
 }
@@ -784,7 +784,6 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 	const uint64_t *ed_pdat64 = (const uint64_t *) ed;
 	const uint64_t *fd_pdat64 = (const uint64_t *) fd;
 	const uint32_t ci_offset = DPAA2_SWP_CINH_EQCR_CI;
-	const uint32_t pi_offset = DPAA2_SWP_CINH_EQCR_PI;
 
 	struct resource_map *map = swp->cinh_map;
 	uint32_t eqcr_ci; /* EQCR consumer index */
