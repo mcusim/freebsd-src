@@ -129,15 +129,6 @@ enum qbman_sdqcr_fc {
 
 /* Forward declarations. */
 
-static int swp_enq_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd);
-static int swp_enq_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd);
-static int swp_enq_mult_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
-static int swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
-
 static int cyc_diff(uint8_t ring_sz, uint8_t first, uint8_t last);
 
 /* Routines to execute software portal commands. */
@@ -194,6 +185,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	p->mc.valid_bit = DPAA2_SWP_VALID_BIT;
 	p->mr.valid_bit = DPAA2_SWP_VALID_BIT;
 
+	/* FIXME: Memory-backed mode doesn't work now. Why? */
 	p->cena_res = desc->cena_res;
 	p->cena_map = desc->cena_map;
 	p->cinh_res = desc->cinh_res;
@@ -272,20 +264,9 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	 */
 	dpaa2_swp_write_reg(p, DPAA2_SWP_CINH_SDQCR, 0);
 
-	p->enq = swp_enq_direct;
-	p->enq_mult = swp_enq_mult_direct;
 	p->eqcr.pi_ring_size = 8;
-
-	if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) {
-		p->eqcr.pi_ring_size = 32;
-		p->enq = swp_enq_memback;
-		p->enq_mult = swp_enq_mult_memback;
-		/* qbman_swp_enqueue_multiple_desc_ptr = */
-		/*     qbman_swp_enqueue_multiple_desc_mem_back; */
-		/* qbman_swp_pull_ptr = qbman_swp_pull_mem_back; */
-		/* qbman_swp_dqrr_next_ptr = qbman_swp_dqrr_next_mem_back; */
-		/* qbman_swp_release_ptr = qbman_swp_release_mem_back; */
-	}
+	/* if ((desc->swp_version & DPAA2_SWP_REV_MASK) >= DPAA2_SWP_REV_5000) */
+	/* 	p->eqcr.pi_ring_size = 32; */
 
 	for (mask_size = p->eqcr.pi_ring_size; mask_size > 0; mask_size >>= 1)
 		p->eqcr.pi_ci_mask = (p->eqcr.pi_ci_mask << 1) + 1;
@@ -767,59 +748,23 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
  */
 
 /**
- * @internal
  * @brief Issue a command to enqueue a frame using one enqueue descriptor.
  *
  * swp:		Software portal used to send this command to.
  * ed:		Enqueue command descriptor.
  * fd:		Frame descriptor to enqueue.
  */
-static int
-swp_enq_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd)
-{
-	/* TBD */
-	return (ENODEV);
-}
-
-/**
- * @internal
- * @brief Issue a command to enqueue a frame using one enqueue descriptor.
- *
- * swp:		Software portal used to send this command to.
- * ed:		Enqueue command descriptor.
- * fd:		Frame descriptor to enqueue.
- */
-static int
-swp_enq_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+int
+dpaa2_swp_enq(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
     struct dpaa2_fd *fd)
 {
 	uint32_t flags = 0;
-	int rc = swp_enq_mult_memback(swp, ed, fd, &flags, 1);
+	int rc = swp_enq_mult(swp, ed, fd, &flags, 1);
 
 	return (rc >= 0 ? 0 : EBUSY);
 }
 
 /**
- * @internal
- * @brief Issue a command to enqueue frames using one enqueue descriptor.
- *
- * swp:		Software portal used to send this command to.
- * ed:		Enqueue command descriptor.
- * fd:		Frame descriptor to enqueue.
- * flags:	Table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL.
- * frames_n:	Number of FDs to enqueue.
- */
-static int
-swp_enq_mult_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-    struct dpaa2_fd *fd, uint32_t *flags, int frames_n)
-{
-	/* TBD */
-	return (ENODEV);
-}
-
-/**
- * @internal
  * @brief Issue a command to enqueue frames using one enqueue descriptor.
  *
  * swp:		Software portal used to send this command to.
@@ -828,17 +773,22 @@ swp_enq_mult_direct(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
  * flags:	Table pointer of QBMAN_ENQUEUE_FLAG_DCA flags, not used if NULL.
  * frames_n:	Number of FDs to enqueue.
  *
- * NOTE: Enqueue command (64 bytes): 32 (descriptor) + 32 (frame descriptor).
+ * NOTE: Enqueue command (64 bytes): 32 (eq. descriptor) + 32 (frame descriptor).
  */
-static int
-swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+int
+dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
     struct dpaa2_fd *fd, uint32_t *flags, int frames_n)
 {
 	const uint8_t  *ed_pdat8 =  (const uint8_t *) ed;
 	const uint32_t *ed_pdat32 = (const uint32_t *) ed;
 	const uint64_t *ed_pdat64 = (const uint64_t *) ed;
 	const uint64_t *fd_pdat64 = (const uint64_t *) fd;
-	uint32_t eqcr_ci, eqcr_pi; /* consumer/producer index */
+	const uint32_t ci_offset = DPAA2_SWP_CINH_EQCR_CI;
+	const uint32_t pi_offset = DPAA2_SWP_CINH_EQCR_PI;
+
+	struct resource_map *map = swp->cinh_map;
+	uint32_t eqcr_ci; /* EQCR consumer index */
+	uint32_t eqcr_pi; /* EQCR producer index */
 	uint32_t half_mask, full_mask, val;
 	uint16_t swp_flags;
 	int num_enq = 0;
@@ -858,9 +808,10 @@ swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 	full_mask = swp->eqcr.pi_ci_mask;
 
 	if (!swp->eqcr.available) {
-		val = bus_read_4(swp->cena_map, DPAA2_SWP_CENA_EQCR_CI_MEMBACK);
+		val = bus_read_4(map, ci_offset);
 		eqcr_ci = swp->eqcr.ci;
 		swp->eqcr.ci = val & full_mask;
+
 		swp->eqcr.available = cyc_diff(swp->eqcr.pi_ring_size,
 		    eqcr_ci, swp->eqcr.ci);
 
@@ -879,38 +830,40 @@ swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 	for (int i = 0; i < num_enq; i++) {
 		/* Write enq. desc. without the VERB, DCA, SEQNUM and OPRID. */
 		for (int j = 1; j <= 3; j++)
-			bus_write_8(swp->cena_map,
+			bus_write_8(map,
 			    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask) +
 			    sizeof(uint64_t) * j, ed_pdat64[j]);
 		/* Write OPRID. */
-		bus_write_4(swp->cena_map,
+		bus_write_4(map,
 		    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask) + sizeof(uint32_t),
 		    ed_pdat32[1]);
 		/* Write DCA and SEQNUM without VERB byte. */
 		for (int j = 1; j <= 3; j++)
-			bus_write_1(swp->cena_map,
+			bus_write_1(map,
 			    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask) +
 			    sizeof(uint8_t) * j, ed_pdat8[j]);
 
 		/* Write frame descriptor. */
 		for (int j = 0; j <= 3; j++)
-			bus_write_8(swp->cena_map,
+			bus_write_8(map,
 			    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask) +
 			    ENQ_DESC_FD_OFFSET +
 			    sizeof(uint64_t) * j, fd_pdat64[j]);
 		eqcr_pi++;
 	}
 
+	wmb();
+
 	/* Write the VERB byte of enqueue descriptor. */
 	eqcr_pi = swp->eqcr.pi;
 	for (int i = 0; i < num_enq; i++) {
-		bus_write_1(swp->cena_map,
+		bus_write_1(map,
 		    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask),
 		    ed_pdat8[0] | swp->eqcr.pi_vb);
 
 		if (flags && (flags[i] & ENQ_FLAG_DCA)) {
 			/* Update DCA byte. */
-			bus_write_1(swp->cena_map,
+			bus_write_1(map,
 			    DPAA2_SWP_CENA_EQCR(eqcr_pi & half_mask) + 1,
 			    (1 << ENQ_CMD_DCA_EN_SHIFT) |
 			    (flags[i] & ENQ_DCA_IDXMASK));
@@ -920,14 +873,6 @@ swp_enq_mult_memback(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 			swp->eqcr.pi_vb ^= DPAA2_SWP_VALID_BIT;
 	}
 	swp->eqcr.pi = eqcr_pi & full_mask;
-
-	bus_barrier(swp->cena_map, 0, rman_get_size(swp->cena_res),
-	    BUS_SPACE_BARRIER_WRITE);
-	bus_barrier(swp->cinh_map, 0, rman_get_size(swp->cinh_res),
-	    BUS_SPACE_BARRIER_WRITE);
-
-	dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_EQCR_PI, 
-	    DPAA2_SWP_RT_MODE | swp->eqcr.pi | swp->eqcr.pi_vb);
 
 	dpaa2_swp_unlock(swp);
 

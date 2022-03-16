@@ -386,11 +386,6 @@ struct dpaa2_swp {
 	struct resource		*cinh_res;
 	struct resource_map	*cinh_map;
 
-	int (*enq)(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-	    struct dpaa2_fd *fd);
-	int (*enq_mult)(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
-	    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
-
 	struct mtx		 lock;
 	struct cv		 cv;
 	struct dpaa2_swp_desc	*desc;
@@ -479,6 +474,10 @@ int dpaa2_swp_dqrr_next_locked(struct dpaa2_swp *swp, struct dpaa2_dq *dq,
     uint32_t *idx);
 int dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
     uint32_t frames_n);
+int dpaa2_swp_enq(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd);
+int dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
+    struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
 
 /* Atomic access routines. */
 

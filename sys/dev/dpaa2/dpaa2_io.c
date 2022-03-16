@@ -302,7 +302,7 @@ dpaa2_io_enq_multiple_fq(device_t iodev, uint32_t fqid,
 	dpaa2_swp_set_ed_norp(&ed, false);
 	dpaa2_swp_set_ed_fq(&ed, fqid);
 
-	return (swp->enq_mult(swp, &ed, fd, &flags, frames_n));
+	return (dpaa2_swp_enq_mult(swp, &ed, fd, &flags, frames_n));
 }
 
 /**
