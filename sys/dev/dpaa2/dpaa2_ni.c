@@ -2053,6 +2053,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	fd.off_fmt_sl = sc->tx_data_off;
 	fd.ctrl = 0x00800000; /* PTA bit */
 
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: txb.paddr=%#jx\n", __func__, txb.paddr);
+
 	/*
 	 * Everything that happens after this enqueues might race with the
 	 * Tx confirmation callback for this frame.
@@ -2326,8 +2329,7 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf = &buf_chan->buf[buf_idx];
 
 	KASSERT(paddr == buf->paddr,
-	    ("frame address should be == buf->paddr: fd_addr=%jx, "
-	    "buf->paddr=%jx", paddr, buf->paddr));
+	    ("fd->addr(%#jx) != buf->paddr(%#jx)", paddr, buf->paddr));
 
 	m = buf->m;
 	buf->m = NULL;
