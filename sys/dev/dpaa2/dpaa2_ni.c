@@ -2038,9 +2038,11 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	txb.vaddr = txb.m->m_data;
 
+#if 0
 	/* For debug purposes only! */
 	device_printf(sc->dev, "%s: mbuf_len=%d, mbuf_oldlen=%d\n", __func__,
 	    txb.m->m_len, data_len);
+#endif
 
 	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
