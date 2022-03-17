@@ -2356,6 +2356,8 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf_len = (short_len) ? (fd->data_length & 0x3FFFFu) : (fd->data_length);
 	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
 
+	device_printf(sc->dev, "%s: buf_len=%d\n", __func__, buf_len);
+
 	/* Prefetch mbuf data. */
 	__builtin_prefetch(buf_data);
 
