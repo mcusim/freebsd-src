@@ -880,6 +880,7 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->tx_mbufn = 0;
 		channel->tx_frames = 0;
 		channel->tx_dropped = 0;
+		channel->rx_anomaly_frames = 0;
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
@@ -1511,6 +1512,9 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_dropped",
 		    CTLFLAG_RD, &sc->channels[i]->tx_dropped,
 		    "Tx dropped counter");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_anomaly_frames",
+		    CTLFLAG_RD, &sc->channels[i]->rx_anomaly_frames,
+		    "Rx frames in the buffers outside of the buffer pools");
 	}
 
 	return (0);
@@ -2053,8 +2057,10 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	fd.off_fmt_sl = sc->tx_data_off;
 	fd.ctrl = 0x00800000; /* PTA bit */
 
+#if 0
 	/* For debug purposes only! */
 	device_printf(sc->dev, "%s: txb.paddr=%#jx\n", __func__, txb.paddr);
+#endif
 
 	/*
 	 * Everything that happens after this enqueues might race with the
@@ -2328,8 +2334,16 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
+#if 0
 	KASSERT(paddr == buf->paddr,
-	    ("fd->addr(%#jx) != buf->paddr(%#jx)", paddr, buf->paddr));
+	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
+	    paddr, buf->paddr));
+#else
+	if (paddr != buf->paddr) {
+		buf_chan->rx_anomaly_frames++;
+		return (0);
+	}
+#endif
 
 	m = buf->m;
 	buf->m = NULL;
