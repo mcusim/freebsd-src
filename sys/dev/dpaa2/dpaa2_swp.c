@@ -783,12 +783,9 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 	const uint32_t *ed_pdat32 = (const uint32_t *) ed;
 	const uint64_t *ed_pdat64 = (const uint64_t *) ed;
 	const uint64_t *fd_pdat64 = (const uint64_t *) fd;
-	const uint32_t ci_offset = DPAA2_SWP_CINH_EQCR_CI;
-
-	struct resource_map *map = swp->cinh_map;
-	uint32_t eqcr_ci; /* EQCR consumer index */
-	uint32_t eqcr_pi; /* EQCR producer index */
-	uint32_t half_mask, full_mask, val;
+	struct resource_map *map;
+	uint32_t eqcr_ci, eqcr_pi; /* EQCR consumer/producer index */
+	uint32_t half_mask, full_mask, val, ci_offset;
 	uint16_t swp_flags;
 	int num_enq = 0;
 
@@ -803,18 +800,23 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 		return (ENOENT);
 	}
 
+	map = swp->cfg.writes_cinh ? swp->cinh_map : swp->cena_map;
+	ci_offset = swp->cfg.mem_backed
+	    ? DPAA2_SWP_CENA_EQCR_CI_MEMBACK
+	    : DPAA2_SWP_CENA_EQCR_CI;
+
 	half_mask = swp->eqcr.pi_ci_mask >> 1;
 	full_mask = swp->eqcr.pi_ci_mask;
 
-	if (!swp->eqcr.available) {
-		val = bus_read_4(map, ci_offset);
+	if (swp->eqcr.available == 0) {
+		val = dpaa2_swp_read_reg(swp, ci_offset);
 		eqcr_ci = swp->eqcr.ci;
 		swp->eqcr.ci = val & full_mask;
 
 		swp->eqcr.available = cyc_diff(swp->eqcr.pi_ring_size,
 		    eqcr_ci, swp->eqcr.ci);
 
-		if (!swp->eqcr.available) {
+		if (swp->eqcr.available == 0) {
 			dpaa2_swp_unlock(swp);
 			return (0);
 		}

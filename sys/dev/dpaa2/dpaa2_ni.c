@@ -2040,6 +2040,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	txb.vaddr = txb.m->m_data;
 
+	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+
 	fd.addr = txb.paddr;
 	fd.data_length = (uint32_t) data_len;
 	fd.bpid = 0; /* BMT bit? */
@@ -2056,6 +2059,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		if (rc == 1)
 			break; /* One frame has been enqueued. */
 	}
+
+	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	if (rc != 1)
 		chan->tx_dropped++;
