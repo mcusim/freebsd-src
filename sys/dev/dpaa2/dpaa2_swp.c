@@ -235,10 +235,10 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 		reg = dpaa2_swp_set_cfg(
 		    p->dqrr.ring_size, /* max. entries QMan writes to DQRR */					/* DQRR_MF */
 		    1, /* writes enabled in the CINH memory only */						/* WN */
-		    1, /* EQCR_CI stashing threshold */								/* EST */
+		    0, /* EQCR_CI stashing is disabled */							/* EST */
 		    3, /* RPM: RCR in array mode */								/* RPM */
 		    2, /* DCM: Discrete consumption ack */							/* DCM */
-		    0, /* EPM: EQCR in ring mode (FIFO) */							/* EPM */
+		    2, /* EPM: EQCR in ring mode (FIFO) */							/* EPM */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing drop enable */		/* SD */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing priority */			/* SP */
 		    1, /* Dequeued frame data, annotation, and FQ context stashing enable */			/* SE */
