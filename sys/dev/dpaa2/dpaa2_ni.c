@@ -2020,7 +2020,6 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		    "error=%d\n", __func__, error);
 		return (error);
 	}
-
 	if (error) {	/* error == EFBIG */
 		txb.m = m_defrag(m, M_NOWAIT);
 		if (txb.m == NULL) {
@@ -2037,8 +2036,11 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 			return (ENOBUFS);
 		}
 	}
-
 	txb.vaddr = txb.m->m_data;
+
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: mbuf_len=%d, mbuf_oldlen=%d\n", __func__,
+	    txb.m->m_len, data_len);
 
 	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
