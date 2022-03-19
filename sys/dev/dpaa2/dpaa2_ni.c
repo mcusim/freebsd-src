@@ -144,6 +144,20 @@ __FBSDID("$FreeBSD$");
 #define BUF_LOPT_DATA_HEAD_ROOM	0x20
 #define BUF_LOPT_DATA_TAIL_ROOM	0x40
 
+#define DPAA2_NI_BUF_ADDR_MASK	(0x1FFFFFFFFFFFFul) /* 49-bit addresses max. */
+#define DPAA2_NI_BUF_CHAN_MASK	(0xFu)
+#define DPAA2_NI_BUF_CHAN_SHIFT	(60)
+#define DPAA2_NI_BUF_IDX_MASK	(0x7FFu)
+#define DPAA2_NI_BUF_IDX_SHIFT	(49)
+
+#define DPAA2_NI_FD_FMT_MASK	(0x3u)
+#define DPAA2_NI_FD_FMT_SHIFT	(12)
+#define DPAA2_NI_FD_ERR_MASK	(0xFFu)
+#define DPAA2_NI_FD_ERR_SHIFT	(0)
+#define DPAA2_NI_FD_SL_MASK	(0x1u)
+#define DPAA2_NI_FD_SL_SHIFT	(14)
+#define DPAA2_NI_FD_LEN_MASK	(0x3FFFFu)
+
 /* Enables TCAM for Flow Steering and QoS look-ups. */
 #define DPNI_OPT_HAS_KEY_MASKING 0x10
 
@@ -388,11 +402,17 @@ static int dpaa2_ni_seed_buf(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *,
 static int dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *,
     struct dpaa2_ni_channel *);
 
-/* Frame descriptors construction */
+/* Frame descriptors routines */
 static int dpaa2_ni_build_single_fd(struct dpaa2_ni_softc *, struct mbuf *,
     struct dpaa2_fd *);
 static int dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *, struct mbuf *,
     struct dpaa2_fd *);
+static int dpaa2_ni_fd_err(struct dpaa2_fd *);
+static uint32_t dpaa2_ni_fd_data_len(struct dpaa2_fd *);
+static int dpaa2_ni_fd_chan_idx(struct dpaa2_fd *);
+static int dpaa2_ni_fd_buf_idx(struct dpaa2_fd *);
+static int dpaa2_ni_fd_format(struct dpaa2_fd *);
+static bool dpaa2_ni_fd_short_len(struct dpaa2_fd *);
 
 /* Various subroutines */
 static int dpaa2_ni_cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
@@ -881,6 +901,10 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->tx_frames = 0;
 		channel->tx_dropped = 0;
 		channel->rx_anomaly_frames = 0;
+		channel->rx_single_buf_frames = 0;
+		channel->rx_sg_buf_frames = 0;
+		channel->rx_enq_rej_frames = 0;
+		channel->rx_ieoi_err_frames = 0;
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
@@ -1515,6 +1539,18 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_anomaly_frames",
 		    CTLFLAG_RD, &sc->channels[i]->rx_anomaly_frames,
 		    "Rx frames in the buffers outside of the buffer pools");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_single_buf_frames",
+		    CTLFLAG_RD, &sc->channels[i]->rx_single_buf_frames,
+		    "Rx frames in single buffers");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_sg_buf_frames",
+		    CTLFLAG_RD, &sc->channels[i]->rx_sg_buf_frames,
+		    "Rx frames in scatter/gather list");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_enq_rej_frames",
+		    CTLFLAG_RD, &sc->channels[i]->rx_enq_rej_frames,
+		    "Enqueue rejected by QMan");
+		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_ieoi_err_frames",
+		    CTLFLAG_RD, &sc->channels[i]->rx_ieoi_err_frames,
+		    "QMan IEOI error");
 	}
 
 	return (0);
@@ -2324,13 +2360,13 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct mbuf *m;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	bus_addr_t released[DPAA2_SWP_BUFS_PER_CMD];
-	bool short_len = ((fd->off_fmt_sl >> 14) & 1) == 1;
 	void *buf_data;
-	int error, chan_idx, buf_idx, buf_len, released_n = 0;
+	int chan_idx, buf_idx, buf_len;
+	int error, released_n = 0;
 
 	/* Parse ADDR_TOK part from the received frame descriptor. */
-	chan_idx = (paddr >> DPAA2_NI_BUF_CHAN_SHIFT) & DPAA2_NI_BUF_CHAN_MASK;
-	buf_idx = (paddr >> DPAA2_NI_BUF_IDX_SHIFT) & DPAA2_NI_BUF_IDX_MASK;
+	chan_idx = dpaa2_ni_fd_chan_idx(fd);
+	buf_idx = dpaa2_ni_fd_buf_idx(fd);
 	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
@@ -2340,20 +2376,39 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	    paddr, buf->paddr));
 #else
 	if (paddr != buf->paddr) {
-		buf_chan->rx_anomaly_frames++;
+		chan->rx_anomaly_frames++;
 		return (0);
 	}
 #endif
+	/* Update statistics. */
+	switch (dpaa2_ni_fd_err(fd)) {
+	case 1: /* Enqueue rejected by QMan */
+		buf_chan->rx_enq_rej_frames++;
+		break;
+	case 2: /* QMan IEOI error */
+		buf_chan->rx_ieoi_err_frames++;
+		break;
+	default:
+		break;
+	}
+	switch (dpaa2_ni_fd_format(fd)) {
+	case DPAA2_FD_SINGLE:
+		buf_chan->rx_single_buf_frames++;
+		break;
+	case DPAA2_FD_SG:
+		buf_chan->rx_sg_buf_frames++;
+		break;
+	default:
+		break;
+	}
 
 	m = buf->m;
 	buf->m = NULL;
-	bus_dmamap_sync(sc->bp_dmat, buf->dmap, BUS_DMASYNC_POSTREAD);
+	bus_dmamap_sync(sc->bp_dmat, buf->dmap,
+	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 	bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 
-	/* Drop FD with error status or not in a single buffer. */
-	/* ... TBD ... */
-
-	buf_len = (short_len) ? (fd->data_length & 0x3FFFFu) : (fd->data_length);
+	buf_len = dpaa2_ni_fd_data_len(fd);
 	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
 
 #if 0
@@ -2684,6 +2739,49 @@ dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *sc, struct mbuf *m,
     struct dpaa2_fd *fd)
 {
 	return (0);
+}
+
+static int
+dpaa2_ni_fd_err(struct dpaa2_fd *fd)
+{
+	return ((fd->ctrl >> DPAA2_NI_FD_ERR_SHIFT) & DPAA2_NI_FD_ERR_MASK);
+}
+
+static uint32_t
+dpaa2_ni_fd_data_len(struct dpaa2_fd *fd)
+{
+	if (dpaa2_ni_fd_short_len(fd))
+		return (fd->data_length & DPAA2_NI_FD_LEN_MASK);
+
+	return (fd->data_length);
+}
+
+static int
+dpaa2_ni_fd_chan_idx(struct dpaa2_fd *fd)
+{
+	return ((((bus_addr_t) fd->addr) >> DPAA2_NI_BUF_CHAN_SHIFT) &
+	    DPAA2_NI_BUF_CHAN_MASK);
+}
+
+static int
+dpaa2_ni_fd_buf_idx(struct dpaa2_fd *fd)
+{
+	return ((((bus_addr_t) fd->addr) >> DPAA2_NI_BUF_IDX_SHIFT) &
+	    DPAA2_NI_BUF_IDX_MASK);
+}
+
+static int
+dpaa2_ni_fd_format(struct dpaa2_fd *fd)
+{
+	return ((enum dpaa2_fd_format)((fd->off_fmt_sl >> DPAA2_NI_FD_FMT_SHIFT)
+	    & DPAA2_NI_FD_FMT_MASK));
+}
+
+static bool
+dpaa2_ni_fd_short_len(struct dpaa2_fd *fd)
+{
+	return (((fd->off_fmt_sl >> DPAA2_NI_FD_SL_SHIFT)
+	    & DPAA2_NI_FD_SL_MASK) == 1);
 }
 
 /**
