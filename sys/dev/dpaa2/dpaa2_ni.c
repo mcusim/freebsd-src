@@ -2012,7 +2012,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_buf txb;
 	struct dpaa2_ni_fq *fq;
 	struct dpaa2_fd fd;
-	int pkt_len, data_len;
+	int pkt_len;
+	/* int data_len; */
 	int error, rc;
 
 	DPNI_LOCK(sc);
@@ -2028,13 +2029,10 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	else
 		chan = sc->channels[0];
 
-	/* Update channel statistics */
-	chan->tx_mbufn++;
-
+	chan->tx_mbufn++; /* Update statistics */
 	fq = &chan->txc_queue;
-
 	pkt_len = m->m_pkthdr.len;
-	data_len = m->m_len;
+	/* data_len = m->m_len; */
 
 	/* Reset frame descriptor fields. */
 	memset(&fd, 0, sizeof(fd));
@@ -2082,7 +2080,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	txb.vaddr = txb.m->m_data;
 
-#if 1
+#if 0
 	/* For debug purposes only! */
 	device_printf(sc->dev, "%s: data_len=%d, data_oldlen=%d, pkt_len=%d, "
 	    "pkt_oldlen=%d\n", __func__, txb.m->m_len, data_len,
@@ -2093,7 +2091,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	fd.addr = txb.paddr;
-	fd.data_length = (uint32_t) data_len;
+	fd.data_length = (uint32_t) pkt_len;
 	fd.bpid = 0; /* BMT bit? */
 	fd.off_fmt_sl = sc->tx_data_off;
 	fd.ctrl = 0x00800000; /* PTA bit */
