@@ -2012,7 +2012,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_buf txb;
 	struct dpaa2_ni_fq *fq;
 	struct dpaa2_fd fd;
-	int32_t data_len;
+	int pkt_len, data_len;
 	int error, rc;
 
 	DPNI_LOCK(sc);
@@ -2032,6 +2032,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	chan->tx_mbufn++;
 
 	fq = &chan->txc_queue;
+
+	pkt_len = m->m_pkthdr.len;
 	data_len = m->m_len;
 
 	/* Reset frame descriptor fields. */
@@ -2080,10 +2082,11 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	txb.vaddr = txb.m->m_data;
 
-#if 0
+#if 1
 	/* For debug purposes only! */
-	device_printf(sc->dev, "%s: mbuf_len=%d, mbuf_oldlen=%d\n", __func__,
-	    txb.m->m_len, data_len);
+	device_printf(sc->dev, "%s: data_len=%d, data_oldlen=%d, pkt_len=%d, "
+	    "pkt_oldlen=%d\n", __func__, txb.m->m_len, data_len,
+	    txb.m->m_pkthdr.len, pkt_len);
 #endif
 
 	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
@@ -2110,9 +2113,6 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		if (rc == 1)
 			break; /* One frame has been enqueued. */
 	}
-
-	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
-	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	if (rc != 1)
 		chan->tx_dropped++;
