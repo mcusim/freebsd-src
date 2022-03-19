@@ -200,9 +200,11 @@
 /* Opaque token for static dequeues. */
 #define DPAA2_SWP_VDQCR_TOKEN		0xCCu
 
-/*
- * Public types.
- */
+enum dpaa2_fd_format {
+	DPAA2_FD_SINGLE = 0,
+	DPAA2_FD_LIST,
+	DPAA2_FD_SG
+};
 
 typedef struct {
 	volatile int	counter;

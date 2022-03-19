@@ -59,12 +59,6 @@
 #define DPAA2_NI_BUFS_PER_CHAN	(50u * DPAA2_SWP_BUFS_PER_CMD)
 #define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
 
-#define DPAA2_NI_BUF_ADDR_MASK	(0x1FFFFFFFFFFFFul) /* 49-bit addresses max. */
-#define DPAA2_NI_BUF_CHAN_MASK	(0xFu)
-#define DPAA2_NI_BUF_CHAN_SHIFT	(60)
-#define DPAA2_NI_BUF_IDX_MASK	(0x7FFu)
-#define DPAA2_NI_BUF_IDX_SHIFT	(49)
-
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
 #define	DPAA2_NI_STAT_SYSCTLS	9u
@@ -263,6 +257,10 @@ struct dpaa2_ni_channel {
 	uint64_t		 tx_frames;
 	uint64_t		 tx_dropped;
 	uint64_t		 rx_anomaly_frames;
+	uint64_t		 rx_single_buf_frames;
+	uint64_t		 rx_sg_buf_frames;
+	uint64_t		 rx_enq_rej_frames;
+	uint64_t		 rx_ieoi_err_frames;
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
