@@ -256,11 +256,6 @@ struct dpaa2_ni_channel {
 	uint64_t		 tx_mbufn;
 	uint64_t		 tx_frames;
 	uint64_t		 tx_dropped;
-	uint64_t		 rx_anomaly_frames;
-	uint64_t		 rx_single_buf_frames;
-	uint64_t		 rx_sg_buf_frames;
-	uint64_t		 rx_enq_rej_frames;
-	uint64_t		 rx_ieoi_err_frames;
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
@@ -515,6 +510,13 @@ struct dpaa2_ni_softc {
 
 	uint16_t		 buf_align;
 	uint16_t		 buf_sz;
+
+	/* For debug purposes only! */
+	uint64_t		 rx_anomaly_frames;
+	uint64_t		 rx_single_buf_frames;
+	uint64_t		 rx_sg_buf_frames;
+	uint64_t		 rx_enq_rej_frames;
+	uint64_t		 rx_ieoi_err_frames;
 
 	/* Attributes of the DPAA2 network interface. */
 	struct dpaa2_ni_attr	 attr;

@@ -479,6 +479,13 @@ dpaa2_ni_attach(device_t dev)
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
 
+	/* For debug purposes only! */
+	sc->rx_anomaly_frames = 0;
+	sc->rx_single_buf_frames = 0;
+	sc->rx_sg_buf_frames = 0;
+	sc->rx_enq_rej_frames = 0;
+	sc->rx_ieoi_err_frames = 0;
+
 	sc->bp_dmat = NULL;
 	sc->st_dmat = NULL;
 	sc->rxd_dmat = NULL;
@@ -900,11 +907,6 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->tx_mbufn = 0;
 		channel->tx_frames = 0;
 		channel->tx_dropped = 0;
-		channel->rx_anomaly_frames = 0;
-		channel->rx_single_buf_frames = 0;
-		channel->rx_sg_buf_frames = 0;
-		channel->rx_enq_rej_frames = 0;
-		channel->rx_ieoi_err_frames = 0;
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
@@ -1514,6 +1516,21 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLTYPE_U64 | CTLFLAG_RD, sc, 0, dpaa2_ni_collect_stats,
 		    "IU", dpni_stat_sysctls[i].desc);
 	}
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_anomaly_frames",
+	    CTLFLAG_RD, &sc->rx_anomaly_frames,
+	    "Rx frames in the buffers outside of the buffer pools");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_single_buf_frames",
+	    CTLFLAG_RD, &sc->rx_single_buf_frames,
+	    "Rx frames in single buffers");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_sg_buf_frames",
+	    CTLFLAG_RD, &sc->rx_sg_buf_frames,
+	    "Rx frames in scatter/gather list");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_enq_rej_frames",
+	    CTLFLAG_RD, &sc->rx_enq_rej_frames,
+	    "Enqueue rejected by QMan");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_ieoi_err_frames",
+	    CTLFLAG_RD, &sc->rx_ieoi_err_frames,
+	    "QMan IEOI error");
 
  	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
@@ -1536,21 +1553,6 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_dropped",
 		    CTLFLAG_RD, &sc->channels[i]->tx_dropped,
 		    "Tx dropped counter");
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_anomaly_frames",
-		    CTLFLAG_RD, &sc->channels[i]->rx_anomaly_frames,
-		    "Rx frames in the buffers outside of the buffer pools");
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_single_buf_frames",
-		    CTLFLAG_RD, &sc->channels[i]->rx_single_buf_frames,
-		    "Rx frames in single buffers");
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_sg_buf_frames",
-		    CTLFLAG_RD, &sc->channels[i]->rx_sg_buf_frames,
-		    "Rx frames in scatter/gather list");
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_enq_rej_frames",
-		    CTLFLAG_RD, &sc->channels[i]->rx_enq_rej_frames,
-		    "Enqueue rejected by QMan");
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "rx_ieoi_err_frames",
-		    CTLFLAG_RD, &sc->channels[i]->rx_ieoi_err_frames,
-		    "QMan IEOI error");
 	}
 
 	return (0);
@@ -2376,27 +2378,28 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	    paddr, buf->paddr));
 #else
 	if (paddr != buf->paddr) {
-		chan->rx_anomaly_frames++;
+		sc->rx_anomaly_frames++;
 		return (0);
 	}
 #endif
+
 	/* Update statistics. */
 	switch (dpaa2_ni_fd_err(fd)) {
 	case 1: /* Enqueue rejected by QMan */
-		buf_chan->rx_enq_rej_frames++;
+		sc->rx_enq_rej_frames++;
 		break;
 	case 2: /* QMan IEOI error */
-		buf_chan->rx_ieoi_err_frames++;
+		sc->rx_ieoi_err_frames++;
 		break;
 	default:
 		break;
 	}
 	switch (dpaa2_ni_fd_format(fd)) {
 	case DPAA2_FD_SINGLE:
-		buf_chan->rx_single_buf_frames++;
+		sc->rx_single_buf_frames++;
 		break;
 	case DPAA2_FD_SG:
-		buf_chan->rx_sg_buf_frames++;
+		sc->rx_sg_buf_frames++;
 		break;
 	default:
 		break;
@@ -2485,11 +2488,27 @@ dpaa2_ni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
+	struct dpaa2_ni_channel	*buf_chan;
+	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
+	int chan_idx, buf_idx;
 	int error;
+	
+	/* Parse ADDR_TOK part from the received frame descriptor. */
+	chan_idx = dpaa2_ni_fd_chan_idx(fd);
+	buf_idx = dpaa2_ni_fd_buf_idx(fd);
+	buf_chan = sc->channels[chan_idx];
+	buf = &buf_chan->buf[buf_idx];
 
 #if 0
-	device_printf(sc->dev, "%s: called\n", __func__);
+	KASSERT(paddr == buf->paddr,
+	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
+	    paddr, buf->paddr));
+#else
+	if (paddr != buf->paddr) {
+		sc->rx_anomaly_frames++;
+		return (0);
+	}
 #endif
 
 	/* There's only one buffer pool for now. */
@@ -2517,11 +2536,27 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
+	struct dpaa2_ni_channel	*buf_chan;
+	struct dpaa2_ni_buf *buf;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
+	int chan_idx, buf_idx;
 	int error;
 
+	/* Parse ADDR_TOK part from the received frame descriptor. */
+	chan_idx = dpaa2_ni_fd_chan_idx(fd);
+	buf_idx = dpaa2_ni_fd_buf_idx(fd);
+	buf_chan = sc->channels[chan_idx];
+	buf = &buf_chan->buf[buf_idx];
+
 #if 0
-	device_printf(sc->dev, "%s: called\n", __func__);
+	KASSERT(paddr == buf->paddr,
+	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
+	    paddr, buf->paddr));
+#else
+	if (paddr != buf->paddr) {
+		sc->rx_anomaly_frames++;
+		return (0);
+	}
 #endif
 
 	/* There's only one buffer pool for now. */
