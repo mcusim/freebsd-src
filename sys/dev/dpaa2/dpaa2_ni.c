@@ -157,6 +157,7 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_NI_FD_SL_MASK	(0x1u)
 #define DPAA2_NI_FD_SL_SHIFT	(14)
 #define DPAA2_NI_FD_LEN_MASK	(0x3FFFFu)
+#define DPAA2_NI_FD_OFFSET_MASK (0x0FFFu)
 
 /* Enables TCAM for Flow Steering and QoS look-ups. */
 #define DPNI_OPT_HAS_KEY_MASKING 0x10
@@ -402,7 +403,7 @@ static int dpaa2_ni_seed_buf(struct dpaa2_ni_softc *, struct dpaa2_ni_channel *,
 static int dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *,
     struct dpaa2_ni_channel *);
 
-/* Frame descriptors routines */
+/* Frame descriptor routines */
 static int dpaa2_ni_build_single_fd(struct dpaa2_ni_softc *, struct mbuf *,
     struct dpaa2_fd *);
 static int dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *, struct mbuf *,
@@ -413,6 +414,7 @@ static int dpaa2_ni_fd_chan_idx(struct dpaa2_fd *);
 static int dpaa2_ni_fd_buf_idx(struct dpaa2_fd *);
 static int dpaa2_ni_fd_format(struct dpaa2_fd *);
 static bool dpaa2_ni_fd_short_len(struct dpaa2_fd *);
+static int dpaa2_ni_fd_offset(struct dpaa2_fd *);
 
 /* Various subroutines */
 static int dpaa2_ni_cmp_api_version(struct dpaa2_ni_softc *, uint16_t, uint16_t);
@@ -2092,8 +2094,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	fd.addr = txb.paddr;
 	fd.data_length = (uint32_t) pkt_len;
-	fd.bpid = 0; /* BMT bit? */
-	fd.off_fmt_sl = sc->tx_data_off;
+	fd.bpid_ivp_bmt = 0; /* BMT bit? */
+	fd.offset_fmt_sl = sc->tx_data_off;
 	fd.ctrl = 0x00800000; /* PTA bit */
 
 #if 0
@@ -2410,7 +2412,7 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 
 	buf_len = dpaa2_ni_fd_data_len(fd);
-	buf_data = (uint8_t *)buf->vaddr + (fd->off_fmt_sl & 0x0FFFu);
+	buf_data = (uint8_t *)buf->vaddr + dpaa2_ni_fd_offset(fd);
 
 #if 0
 	device_printf(sc->dev, "%s: buf_len=%d\n", __func__, buf_len);
@@ -2806,15 +2808,21 @@ dpaa2_ni_fd_buf_idx(struct dpaa2_fd *fd)
 static int
 dpaa2_ni_fd_format(struct dpaa2_fd *fd)
 {
-	return ((enum dpaa2_fd_format)((fd->off_fmt_sl >> DPAA2_NI_FD_FMT_SHIFT)
-	    & DPAA2_NI_FD_FMT_MASK));
+	return ((enum dpaa2_fd_format)((fd->offset_fmt_sl >>
+	    DPAA2_NI_FD_FMT_SHIFT) & DPAA2_NI_FD_FMT_MASK));
 }
 
 static bool
 dpaa2_ni_fd_short_len(struct dpaa2_fd *fd)
 {
-	return (((fd->off_fmt_sl >> DPAA2_NI_FD_SL_SHIFT)
+	return (((fd->offset_fmt_sl >> DPAA2_NI_FD_SL_SHIFT)
 	    & DPAA2_NI_FD_SL_MASK) == 1);
+}
+
+static int
+dpaa2_ni_fd_offset(struct dpaa2_fd *fd)
+{
+	return (fd->offset_fmt_sl & DPAA2_NI_FD_OFFSET_MASK);
 }
 
 /**
