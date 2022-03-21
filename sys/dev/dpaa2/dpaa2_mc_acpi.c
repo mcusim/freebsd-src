@@ -78,7 +78,8 @@ dpaa2_mac_dev_probe(device_t dev)
 	uint64_t reg;
 	ssize_t s;
 
-	s = device_get_property(dev, "reg", &reg, sizeof(reg));
+	s = device_get_property(dev, "reg", &reg, sizeof(reg),
+	    DEVICE_PROP_UINT64);
 	if (s == -1)
 		return (ENXIO);
 
@@ -105,21 +106,23 @@ dpaa2_mac_dev_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	s = device_get_property(dev, "reg", &sc->reg, sizeof(sc->reg));
+	s = device_get_property(dev, "reg", &sc->reg, sizeof(sc->reg),
+	    DEVICE_PROP_UINT64);
 	if (s == -1) {
 		device_printf(dev, "Cannot find 'reg' property: %zd\n", s);
 		return (ENXIO);
 	}
 
 	s = device_get_property(dev, "managed", sc->managed,
-	    sizeof(sc->managed));
+	    sizeof(sc->managed), DEVICE_PROP_ANY);
 	s = device_get_property(dev, "phy-connection-type", sc->phy_conn_type,
-	    sizeof(sc->phy_conn_type));
+	    sizeof(sc->phy_conn_type), DEVICE_PROP_ANY);
 	s = device_get_property(dev, "phy-mode", sc->phy_mode,
-	    sizeof(sc->phy_mode));
+	    sizeof(sc->phy_mode), DEVICE_PROP_ANY);
 
 	hobj = NULL;
-	s = device_get_property(dev, "phy-handle", &hobj, sizeof(hobj));
+	s = device_get_property(dev, "phy-handle", &hobj, sizeof(hobj),
+	    DEVICE_PROP_ANY);
 	if (s > 0) {
 		if (hobj->Type != ACPI_TYPE_PACKAGE) {
 			device_printf(dev, "Cannot get 'phy-handle' package obj, not ACPI_TYPE_PACKAGE\n");
