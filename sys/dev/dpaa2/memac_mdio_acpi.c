@@ -86,9 +86,9 @@ memacphy_acpi_attach(device_t dev)
 	}
 
 	s = device_get_property(dev, "phy-channel",
-	    &sc->phy_channel, sizeof(sc->phy_channel));
+	    &sc->phy_channel, sizeof(sc->phy_channel), DEVICE_PROP_UINT64);
 	s = device_get_property(dev, "compatible",
-	    sc->compatible, sizeof(sc->compatible));
+	    sc->compatible, sizeof(sc->compatible), DEVICE_PROP_ANY);
 	if (bootverbose)
 		device_printf(dev, "UID %#04x phy-channel %ju compatible '%s'\n",
 		    sc->uid, sc->phy_channel,
