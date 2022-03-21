@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/taskqueue.h>
 #include <sys/sysctl.h>
-#include <sys/prng.h>
 
 #include <vm/vm.h>
 
@@ -2030,8 +2029,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		/* Select channel based on the mbuf's flowid. */
 		chan = sc->channels[m->m_pkthdr.flowid % sc->chan_n];
 	else
-		/* Select channel randomly. */
-		chan = sc->channels[prng32_bounded(sc->chan_n)];
+		chan = sc->channels[0];
 
 	chan->tx_mbufn++; /* Update statistics */
 	fq = &chan->txc_queue;
