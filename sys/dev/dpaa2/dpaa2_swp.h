@@ -267,23 +267,28 @@ struct dpaa2_scn {
 /**
  * @brief DPAA2 frame descriptor.
  *
- * addr:	Memory address of the start of the buffer holding the frame
- *		data or the buffer containing the scatter/gather list.
- * data_length:	Length of the frame data (in bytes).
- * bpid:	Buffer pool ID (14 bit + BMT bit + IVP bit)
- * off_fmt_sl:	Frame data offset, frame format and short-length fields.
- * frame_ctx:   This field allows the sender of a frame to communicate some
- *		out-of-band information to the receiver of the frame.
- * ctrl:	Control bits (DD, SC, DROPP, PTAC, ERR, etc.)
- * flow_ctx:	Frame flow context.
+ * addr:		Memory address of the start of the buffer holding the
+ *			frame data or the buffer containing the scatter/gather
+ *			list.
+ * data_length:		Length of the frame data (in bytes).
+ * bpid_ivp_bmt:	Buffer pool ID (14 bit + BMT bit + IVP bit)
+ * offset_fmt_sl:	Frame data offset, frame format and short-length fields.
+ * frame_ctx:		Frame context. This field allows the sender of a frame
+ *			to communicate some out-of-band information to the
+ *			receiver of the frame.
+ * ctrl:		Control bits (ERR, CBMT, ASAL, PTAC, DROPP, SC, DD).
+ * flow_ctx:		Frame flow context. Associates the frame with a flow
+ *			structure. QMan may use the FLC field for 3 purposes:
+ *			stashing control, order definition point identification,
+ *			and enqueue replication control.
  *
  * NOTE: 32 bytes.
  */
 struct dpaa2_fd {
 	uint64_t	addr;
 	uint32_t	data_length;
-	uint16_t	bpid;
-	uint16_t	off_fmt_sl;
+	uint16_t	bpid_ivp_bmt;
+	uint16_t	offset_fmt_sl;
 	uint32_t	frame_ctx;
 	uint32_t	ctrl;
 	uint64_t	flow_ctx;
