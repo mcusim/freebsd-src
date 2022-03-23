@@ -265,9 +265,9 @@ struct dpaa2_ni_fq {
 			struct dpaa2_ni_tx_ring	 tx_rings[DPAA2_NI_MAX_TCS];
 			uint32_t		 tx_rings_n;
 			uint32_t		 tx_qdbin;
-		}
+		};
 		char data[0]; /* for Rx, RxErr queues */
-	}
+	};
 } __aligned(CACHE_LINE_SIZE);
 
 /**
