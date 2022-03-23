@@ -884,7 +884,7 @@ dpaa2_ni_setup_channels(device_t dev)
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
-		channel->txc_queue.txq_n = 0;
+		channel->txc_queue.tx_rings_n = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -1132,9 +1132,6 @@ dpaa2_ni_bind(device_t dev)
 static int
 dpaa2_ni_setup_rx_dist(device_t dev)
 {
-	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	int error;
-
 	/*
 	 * Have the interface implicitly distribute traffic based on the default
 	 * hash key.
@@ -1151,7 +1148,7 @@ dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
-	con_info = device_get_ivars(fq->channel->con_dev);
+	con_info = device_get_ivars(fq->chan->con_dev);
 
 	queue_cfg.type = DPAA2_NI_QUEUE_RX;
 	queue_cfg.tc = fq->tc;
@@ -1195,7 +1192,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
-	con_info = device_get_ivars(fq->channel->con_dev);
+	con_info = device_get_ivars(fq->chan->con_dev);
 
 	KASSERT(sc->attr.num.tx_tcs <= DPAA2_NI_MAX_TCS,
 	    ("too many Tx traffic classes: tx_tcs=%d\n",
