@@ -1297,7 +1297,7 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
-	con_info = device_get_ivars(fq->channel->con_dev);
+	con_info = device_get_ivars(fq->chan->con_dev);
 
 	queue_cfg.type = DPAA2_NI_QUEUE_RX_ERR;
 	queue_cfg.tc = fq->tc; /* ignored */
@@ -1536,6 +1536,7 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 static int
 dpaa2_ni_setup_dma(struct dpaa2_ni_softc *sc)
 {
+	device_t dev = sc->dev;
 	int error;
 
 	KASSERT((sc->buf_align == BUF_ALIGN) || (sc->buf_align == BUF_ALIGN_V1),
@@ -2079,7 +2080,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	int error, rc;
 
 	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
-		return;
+		return (0);
 
 	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
 		/* Select channel based on the mbuf's flowid. */
@@ -2147,8 +2148,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	 * Tx confirmation callback for this frame.
 	 */
 	for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
-		rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(chan->io_dev, fq->tx_fqid[0],
-		    &fd, 1);
+		rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(chan->io_dev,
+		    fq->tx_rings[0].fqid, &fd, 1);
 		if (rc == 1)
 			break; /* One frame has been enqueued. */
 	}
