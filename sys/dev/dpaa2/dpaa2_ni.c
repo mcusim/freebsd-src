@@ -2083,7 +2083,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_ni_tx_ring *tx_ring;
-	int error, rc, chan;
+	int error, chan;
 
 	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
 		return (0);
