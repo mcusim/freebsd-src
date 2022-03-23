@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/taskqueue.h>
 #include <sys/sysctl.h>
+#include <sys/buf_ring.h>
 
 #include <vm/vm.h>
 

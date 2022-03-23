@@ -34,6 +34,8 @@
 #include <sys/queue.h>
 #include <sys/taskqueue.h>
 #include <sys/mbuf.h>
+#include <sys/param.h>
+#include <sys/buf_ring.h>
 
 #include <net/ethernet.h>
 
@@ -160,6 +162,9 @@ enum dpaa2_ni_err_action {
 	DPAA2_NI_ERR_CONTINUE,
 	DPAA2_NI_ERR_SEND_TO_ERROR_QUEUE
 };
+
+struct dpaa2_ni_channel;
+struct dpaa2_ni_fq;
 
 /**
  * @brief Attributes of the DPNI object.
