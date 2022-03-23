@@ -102,7 +102,7 @@ __FBSDID("$FreeBSD$");
 } while (0)
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
-#define DPAA2_TX_RING(sc, chan)	(&(sc)->channels[(chan)].txc_queue.tx_rings[0])
+#define DPAA2_TX_RING(sc, chan)	(&(sc)->channels[(chan)]->txc_queue.tx_rings[0])
 #define DPAA2_TX_RING_LOCK(txr) do {			\
 	mtx_assert(&(txr)->txb_lock, MA_NOTOWNED);	\
 	mtx_lock(&(txr)->txb_lock);			\
@@ -2319,12 +2319,12 @@ dpaa2_ni_tx_task(void *arg, int count)
 
 		if (__predict_false(error != 0)) {
 			if (txb->m != NULL)
-				drbr_putback(ifp, tx->br, txb->m);
+				drbr_putback(sc->ifp, tx->br, txb->m);
 			else
-				drbr_advance(ifp, tx->br);
+				drbr_advance(sc->ifp, tx->br);
 			break;
 		} else {
-			pkt_len = m->m_pkthdr.len;
+			pkt_len = txb->m->m_pkthdr.len;
 
 			fd.addr = txb->paddr;
 			fd.data_length = (uint32_t)(pkt_len - sc->tx_data_off);
@@ -2343,7 +2343,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 					break; /* One frame has been enqueued. */
 			}
 
-			bus_dmamap_sync(sc->bp_dmat, txb.dmap,
+			bus_dmamap_sync(sc->tx_dmat, txb->dmap,
 			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 			if (rc != 1)
@@ -2351,7 +2351,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 			else
 				fq->chan->tx_frames++;
 		}
-		drbr_advance(ifp, tx->br);
+		drbr_advance(sc->ifp, tx->br);
 	}
 
 	DPAA2_TX_RING_UNLOCK(tx);
