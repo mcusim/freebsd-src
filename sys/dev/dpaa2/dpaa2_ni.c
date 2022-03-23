@@ -124,6 +124,8 @@ __FBSDID("$FreeBSD$");
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
+#define DPAA2_TX_BUFRING_SZ	(1024)
+
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
 
@@ -368,7 +370,7 @@ static int dpaa2_ni_detach(device_t);
 /* DPAA2 network interface setup and configuration */
 static int dpaa2_ni_setup(device_t);
 static int dpaa2_ni_setup_channels(device_t);
-static int dpaa2_ni_prepare_fq(device_t, struct dpaa2_ni_channel *,
+static int dpaa2_ni_setup_fq(device_t, struct dpaa2_ni_channel *,
     enum dpaa2_ni_queue_type);
 static int dpaa2_ni_bind(device_t);
 static int dpaa2_ni_setup_rx_dist(device_t);
@@ -377,6 +379,7 @@ static int dpaa2_ni_setup_msi(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *);
+static int dpaa2_ni_setup_dma(struct dpaa2_ni_softc *);
 
 /* Tx/Rx flow configuration */
 static int dpaa2_ni_setup_rx_flow(device_t, struct dpaa2_cmd *,
@@ -480,6 +483,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->media_status = 0;
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
+	sc->buf_align = 0;
 
 	/* For debug purposes only! */
 	sc->rx_anomaly_frames = 0;
@@ -512,7 +516,7 @@ dpaa2_ni_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	mtx_init(&sc->lock, device_get_nameunit(dev), "dpaa2_ni lock", MTX_DEF);
+	mtx_init(&sc->lock, device_get_nameunit(dev), "dpaa2_ni", MTX_DEF);
 
 	/* Allocate network interface */
 	ifp = if_alloc(IFT_ETHER);
@@ -564,7 +568,7 @@ dpaa2_ni_attach(device_t dev)
 		device_printf(dev, "Failed to allocate task queue\n");
 		goto err_close_ni;
 	}
-	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s taskq",
+	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s events",
 	    device_get_nameunit(dev));
 
 	error = dpaa2_ni_setup(dev);
@@ -688,6 +692,13 @@ dpaa2_ni_setup(device_t dev)
 	error = dpaa2_ni_set_buf_layout(dev, cmd);
 	if (error) {
 		device_printf(dev, "Failed to configure buffer layout\n");
+		return (error);
+	}
+
+	/* Configure DMA resources. */
+	error = dpaa2_ni_setup_dma(sc);
+	if (error) {
+		device_printf(dev, "%s: failed to setup DMA\n", __func__);
 		return (error);
 	}
 
@@ -820,45 +831,6 @@ dpaa2_ni_setup_channels(device_t dev)
 
 	device_printf(dev, "channels=%d\n", sc->chan_n);
 
-	/*
-	 * DMA tag to allocate buffers for buffer pool.
-	 *
-	 * NOTE: QBMan supports DMA addresses up to 49-bits maximum.
-	 *	 Bits 63-49 are not used by QBMan.
-	 */
-	error = bus_dma_tag_create(
-	    bus_get_dma_tag(dev),
-	    sc->buf_align, 0,		/* alignment, boundary */
-	    BUF_MAXADDR_49BIT,		/* low restricted addr */
-	    BUF_MAXADDR,		/* high restricted addr */
-	    NULL, NULL,			/* filter, filterarg */
-	    BUF_SIZE, 1,		/* maxsize, nsegments */
-	    BUF_SIZE, 0,		/* maxsegsize, flags */
-	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->bp_dmat);
-	if (error) {
-		device_printf(dev, "Failed to create a DMA tag for buffer "
-		    "pool\n");
-		return (error);
-	}
-
-	/* DMA tag to allocate channel storage. */
-	error = bus_dma_tag_create(
-	    bus_get_dma_tag(dev),
-	    ETH_STORE_ALIGN, 0,		/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
-	    BUS_SPACE_MAXADDR,		/* high restricted addr */
-	    NULL, NULL,			/* filter, filterarg */
-	    ETH_STORE_SIZE, 1,		/* maxsize, nsegments */
-	    ETH_STORE_SIZE, 0,		/* maxsegsize, flags */
-	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->st_dmat);
-	if (error) {
-		device_printf(dev, "Failed to create a DMA tag for channel "
-		    "storage\n");
-		return (error);
-	}
-
 	sysctl_ctx = device_get_sysctl_ctx(sc->dev);
 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
@@ -906,7 +878,6 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel->recycled_n = 0;
 
 		/* For debug purposes only! */
-		channel->tx_mbufn = 0;
 		channel->tx_frames = 0;
 		channel->tx_dropped = 0;
 
@@ -961,14 +932,13 @@ dpaa2_ni_setup_channels(device_t dev)
 		}
 
 		/* Prepare queues for this channel. */
-		error = dpaa2_ni_prepare_fq(dev, channel,
-		    DPAA2_NI_QUEUE_TX_CONF);
+		error = dpaa2_ni_setup_fq(dev, channel, DPAA2_NI_QUEUE_TX_CONF);
 		if (error) {
 			device_printf(dev, "%s: failed to prepare TxConf "
 			    "queue: error=%d\n", __func__, error);
 			return (error);
 		}
-		error = dpaa2_ni_prepare_fq(dev, channel, DPAA2_NI_QUEUE_RX);
+		error = dpaa2_ni_setup_fq(dev, channel, DPAA2_NI_QUEUE_RX);
 		if (error) {
 			device_printf(dev, "%s: failed to prepare Rx queue: "
 			    "error=%d\n", __func__, error);
@@ -983,7 +953,7 @@ dpaa2_ni_setup_channels(device_t dev)
 	}
 
 	/* There is exactly one Rx error queue per DPNI. */
-	error = dpaa2_ni_prepare_fq(dev, sc->channels[0], DPAA2_NI_QUEUE_RX_ERR);
+	error = dpaa2_ni_setup_fq(dev, sc->channels[0], DPAA2_NI_QUEUE_RX_ERR);
 	if (error) {
 		device_printf(dev, "%s: failed to prepare RxError queue: "
 		    "error=%d\n", __func__, error);
@@ -997,49 +967,58 @@ dpaa2_ni_setup_channels(device_t dev)
  * @brief Performs an initial configuration of the frame queues.
  */
 static int
-dpaa2_ni_prepare_fq(device_t dev, struct dpaa2_ni_channel *chan,
+dpaa2_ni_setup_fq(device_t dev, struct dpaa2_ni_channel *chan,
     enum dpaa2_ni_queue_type queue_type)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_ni_fq *fq;
 
 	switch (queue_type) {
 	case DPAA2_NI_QUEUE_TX_CONF:
 		/* One queue per channel. */
-		chan->txc_queue.type = queue_type;
-		chan->txc_queue.tc = 0; /* ignored */
-		chan->txc_queue.flowid = chan->flowid;
-		chan->txc_queue.consume = dpaa2_ni_tx_conf;
-		chan->txc_queue.channel = chan;
+		fq = &chan->txc_queue;
+
+		fq->consume = dpaa2_ni_tx_conf;
+		fq->chan = chan;
+		fq->flowid = chan->flowid;
+		fq->tc = 0; /* ignored */
+		fq->type = queue_type;
+
 		break;
 	case DPAA2_NI_QUEUE_RX:
 		KASSERT(sc->attr.num.rx_tcs <= DPAA2_NI_MAX_TCS,
 		    ("too many Rx traffic classes: rx_tcs=%d\n",
 		    sc->attr.num.rx_tcs));
 
-		/* One queue per Rx traffic class within a channel. */
 		chan->rxq_n = 0;
+
+		/* One queue per Rx traffic class within a channel. */
 		for (int i = 0; i < sc->attr.num.rx_tcs; i++) {
-			chan->rx_queues[i].type = queue_type;
-			chan->rx_queues[i].tc = (uint8_t) i;
-			chan->rx_queues[i].flowid = chan->flowid;
-			chan->rx_queues[i].consume = dpaa2_ni_rx;
-			chan->rx_queues[i].channel = chan;
+			fq = &chan->rx_queues[i];
+
+			fq->consume = dpaa2_ni_rx;
+			fq->chan = chan;
+			fq->flowid = chan->flowid;
+			fq->tc = (uint8_t) i;
+			fq->type = queue_type;
+
 			chan->rxq_n++;
 		}
 		break;
 	case DPAA2_NI_QUEUE_RX_ERR:
 		/* One queue per network interface. */
-		sc->rxe_queue.type = DPAA2_NI_QUEUE_RX_ERR;
-		sc->rxe_queue.tc = 0; /* ignored */
-		sc->rxe_queue.flowid = 0; /* ignored */
-		sc->rxe_queue.consume = dpaa2_ni_rx_err;
-		sc->rxe_queue.channel = chan;
+		fq = &sc->rxe_queue;
+
+		fq->consume = dpaa2_ni_rx_err;
+		fq->chan = chan;
+		fq->flowid = 0; /* ignored */
+		fq->tc = 0; /* ignored */
+		fq->type = queue_type;
 		break;
 	default:
 		device_printf(dev, "%s: unexpected frame queue type: %d\n",
 		    __func__, queue_type);
 		return (EINVAL);
-		break;
 	}
 
 	return (0);
@@ -1155,22 +1134,6 @@ dpaa2_ni_setup_rx_dist(device_t dev)
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	int error;
 
-	error = bus_dma_tag_create(
-	    bus_get_dma_tag(dev),
-	    PAGE_SIZE, 0,		/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
-	    BUS_SPACE_MAXADDR,		/* high restricted addr */
-	    NULL, NULL,			/* filter, filterarg */
-	    DPAA2_CLASSIFIER_DMA_SIZE, 1, /* maxsize, nsegments */
-	    DPAA2_CLASSIFIER_DMA_SIZE, 0, /* maxsegsize, flags */
-	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->rxd_dmat);
-	if (error) {
-		device_printf(dev, "Failed to create a DMA tag for Rx traffic "
-		    "distribution key configuration buffer\n");
-		return (error);
-	}
-
 	/*
 	 * Have the interface implicitly distribute traffic based on the default
 	 * hash key.
@@ -1202,13 +1165,6 @@ dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
 
 	fq->fqid = queue_cfg.fqid;
 
-#if 0
-	if (bootverbose)
-		device_printf(dev, "Rx queue: tc=%d, flowid=%d, fqid=%d, "
-		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx, queue_cfg.fqid,
-		    con_info->id);
-#endif
-
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
 	queue_cfg.priority = 1;
@@ -1234,6 +1190,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *con_info;
 	struct dpaa2_ni_queue_cfg queue_cfg = {0};
+	struct dpaa2_ni_tx_ring *tx_ring;
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
@@ -1243,11 +1200,14 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	    ("too many Tx traffic classes: tx_tcs=%d\n",
 	    sc->attr.num.tx_tcs));
 
-	/* Get FQIDs of the Tx queues with different traffic classes. */
+	fq->tx_rings_n = 0;
+
+	/* Setup Tx rings. */
 	for (int i = 0; i < sc->attr.num.tx_tcs; i++) {
 		queue_cfg.type = DPAA2_NI_QUEUE_TX;
 		queue_cfg.tc = i;
 		queue_cfg.idx = fq->flowid;
+
 		error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
 		if (error) {
 			device_printf(dev, "%s: failed to obtain Tx queue "
@@ -1255,14 +1215,45 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 			    queue_cfg.tc, queue_cfg.idx);
 			return (error);
 		}
-		fq->tx_fqid[i] = queue_cfg.fqid;
 
-#if 0
-		if (bootverbose)
-			device_printf(dev, "Tx queue: tc=%d, flowid=%d, "
-			    "fqid=%d, dpcon_id=%d\n", queue_cfg.tc,
-			    queue_cfg.idx, queue_cfg.fqid, con_info->id);
-#endif
+		tx_ring = &fq->tx_rings[i];
+		tx_ring->fq = fq;
+		tx_ring->fqid = queue_cfg.fqid;
+		mtx_init(&tx_ring->br_lock, "dpaa2_tx", NULL, MTX_DEF);
+
+		/* Allocate Tx ring buffer. */
+		tx_ring->br = buf_ring_alloc(DPAA2_TX_BUFRING_SZ, M_DEVBUF,
+		    M_NOWAIT, &tx_ring->br_lock);
+		if (tx_ring->br == NULL) {
+			device_printf(dev, "%s: failed to setup Tx buffer ring: "
+			    "fqid=%d\n", __func__, tx_ring->fqid);
+			return (ENOMEM);
+		}
+
+		/* Create DMA map for Tx buffers. */
+		error = bus_dmamap_create(sc->tx_dmat, 0, &tx_ring->txb.dmap);
+		if (error) {
+			device_printf(sc->dev, "%s: failed to create Tx DMA "
+			    "map: error=%d\n", __func__, error);
+			return (error);
+		}
+
+		/* Create a taskqueue for Tx ring to transmit mbufs. */
+		tx_ring->taskq = taskqueue_create_fast("dpaa2_ni_tx_taskq",
+		    M_WAITOK, taskqueue_thread_enqueue, &tx_ring->taskq);
+		if (tx_ring->taskq == NULL) {
+			device_printf(dev, "%s: failed to allocate Tx ring "
+			    "taskqueue\n", __func__);
+			return (ENOMEM);
+		}
+		taskqueue_start_threads(&sc->tq, 1, PI_NET,
+		    "%s tx_taskq(fqid=%d)", device_get_nameunit(dev),
+		    tx_ring->fqid);
+
+		/* Task to send mbufs from the ring. */
+		TASK_INIT(&tx_ring->task, 0, dpaa2_ni_tx_task, tx_ring);
+
+		fq->tx_rings_n++;
 	}
 
 	/* All Tx queues which belong to the same flowid have the same qdbin. */
@@ -1280,13 +1271,6 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	}
 
 	fq->fqid = queue_cfg.fqid;
-
-#if 0
-	if (bootverbose)
-		device_printf(dev, "TxConf queue: tc=%d, flowid=%d, fqid=%d, "
-		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
-		    queue_cfg.fqid, con_info->id);
-#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
@@ -1328,13 +1312,6 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	}
 
 	fq->fqid = queue_cfg.fqid;
-
-#if 0
-	if (bootverbose)
-		device_printf(dev, "RxErr queue: tc=%d, flowid=%d, fqid=%d, "
-		    "dpcon_id=%d\n", queue_cfg.tc, queue_cfg.idx,
-		    queue_cfg.fqid, con_info->id);
-#endif
 
 	queue_cfg.dest_id = con_info->id;
 	queue_cfg.dest_type = DPAA2_NI_DEST_DPCON;
@@ -1547,14 +1524,116 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Channel");
 		parent2 = SYSCTL_CHILDREN(node2);
 
-		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_mbufn",
-		    CTLFLAG_RD, &sc->channels[i]->tx_mbufn, "Tx mbuf counter");
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_frames",
 		    CTLFLAG_RD, &sc->channels[i]->tx_frames,
 		    "Tx frames counter");
 		SYSCTL_ADD_UQUAD(ctx, parent2, OID_AUTO, "tx_dropped",
 		    CTLFLAG_RD, &sc->channels[i]->tx_dropped,
 		    "Tx dropped counter");
+	}
+
+	return (0);
+}
+
+static int
+dpaa2_ni_setup_dma(struct dpaa2_ni_softc *sc)
+{
+	int error;
+
+	KASSERT((sc->buf_align == BUF_ALIGN) || (sc->buf_align == BUF_ALIGN_V1),
+	    ("unexpected buffer alignment: %d\n", sc->buf_align));
+
+	/*
+	 * DMA tag to allocate buffers for buffer pool.
+	 *
+	 * NOTE: QBMan supports DMA addresses up to 49-bits maximum.
+	 *	 Bits 63-49 are not used by QBMan.
+	 */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    sc->buf_align, 0,		/* alignment, boundary */
+	    BUF_MAXADDR_49BIT,		/* low restricted addr */
+	    BUF_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    BUF_SIZE, 1,		/* maxsize, nsegments */
+	    BUF_SIZE, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->bp_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for buffer "
+		    "pool\n", __func__);
+		return (error);
+	}
+
+	/*
+	 * DMA tag to map Tx mbufs.
+	 *
+	 * TODO: Use more then 1 segment when SG DPAA2 frames will be supported.
+	 */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    sc->buf_align, 0,		/* alignment, boundary */
+	    BUF_MAXADDR_49BIT,		/* low restricted addr */
+	    BUF_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    BUF_SIZE, 1,		/* maxsize, nsegments */
+	    BUF_SIZE, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->tx_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for Tx "
+		    "buffers\n", __func__);
+		return (error);
+	}
+
+	/* DMA tag to allocate channel storage. */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    ETH_STORE_ALIGN, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    ETH_STORE_SIZE, 1,		/* maxsize, nsegments */
+	    ETH_STORE_SIZE, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->st_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for channel "
+		    "storage\n", __func__);
+		return (error);
+	}
+
+	/* DMA tag for Rx distribution key. */
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    PAGE_SIZE, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    DPAA2_CLASSIFIER_DMA_SIZE, 1, /* maxsize, nsegments */
+	    DPAA2_CLASSIFIER_DMA_SIZE, 0, /* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->rxd_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for Rx "
+		    "distribution key\n", __func__);
+		return (error);
+	}
+
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    PAGE_SIZE, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    ETH_QOS_KCFG_BUF_SIZE, 1,	/* maxsize, nsegments */
+	    ETH_QOS_KCFG_BUF_SIZE, 0,	/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->qos_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for QoS key\n",
+		    __func__);
+		return (error);
 	}
 
 	return (0);
@@ -1756,22 +1835,6 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	 * Allocate a buffer visible to the device to hold the QoS table key
 	 * configuration.
 	 */
-
-	error = bus_dma_tag_create(
-	    bus_get_dma_tag(dev),
-	    PAGE_SIZE, 0,		/* alignment, boundary */
-	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
-	    BUS_SPACE_MAXADDR,		/* high restricted addr */
-	    NULL, NULL,			/* filter, filterarg */
-	    ETH_QOS_KCFG_BUF_SIZE, 1,	/* maxsize, nsegments */
-	    ETH_QOS_KCFG_BUF_SIZE, 0,	/* maxsegsize, flags */
-	    NULL, NULL,			/* lockfunc, lockarg */
-	    &sc->qos_dmat);
-	if (error) {
-		device_printf(dev, "Failed to create a DMA tag for QoS key "
-		    "configuration buffer\n");
-		return (error);
-	}
 
 	error = bus_dmamem_alloc(sc->qos_dmat, &sc->qos_kcfg.vaddr,
 	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->qos_kcfg.dmap);
@@ -2015,15 +2078,10 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_fq *fq;
 	struct dpaa2_fd fd;
 	int pkt_len;
-	/* int data_len; */
 	int error, rc;
 
-	DPNI_LOCK(sc);
-	if ((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
-		DPNI_UNLOCK(sc);
-		return (0);
-	}
-	DPNI_UNLOCK(sc);
+	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
+		return;
 
 	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
 		/* Select channel based on the mbuf's flowid. */
@@ -2031,10 +2089,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	else
 		chan = sc->channels[0];
 
-	chan->tx_mbufn++; /* Update statistics */
 	fq = &chan->txc_queue;
 	pkt_len = m->m_pkthdr.len;
-	/* data_len = m->m_len; */
 
 	/* Reset frame descriptor fields. */
 	memset(&fd, 0, sizeof(fd));
@@ -2082,26 +2138,11 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 	txb.vaddr = txb.m->m_data;
 
-#if 0
-	/* For debug purposes only! */
-	device_printf(sc->dev, "%s: data_len=%d, data_oldlen=%d, pkt_len=%d, "
-	    "pkt_oldlen=%d\n", __func__, txb.m->m_len, data_len,
-	    txb.m->m_pkthdr.len, pkt_len);
-#endif
-
-	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
-	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
-
 	fd.addr = txb.paddr;
 	fd.data_length = (uint32_t) pkt_len;
 	fd.bpid_ivp_bmt = 0; /* BMT bit? */
 	fd.offset_fmt_sl = sc->tx_data_off;
-	fd.ctrl = 0x00800000; /* PTA bit */
-
-#if 0
-	/* For debug purposes only! */
-	device_printf(sc->dev, "%s: txb.paddr=%#jx\n", __func__, txb.paddr);
-#endif
+	fd.ctrl = 0x00800000; /* PTA bit? */
 
 	/*
 	 * Everything that happens after this enqueues might race with the
@@ -2113,6 +2154,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		if (rc == 1)
 			break; /* One frame has been enqueued. */
 	}
+
+	bus_dmamap_sync(sc->bp_dmat, txb.dmap,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	if (rc != 1)
 		chan->tx_dropped++;
@@ -2413,10 +2457,6 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	buf_len = dpaa2_ni_fd_data_len(fd);
 	buf_data = (uint8_t *)buf->vaddr + dpaa2_ni_fd_offset(fd);
-
-#if 0
-	device_printf(sc->dev, "%s: buf_len=%d\n", __func__, buf_len);
-#endif
 
 	/* Prefetch mbuf data. */
 	__builtin_prefetch(buf_data);

@@ -209,7 +209,30 @@ struct dpaa2_ni_sbuf {
 };
 
 /**
+ * @brief Tx ring.
+ *
+ * fq:		Parent (TxConf) frame queue.
+ * fqid:	ID of the logical Tx queue.
+ * br:		Ring buffer for mbufs to transmit.
+ * br_lock:	Lock for the ring buffer.
+ * txb:		The latest transmitted, but not yet confirmed mbuf.
+ */
+struct dpaa2_ni_tx_ring {
+	struct dpaa2_ni_fq	*fq;
+	uint32_t		 fqid;
+
+	struct buf_ring		*br;
+	struct mtx		 br_lock;
+
+	struct dpaa2_ni_buf	 txb;
+
+	struct taskqueue	*taskq;
+	struct task		 task;
+};
+
+/**
  * @brief A Frame Queue is the basic queuing structure used by the QMan.
+ *
  * It comprises a list of frame descriptors (FDs), so it can be thought of
  * as a queue of frames.
  *
@@ -227,18 +250,25 @@ struct dpaa2_ni_sbuf {
  *		with the same flowid have the same destination bin.
  */
 struct dpaa2_ni_fq {
-	struct dpaa2_ni_channel	*channel;
+	int (*consume)(struct dpaa2_ni_channel *,
+	    struct dpaa2_ni_fq *, struct dpaa2_fd *);
+
+	struct dpaa2_ni_channel	*chan;
 	uint32_t		 fqid;
-	uint32_t		 txq_n;
-	uint32_t		 tx_fqid[DPAA2_NI_MAX_TCS];
-	uint32_t		 tx_qdbin;
 	uint16_t		 flowid;
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 
-	int (*consume)(struct dpaa2_ni_channel *channel, struct dpaa2_ni_fq *fq,
-	    struct dpaa2_fd *fd);
-};
+	/* Optional fields. */
+	union {
+		struct { /* for TxConf queue */
+			struct dpaa2_ni_tx_ring	 tx_rings[DPAA2_NI_MAX_TCS];
+			uint32_t		 tx_rings_n;
+			uint32_t		 tx_qdbin;
+		}
+		char data[0]; /* for Rx, RxErr queues */
+	}
+} __aligned(CACHE_LINE_SIZE);
 
 /**
  * @brief QBMan channel to process ingress traffic (Rx, Tx conf).
@@ -253,7 +283,6 @@ struct dpaa2_ni_channel {
 	uint16_t		 flowid;
 
 	/* For debug purposes only! */
-	uint64_t		 tx_mbufn;
 	uint64_t		 tx_frames;
 	uint64_t		 tx_dropped;
 
@@ -536,8 +565,9 @@ struct dpaa2_ni_softc {
 
 	/* DMA resources */
 	bus_dma_tag_t		 bp_dmat;  /* for buffer pool */
+	bus_dma_tag_t		 tx_dmat;  /* for Tx buffers */
 	bus_dma_tag_t		 st_dmat;  /* for channel storage */
-	bus_dma_tag_t		 rxd_dmat; /* for Rx traffic distribution key */
+	bus_dma_tag_t		 rxd_dmat; /* for Rx distribution key */
 	bus_dma_tag_t		 qos_dmat; /* for QoS table key */
 
 	struct dpaa2_ni_buf	 qos_kcfg; /* QoS table key config. */
