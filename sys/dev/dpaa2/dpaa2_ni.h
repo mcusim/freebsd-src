@@ -228,8 +228,8 @@ struct dpaa2_ni_tx_ring {
 
 	struct buf_ring		*br;
 	struct mtx		 br_lock;
-
 	struct dpaa2_ni_buf	 txb;
+	struct mtx		 txb_lock;
 
 	struct taskqueue	*taskq;
 	struct task		 task;
