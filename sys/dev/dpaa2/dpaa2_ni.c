@@ -2082,7 +2082,7 @@ static int
 dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	struct dpaa2_ni_tx_ring *tx_ring;
+	struct dpaa2_ni_tx_ring *tx;
 	int error, chan;
 
 	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
@@ -2094,7 +2094,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	else
 		chan = 0;
 
-	tx_ring = DPAA2_TX_RING(sc, chan);
+	tx = DPAA2_TX_RING(sc, chan);
 
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
@@ -2105,11 +2105,13 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	}
 
 	/* Enqueue then schedule taskqueue. */
-	error = drbr_enqueue(ifp, tx_ring->br, m);
-	if (__predict_false(error != 0))
+	error = drbr_enqueue(ifp, tx->br, m);
+	if (__predict_false(error != 0)) {
+		device_printf(sc->dev, "%s: drbr_enqueue() failed\n", __func__);
 		return (error);
+	}
+	taskqueue_enqueue(tx->taskq, &tx->task);
 
-	taskqueue_enqueue(tx_ring->taskq, &tx_ring->task);
 	return (0);
 }
 
