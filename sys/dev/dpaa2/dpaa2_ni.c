@@ -2303,7 +2303,6 @@ dpaa2_ni_tx_task(void *arg, int count)
 	struct dpaa2_ni_channel	*chan = fq->chan;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_ni_buf *txb = &tx->txb;
-	struct dpaa2_ni_swa *swa;
 	struct dpaa2_fd fd;
 	int error, rc, pkt_len;
 
@@ -2635,7 +2634,6 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_buf *txb;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	int chan_idx, tx_idx;
-	int error;
 
 	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
