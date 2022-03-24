@@ -104,10 +104,9 @@ __FBSDID("$FreeBSD$");
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
 #define DPAA2_TX_RING(sc, chan)	(&(sc)->channels[(chan)]->txc_queue.tx_rings[0])
-#define DPAA2_TX_RING_BUF_LOCK(txr, flags) do {		\
+#define DPAA2_TX_RING_BUF_LOCK(txr) do {		\
 	mtx_assert(&(txr)->txb_lock, MA_NOTOWNED);	\
 	mtx_lock(&(txr)->txb_lock);			\
-	(*(flags)) = (txr)->flags;			\
 } while (0)
 #define	DPAA2_TX_RING_BUF_UNLOCK(txr) mtx_unlock(&(txr)->txb_lock)
 
@@ -2104,7 +2103,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		chan = m->m_pkthdr.flowid % sc->chan_n;
 	} else {
 		chan = sc->next_chan++;
-		sc->next_chan %= chan_n;
+		sc->next_chan %= sc->chan_n;
 	}
 	DPNI_UNLOCK(sc);
 
@@ -2306,11 +2305,10 @@ dpaa2_ni_tx_task(void *arg, int count)
 	struct dpaa2_ni_buf *txb = &tx->txb;
 	struct dpaa2_ni_swa *swa;
 	struct dpaa2_fd fd;
-	uint16_t flags;
 	int error, rc, pkt_len;
 
-	DPAA2_TX_RING_BUF_LOCK(tx, &flags);
-	if (flags & DPAA2_TX_RING_LOCKED) {
+	DPAA2_TX_RING_BUF_LOCK(tx);
+	if (tx->flags & DPAA2_TX_RING_LOCKED) {
 		/* Do not drain Tx ring if the buffer is locked. */
 		DPAA2_TX_RING_BUF_UNLOCK(tx);
 		return;
@@ -2636,7 +2634,6 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_tx_ring *tx;
 	struct dpaa2_ni_buf *txb;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	uint16_t flags;
 	int chan_idx, tx_idx;
 	int error;
 
@@ -2659,8 +2656,8 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		return (0);
 	}
 
-	DPAA2_TX_RING_BUF_LOCK(tx, &flags);
-	if (!(flags & DPAA2_TX_RING_LOCKED)) {
+	DPAA2_TX_RING_BUF_LOCK(tx);
+	if (!(tx->flags & DPAA2_TX_RING_LOCKED)) {
 		/* Tx ring isn't locked, leaving... */
 		DPAA2_TX_RING_BUF_UNLOCK(tx);
 		return (0);
