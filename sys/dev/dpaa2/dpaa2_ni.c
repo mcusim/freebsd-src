@@ -2653,6 +2653,7 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		sc->rx_anomaly_frames++;
 		return (0);
 	}
+#endif
 
 	DPAA2_TX_RING_BUF_LOCK(tx);
 	if (!(tx->flags & DPAA2_TX_RING_LOCKED)) {
