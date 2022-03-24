@@ -1246,6 +1246,9 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 			return (error);
 		}
 
+		/* Task to send mbufs from the ring. */
+		TASK_INIT(&tx_ring->task, 0, dpaa2_ni_tx_task, tx_ring);
+
 		/* Create a taskqueue for Tx ring to transmit mbufs. */
 		tx_ring->taskq = taskqueue_create_fast("dpaa2_ni_tx_taskq",
 		    M_WAITOK, taskqueue_thread_enqueue, &tx_ring->taskq);
@@ -1254,12 +1257,9 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 			    "taskqueue\n", __func__);
 			return (ENOMEM);
 		}
-		taskqueue_start_threads(&sc->tq, 1, PI_NET,
+		taskqueue_start_threads(&tx_ring->taskq, 1, PI_NET,
 		    "%s tx_taskq(fqid=%d)", device_get_nameunit(dev),
 		    tx_ring->fqid);
-
-		/* Task to send mbufs from the ring. */
-		TASK_INIT(&tx_ring->task, 0, dpaa2_ni_tx_task, tx_ring);
 
 		fq->tx_rings_n++;
 	}
