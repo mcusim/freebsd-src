@@ -2376,6 +2376,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 				 */
 				tx->flags |= DPAA2_TX_RING_LOCKED;
 				fq->chan->tx_frames++;
+				drbr_advance(sc->ifp, tx->br);
 				break;
 			}
 		}
