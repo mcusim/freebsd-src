@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/buf_ring.h>
 
 #include <vm/vm.h>
+#include <vm/pmap.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -103,11 +104,12 @@ __FBSDID("$FreeBSD$");
 #define	DPNI_UNLOCK(sc)		mtx_unlock(&(sc)->lock)
 
 #define DPAA2_TX_RING(sc, chan)	(&(sc)->channels[(chan)]->txc_queue.tx_rings[0])
-#define DPAA2_TX_RING_LOCK(txr) do {			\
+#define DPAA2_TX_RING_BUF_LOCK(txr, flags) do {		\
 	mtx_assert(&(txr)->txb_lock, MA_NOTOWNED);	\
 	mtx_lock(&(txr)->txb_lock);			\
+	(*(flags)) = (txr)->flags;			\
 } while (0)
-#define	DPAA2_TX_RING_UNLOCK(txr) mtx_unlock(&(txr)->txb_lock)
+#define	DPAA2_TX_RING_BUF_UNLOCK(txr) mtx_unlock(&(txr)->txb_lock)
 
 #define DPNI_IRQ_INDEX		0 /* Index of the only DPNI IRQ. */
 #define DPNI_IRQ_LINK_CHANGED	1 /* Link state changed */
@@ -168,6 +170,10 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_NI_FD_SL_SHIFT	(14)
 #define DPAA2_NI_FD_LEN_MASK	(0x3FFFFu)
 #define DPAA2_NI_FD_OFFSET_MASK (0x0FFFu)
+
+/* Tx ring flags. */
+#define DPAA2_TX_RING_DEF	0x0u
+#define DPAA2_TX_RING_LOCKED	0x4000u	/* Wait till ring's unlocked */
 
 /* Enables TCAM for Flow Steering and QoS look-ups. */
 #define DPNI_OPT_HAS_KEY_MASKING 0x10
@@ -495,6 +501,7 @@ dpaa2_ni_attach(device_t dev)
 	sc->if_flags = 0;
 	sc->link_state = LINK_STATE_UNKNOWN;
 	sc->buf_align = 0;
+	sc->next_chan = 0;
 
 	/* For debug purposes only! */
 	sc->rx_anomaly_frames = 0;
@@ -1197,7 +1204,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *con_info;
 	struct dpaa2_ni_queue_cfg queue_cfg = {0};
-	struct dpaa2_ni_tx_ring *tx_ring;
+	struct dpaa2_ni_tx_ring *tx;
 	int error;
 
 	/* Obtain DPCON associated with the FQ's channel. */
@@ -1223,43 +1230,44 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 			return (error);
 		}
 
-		tx_ring = &fq->tx_rings[i];
-		tx_ring->fq = fq;
-		tx_ring->fqid = queue_cfg.fqid;
-		mtx_init(&tx_ring->br_lock, "dpaa2_tx_br", NULL, MTX_DEF);
-		mtx_init(&tx_ring->txb_lock, "dpaa2_tx_buf", NULL, MTX_DEF);
+		tx = &fq->tx_rings[i];
+		tx->fq = fq;
+		tx->fqid = queue_cfg.fqid;
+		tx->txid = fq->tx_rings_n; /* Tx ring index */
+		tx->flags = DPAA2_TX_RING_DEF;
+		mtx_init(&tx->br_lock, "dpaa2_tx_br", NULL, MTX_DEF);
+		mtx_init(&tx->txb_lock, "dpaa2_tx_buf", NULL, MTX_DEF);
 
 		/* Allocate Tx ring buffer. */
-		tx_ring->br = buf_ring_alloc(DPAA2_TX_BUFRING_SZ, M_DEVBUF,
-		    M_NOWAIT, &tx_ring->br_lock);
-		if (tx_ring->br == NULL) {
-			device_printf(dev, "%s: failed to setup Tx buffer ring: "
-			    "fqid=%d\n", __func__, tx_ring->fqid);
+		tx->br = buf_ring_alloc(DPAA2_TX_BUFRING_SZ, M_DEVBUF, M_NOWAIT,
+		    &tx->br_lock);
+		if (tx->br == NULL) {
+			device_printf(dev, "%s: failed to setup Tx buffer "
+			    "ring: fqid=%d\n", __func__, tx->fqid);
 			return (ENOMEM);
 		}
 
 		/* Create DMA map for Tx buffers. */
-		error = bus_dmamap_create(sc->tx_dmat, 0, &tx_ring->txb.dmap);
+		error = bus_dmamap_create(sc->tx_dmat, 0, &tx->txb.dmap);
 		if (error) {
 			device_printf(sc->dev, "%s: failed to create Tx DMA "
 			    "map: error=%d\n", __func__, error);
 			return (error);
 		}
 
-		/* Task to send mbufs from the ring. */
-		TASK_INIT(&tx_ring->task, 0, dpaa2_ni_tx_task, tx_ring);
+		/* Task to send mbufs from the Tx ring. */
+		TASK_INIT(&tx->task, 0, dpaa2_ni_tx_task, tx);
 
 		/* Create a taskqueue for Tx ring to transmit mbufs. */
-		tx_ring->taskq = taskqueue_create_fast("dpaa2_ni_tx_taskq",
-		    M_WAITOK, taskqueue_thread_enqueue, &tx_ring->taskq);
-		if (tx_ring->taskq == NULL) {
+		tx->taskq = taskqueue_create_fast("dpaa2_ni_tx_taskq",
+		    M_WAITOK, taskqueue_thread_enqueue, &tx->taskq);
+		if (tx->taskq == NULL) {
 			device_printf(dev, "%s: failed to allocate Tx ring "
 			    "taskqueue\n", __func__);
 			return (ENOMEM);
 		}
-		taskqueue_start_threads(&tx_ring->taskq, 1, PI_NET,
-		    "%s tx_taskq(fqid=%d)", device_get_nameunit(dev),
-		    tx_ring->fqid);
+		taskqueue_start_threads(&tx->taskq, 1, PI_NET,
+		    "%s tx_taskq(fqid=%d)", device_get_nameunit(dev), tx->fqid);
 
 		fq->tx_rings_n++;
 	}
@@ -2085,14 +2093,20 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct dpaa2_ni_tx_ring *tx;
 	int error, chan;
 
-	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
+	DPNI_LOCK(sc);
+	if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING))) {
+		DPNI_UNLOCK(sc);
 		return (0);
+	}
 
-	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE))
+	if (__predict_true(M_HASHTYPE_GET(m) != M_HASHTYPE_NONE)) {
 		/* Select channel based on the mbuf's flowid. */
 		chan = m->m_pkthdr.flowid % sc->chan_n;
-	else
-		chan = 0;
+	} else {
+		chan = sc->next_chan++;
+		sc->next_chan %= chan_n;
+	}
+	DPNI_UNLOCK(sc);
 
 	tx = DPAA2_TX_RING(sc, chan);
 
@@ -2104,7 +2118,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		return (ENOBUFS);
 	}
 
-	/* Enqueue then schedule taskqueue. */
+	/* Enqueue and schedule taskqueue. */
 	error = drbr_enqueue(ifp, tx->br, m);
 	if (__predict_false(error != 0)) {
 		device_printf(sc->dev, "%s: drbr_enqueue() failed\n", __func__);
@@ -2286,20 +2300,21 @@ static void
 dpaa2_ni_tx_task(void *arg, int count)
 {
 	struct dpaa2_ni_tx_ring *tx = (struct dpaa2_ni_tx_ring *) arg;
-	struct dpaa2_ni_softc *sc;
-	struct dpaa2_ni_fq *fq;
-	struct dpaa2_ni_buf *txb;
+	struct dpaa2_ni_fq *fq = tx->fq;
+	struct dpaa2_ni_channel	*chan = fq->chan;
+	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
+	struct dpaa2_ni_buf *txb = &tx->txb;
+	struct dpaa2_ni_swa *swa;
 	struct dpaa2_fd fd;
+	uint16_t flags;
 	int error, rc, pkt_len;
 
-	/* Reset frame descriptor fields. */
-	memset(&fd, 0, sizeof(fd));
-
-	DPAA2_TX_RING_LOCK(tx);
-
-	fq = tx->fq;
-	sc = device_get_softc(fq->chan->ni_dev);
-	txb = &tx->txb;
+	DPAA2_TX_RING_BUF_LOCK(tx, &flags);
+	if (flags & DPAA2_TX_RING_LOCKED) {
+		/* Do not drain Tx ring if the buffer is locked. */
+		DPAA2_TX_RING_BUF_UNLOCK(tx);
+		return;
+	}
 
 	while ((txb->m = drbr_peek(sc->ifp, tx->br)) != NULL) {
 		/* DMA load */
@@ -2328,19 +2343,24 @@ dpaa2_ni_tx_task(void *arg, int count)
 		} else {
 			pkt_len = txb->m->m_pkthdr.len;
 
-			fd.addr = txb->paddr;
+			/* Reset frame descriptor fields. */
+			memset(&fd, 0, sizeof(fd));
+
+			fd.addr =
+			    ((uint64_t)(chan->flowid & DPAA2_NI_BUF_CHAN_MASK) <<
+				DPAA2_NI_BUF_CHAN_SHIFT) |
+			    ((uint64_t)(tx->txid & DPAA2_NI_BUF_IDX_MASK) <<
+				DPAA2_NI_BUF_IDX_SHIFT) |
+			    (txb->paddr & DPAA2_NI_BUF_ADDR_MASK);
+
 			fd.data_length = (uint32_t)(pkt_len - sc->tx_data_off);
 			fd.bpid_ivp_bmt = 0; /* BMT bit? */
 			fd.offset_fmt_sl = sc->tx_data_off;
 			fd.ctrl = 0x00800000; /* PTA bit? */
 
-			/*
-			 * Everything that happens after this enqueues might
-			 * race with the Tx confirmation callback for this frame.
-			 */
 			for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
 				rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(fq->chan->io_dev,
-				    fq->tx_rings[0].fqid, &fd, 1);
+				    tx->fqid, &fd, 1);
 				if (rc == 1)
 					break; /* One frame has been enqueued. */
 			}
@@ -2348,15 +2368,24 @@ dpaa2_ni_tx_task(void *arg, int count)
 			bus_dmamap_sync(sc->tx_dmat, txb->dmap,
 			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
-			if (rc != 1)
+			if (rc != 1) {
+				bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+				m_freem(txb->m);
 				fq->chan->tx_dropped++;
-			else
+			} else {
+				/*
+				 * Unlock the Tx buffer, unload and free mbuf
+				 * when Tx confirmation is received.
+				 */
+				tx->flags |= DPAA2_TX_RING_LOCKED;
 				fq->chan->tx_frames++;
+				break;
+			}
 		}
 		drbr_advance(sc->ifp, tx->br);
 	}
 
-	DPAA2_TX_RING_UNLOCK(tx);
+	DPAA2_TX_RING_BUF_UNLOCK(tx);
 }
 
 static int
@@ -2602,43 +2631,47 @@ static int
 dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
-	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_channel	*buf_chan;
-	struct dpaa2_ni_buf *buf;
+	struct dpaa2_ni_tx_ring *tx;
+	struct dpaa2_ni_buf *txb;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	int chan_idx, buf_idx;
+	uint16_t flags;
+	int chan_idx, tx_idx;
 	int error;
 
 	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
-	buf_idx = dpaa2_ni_fd_buf_idx(fd);
+	tx_idx = dpaa2_ni_fd_buf_idx(fd);
 	buf_chan = sc->channels[chan_idx];
-	buf = &buf_chan->buf[buf_idx];
+	KASSERT(tx_idx < buf_chan->txc_queue.tx_rings_n,
+	    ("%s: incorrect Tx ring index", __func__));
+	tx = &buf_chan->txc_queue.tx_rings[tx_idx];
+	txb = &tx->txb;
 
 #if 0
-	KASSERT(paddr == buf->paddr,
-	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
-	    paddr, buf->paddr));
+	KASSERT(paddr == txb->paddr,
+	    ("%s: unexpected frame physical address: paddr=%#jx, txb_paddr=%#jx",
+	    __func__, paddr, txb->paddr));
 #else
-	if (paddr != buf->paddr) {
+	if (paddr != txb->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
 	}
-#endif
 
-	/* There's only one buffer pool for now. */
-	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
-	bpsc = device_get_softc(bp_dev);
-
-	/* Release buffer to QBMan buffer pool. */
-	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
-	if (error) {
-		device_printf(sc->dev, "failed to release frame buffer to the "
-		    "pool: error=%d\n", error);
-		return (error);
+	DPAA2_TX_RING_BUF_LOCK(tx, &flags);
+	if (!(flags & DPAA2_TX_RING_LOCKED)) {
+		/* Tx ring isn't locked, leaving... */
+		DPAA2_TX_RING_BUF_UNLOCK(tx);
+		return (0);
 	}
+
+	/* Unlock the Tx buffer, unload and free mbuf. */
+	tx->flags &= ~DPAA2_TX_RING_LOCKED;
+	bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+	m_freem(txb->m);
+
+	DPAA2_TX_RING_BUF_UNLOCK(tx);
 
 	return (0);
 }

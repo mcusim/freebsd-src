@@ -225,11 +225,13 @@ struct dpaa2_ni_sbuf {
 struct dpaa2_ni_tx_ring {
 	struct dpaa2_ni_fq	*fq;
 	uint32_t		 fqid;
+	uint32_t		 txid; /* Tx ring index */
 
 	struct buf_ring		*br;
 	struct mtx		 br_lock;
 	struct dpaa2_ni_buf	 txb;
 	struct mtx		 txb_lock;
+	uint16_t		 flags;
 
 	struct taskqueue	*taskq;
 	struct task		 task;
@@ -580,6 +582,7 @@ struct dpaa2_ni_softc {
 
 	/* Channels and RxError frame queue */
 	uint32_t		 chan_n;
+	uint32_t		 next_chan;
 	struct dpaa2_ni_channel	*channels[DPAA2_NI_MAX_CHANNELS];
 	struct dpaa2_ni_fq	 rxe_queue; /* one per network interface */
 
