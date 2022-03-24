@@ -2096,6 +2096,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 
 	tx = DPAA2_TX_RING(sc, chan);
 
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: stage 1\n", __func__);
+
 	/* Reserve headroom for SW and HW annotations. */
 	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
 	if (m == NULL) {
@@ -2104,6 +2107,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		return (ENOBUFS);
 	}
 
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: stage 2\n", __func__);
+
 	/* Enqueue then schedule taskqueue. */
 	error = drbr_enqueue(ifp, tx->br, m);
 	if (__predict_false(error != 0)) {
@@ -2111,6 +2117,9 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		return (error);
 	}
 	taskqueue_enqueue(tx->taskq, &tx->task);
+
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: stage 3\n", __func__);
 
 	return (0);
 }
@@ -2301,7 +2310,13 @@ dpaa2_ni_tx_task(void *arg, int count)
 	sc = device_get_softc(fq->chan->ni_dev);
 	txb = &tx->txb;
 
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: stage 4.1\n", __func__);
+
 	while ((txb->m = drbr_peek(sc->ifp, tx->br)) != NULL) {
+		/* For debug purposes only! */
+		device_printf(sc->dev, "%s: stage 4.2\n", __func__);
+
 		/* DMA load */
 		error = bus_dmamap_load_mbuf(sc->tx_dmat, txb->dmap, txb->m,
 		    dpaa2_ni_dmamap_cb2, &txb->paddr, BUS_DMA_NOWAIT);
@@ -2319,13 +2334,23 @@ dpaa2_ni_tx_task(void *arg, int count)
 			}
 		}
 
+		/* For debug purposes only! */
+		device_printf(sc->dev, "%s: stage 5, error=%d\n", __func__,
+		    error);
+
 		if (__predict_false(error != 0)) {
+			/* For debug purposes only! */
+			device_printf(sc->dev, "%s: stage 6.1\n", __func__);
+
 			if (txb->m != NULL)
 				drbr_putback(sc->ifp, tx->br, txb->m);
 			else
 				drbr_advance(sc->ifp, tx->br);
 			break;
 		} else {
+			/* For debug purposes only! */
+			device_printf(sc->dev, "%s: stage 6.2\n", __func__);
+
 			pkt_len = txb->m->m_pkthdr.len;
 
 			fd.addr = txb->paddr;
@@ -2344,6 +2369,9 @@ dpaa2_ni_tx_task(void *arg, int count)
 				if (rc == 1)
 					break; /* One frame has been enqueued. */
 			}
+
+			/* For debug purposes only! */
+			device_printf(sc->dev, "%s: stage 7\n", __func__);
 
 			bus_dmamap_sync(sc->tx_dmat, txb->dmap,
 			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
