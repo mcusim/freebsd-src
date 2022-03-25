@@ -2654,6 +2654,10 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	tx = &buf_chan->txc_queue.tx_rings[tx_idx];
 	txb = &tx->buf[buf_idx];
 
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: paddr=%#jx, txb_paddr=%#jx\n", __func__,
+	    paddr, txb->paddr);
+
 #if 0
 	KASSERT(paddr == txb->paddr,
 	    ("%s: unexpected frame physical address: paddr=%#jx, txb_paddr=%#jx",
