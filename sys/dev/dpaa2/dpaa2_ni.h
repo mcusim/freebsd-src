@@ -61,6 +61,10 @@
 #define DPAA2_NI_BUFS_PER_CHAN	(50u * DPAA2_SWP_BUFS_PER_CMD)
 #define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
 
+/* Maximum number of buffers allocated per Tx ring. */
+#define DPAA2_NI_BUFS_PER_TX	(128u)
+#define DPAA2_NI_MAX_BPTX	(256u) /* 8 bits for buffer index max. */
+
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
 #define	DPAA2_NI_STAT_SYSCTLS	9u
@@ -227,12 +231,16 @@ struct dpaa2_ni_tx_ring {
 	uint32_t		 fqid;
 	uint32_t		 txid; /* Tx ring index */
 
-	struct buf_ring		*br;
-	struct mtx		 br_lock;
-	struct dpaa2_ni_buf	 txb;
-	struct mtx		 txb_lock;
-	uint16_t		 flags;
+	/* Buffer rings. */
+	struct buf_ring		*mbuf_br; /* for mbufs to transmit */
+	struct mtx		 mbuf_lock;
+	struct buf_ring		*idx_br; /* for indexes in "buf" array */
+	struct mtx		 idx_lock;
 
+	/* Buffers to DMA load/unload Tx mbufs. */
+	struct dpaa2_ni_buf	 buf[DPAA2_NI_BUFS_PER_TX];
+
+	/* Tasks. */
 	struct taskqueue	*taskq;
 	struct task		 task;
 };
@@ -266,15 +274,9 @@ struct dpaa2_ni_fq {
 	uint8_t			 tc;
 	enum dpaa2_ni_queue_type type;
 
-	/* Optional fields. */
-	union {
-		struct { /* for TxConf queue */
-			struct dpaa2_ni_tx_ring	 tx_rings[DPAA2_NI_MAX_TCS];
-			uint32_t		 tx_rings_n;
-			uint32_t		 tx_qdbin;
-		};
-		char data[0]; /* for Rx, RxErr queues */
-	};
+	/* Optional fields (for TxConf queue). */
+	struct dpaa2_ni_tx_ring	 tx_rings[DPAA2_NI_MAX_TCS];
+	uint32_t		 tx_qdbin;
 } __aligned(CACHE_LINE_SIZE);
 
 /**
@@ -582,7 +584,6 @@ struct dpaa2_ni_softc {
 
 	/* Channels and RxError frame queue */
 	uint32_t		 chan_n;
-	uint32_t		 next_chan;
 	struct dpaa2_ni_channel	*channels[DPAA2_NI_MAX_CHANNELS];
 	struct dpaa2_ni_fq	 rxe_queue; /* one per network interface */
 
