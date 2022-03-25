@@ -1249,7 +1249,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 		}
 
 		/* Create DMA map for Tx buffers. */
-		for (int j = 0; j < DPAA2_NI_BUFS_PER_TX; j++) {
+		for (uint64_t j = 0; j < DPAA2_NI_BUFS_PER_TX; j++) {
 			error = bus_dmamap_create(sc->tx_dmat, 0,
 			    &tx->buf[j].dmap);
 			if (error) {
