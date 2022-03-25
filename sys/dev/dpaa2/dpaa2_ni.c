@@ -1257,6 +1257,9 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 				    "Tx DMA map: error=%d\n", __func__, error);
 				return (error);
 			}
+
+			/* Add index of the Tx buffer to the ring. */
+			buf_ring_enqueue(tx->idx_br, (void *) j);
 		}
 
 		/* Task to send mbufs from the Tx ring. */
