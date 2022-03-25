@@ -897,7 +897,6 @@ dpaa2_ni_setup_channels(device_t dev)
 
 		/* None of the frame queues for this channel configured yet. */
 		channel->rxq_n = 0;
-		channel->txc_queue.tx_rings_n = 0;
 
 		/* Setup WQ channel notification context. */
 		ctx = &channel->ctx;
@@ -2316,7 +2315,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 		if (__predict_false(pidx == NULL))
 			continue;
 		else {
-			idx = (uint8_t) pidx;
+			idx = (uint64_t) pidx;
 			txb = &tx->buf[idx];
 			txb->m = m;
 		}
