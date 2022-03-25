@@ -2636,7 +2636,7 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_channel	*buf_chan;
 	struct dpaa2_ni_tx_ring *tx;
 	struct dpaa2_ni_buf *txb;
-	bus_addr_t paddr = (bus_addr_t) fd->addr;
+	bus_addr_t paddr = (bus_addr_t) (fd->addr & BUF_MAXADDR_49BIT);
 	uint64_t buf_idx;
 	int chan_idx, tx_idx;
 
