@@ -2306,7 +2306,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 	struct dpaa2_ni_buf *txb;
 	struct dpaa2_fd fd;
 	struct mbuf *m;
-	uint8_t idx;
+	uint64_t idx;
 	void *pidx;
 	int error, rc, pkt_len;
 
@@ -2340,9 +2340,9 @@ dpaa2_ni_tx_task(void *arg, int count)
 
 		if (__predict_false(error != 0)) {
 			if (txb->m != NULL)
-				drbr_putback(sc->ifp, tx->br, txb->m);
+				drbr_putback(sc->ifp, tx->mbuf_br, txb->m);
 			else
-				drbr_advance(sc->ifp, tx->br);
+				drbr_advance(sc->ifp, tx->mbuf_br);
 			buf_ring_enqueue(tx->idx_br, pidx);
 			break;
 		} else {
@@ -2635,12 +2635,13 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	struct dpaa2_ni_tx_ring *tx;
 	struct dpaa2_ni_buf *txb;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
-	int chan_idx, tx_idx, buf_idx;
+	uint64_t buf_idx;
+	int chan_idx, tx_idx;
 
 	/* Parse ADDR_TOK part from the received frame descriptor. */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	tx_idx = dpaa2_ni_fd_tx_idx(fd);
-	buf_idx = dpaa2_ni_fd_txbuf_idx(fd);
+	buf_idx = (uint64_t) dpaa2_ni_fd_txbuf_idx(fd);
 
 	KASSERT(tx_idx < DPAA2_NI_MAX_TCS, ("%s: incorrect Tx ring index",
 	    __func__));
@@ -2649,7 +2650,7 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	buf_chan = sc->channels[chan_idx];
 	tx = &buf_chan->txc_queue.tx_rings[tx_idx];
-	txb = tx->buf[buf_idx];
+	txb = &tx->buf[buf_idx];
 
 #if 0
 	KASSERT(paddr == txb->paddr,
