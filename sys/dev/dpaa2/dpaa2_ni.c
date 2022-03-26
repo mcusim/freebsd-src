@@ -56,6 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/taskqueue.h>
 #include <sys/sysctl.h>
 #include <sys/buf_ring.h>
+#include <sys/prng.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -2107,7 +2108,8 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 		/* Select channel based on the mbuf's flowid. */
 		chan = m->m_pkthdr.flowid % sc->chan_n;
 	else
-		chan = 0;
+		/* Select channel randomly. */
+		chan = prng32_bounded(sc->chan_n);
 
 	/* TODO: Select Tx ring based on traffic class. */
 	tx = DPAA2_TX_RING(sc, chan, 0);
