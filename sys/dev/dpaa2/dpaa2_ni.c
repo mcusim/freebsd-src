@@ -2658,8 +2658,8 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	tx = &buf_chan->txc_queue.tx_rings[tx_idx];
 	txb = &tx->buf[buf_idx];
 
-	KASSERT(paddr == buf->paddr, ("%s: unexpected frame buffer: "
-	    "fd_addr(%#jx) != buf_paddr(%#jx)", __func__, paddr, buf->paddr));
+	KASSERT(paddr == txb->paddr, ("%s: unexpected frame buffer: "
+	    "fd_addr(%#jx) != txb_paddr(%#jx)", __func__, paddr, txb->paddr));
 	if (paddr != txb->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
