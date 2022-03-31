@@ -2316,6 +2316,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 		/* Obtain an index of a Tx buffer. */
 		pidx = buf_ring_dequeue_mc(tx->idx_br);
 		if (__predict_false(pidx == NULL))
+			/* TODO: Limit number of attempts. */
 			continue;
 		else {
 			idx = (uint64_t) pidx;
@@ -2345,6 +2346,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 				drbr_putback(sc->ifp, tx->mbuf_br, txb->m);
 			else
 				drbr_advance(sc->ifp, tx->mbuf_br);
+			/* Return Tx buffer back. */
 			buf_ring_enqueue(tx->idx_br, pidx);
 			break;
 		} else {
@@ -2380,6 +2382,7 @@ dpaa2_ni_tx_task(void *arg, int count)
 			if (rc != 1) {
 				bus_dmamap_unload(sc->tx_dmat, txb->dmap);
 				m_freem(txb->m);
+				/* Return Tx buffer back. */
 				buf_ring_enqueue(tx->idx_br, pidx);
 				fq->chan->tx_dropped++;
 			} else
@@ -2456,35 +2459,34 @@ static int
 dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
     struct dpaa2_fd *fd)
 {
-	device_t bp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_bp_softc *bpsc;
 	struct dpaa2_ni_channel	*buf_chan;
 	struct dpaa2_ni_buf *buf;
 	struct ifnet *ifp = sc->ifp;
 	struct mbuf *m;
+	device_t bp_dev;
 	bus_addr_t paddr = (bus_addr_t) fd->addr;
 	bus_addr_t released[DPAA2_SWP_BUFS_PER_CMD];
 	void *buf_data;
 	int chan_idx, buf_idx, buf_len;
 	int error, released_n = 0;
 
-	/* Parse ADDR_TOK part from the received frame descriptor. */
+	/*
+	 * Get channel and buffer indexes from the ADDR_TOK (not used by QBMan)
+	 * bits of the physical address.
+	 */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	buf_idx = dpaa2_ni_fd_buf_idx(fd);
 	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
-#if 0
-	KASSERT(paddr == buf->paddr,
-	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
-	    paddr, buf->paddr));
-#else
+	KASSERT(paddr == buf->paddr, ("%s: unexpected frame buffer: "
+	    "fd_addr(%#jx) != buf_paddr(%#jx)", __func__, paddr, buf->paddr));
 	if (paddr != buf->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
 	}
-#endif
 
 	/* Update statistics. */
 	switch (dpaa2_ni_fd_err(fd)) {
@@ -2593,22 +2595,21 @@ dpaa2_ni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	int chan_idx, buf_idx;
 	int error;
 	
-	/* Parse ADDR_TOK part from the received frame descriptor. */
+	/*
+	 * Get channel and buffer indexes from the ADDR_TOK (not used by QBMan)
+	 * bits of the physical address.
+	 */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	buf_idx = dpaa2_ni_fd_buf_idx(fd);
 	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
 
-#if 0
-	KASSERT(paddr == buf->paddr,
-	    ("frame address != buf->paddr: fd_addr=%#jx, buf_paddr=%#jx",
-	    paddr, buf->paddr));
-#else
+	KASSERT(paddr == buf->paddr, ("%s: unexpected frame buffer: "
+	    "fd_addr(%#jx) != buf_paddr(%#jx)", __func__, paddr, buf->paddr));
 	if (paddr != buf->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
 	}
-#endif
 
 	/* There's only one buffer pool for now. */
 	bp_dev = (device_t) rman_get_start(sc->res[BP_RID(0)]);
@@ -2640,30 +2641,29 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	uint64_t buf_idx;
 	int chan_idx, tx_idx;
 
-	/* Parse ADDR_TOK part from the received frame descriptor. */
+	/*
+	 * Get channel, Tx ring and buffer indexes from the ADDR_TOK
+	 * (not used by QBMan) bits of the physical address.
+	 */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	tx_idx = dpaa2_ni_fd_tx_idx(fd);
 	buf_idx = (uint64_t) dpaa2_ni_fd_txbuf_idx(fd);
 
-	KASSERT(tx_idx < DPAA2_NI_MAX_TCS, ("%s: incorrect Tx ring index",
+	KASSERT(tx_idx < DPAA2_NI_MAX_TCS, ("%s: invalid Tx ring index",
 	    __func__));
-	KASSERT(buf_idx < DPAA2_NI_BUFS_PER_TX, ("%s: incorrect Tx buffer index",
+	KASSERT(buf_idx < DPAA2_NI_BUFS_PER_TX, ("%s: invalid Tx buffer index",
 	    __func__));
 
 	buf_chan = sc->channels[chan_idx];
 	tx = &buf_chan->txc_queue.tx_rings[tx_idx];
 	txb = &tx->buf[buf_idx];
 
-#if 0
-	KASSERT(paddr == txb->paddr,
-	    ("%s: unexpected frame physical address: paddr=%#jx, txb_paddr=%#jx",
-	    __func__, paddr, txb->paddr));
-#else
+	KASSERT(paddr == buf->paddr, ("%s: unexpected frame buffer: "
+	    "fd_addr(%#jx) != buf_paddr(%#jx)", __func__, paddr, buf->paddr));
 	if (paddr != txb->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
 	}
-#endif
 
 	/* Unload, free mbuf and return buffer index back to the ring. */
 	bus_dmamap_unload(sc->tx_dmat, txb->dmap);
@@ -2746,7 +2746,6 @@ dpaa2_ni_seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 		if (stop)
 			break; /* Stop seeding buffers after error. */
 	}
-
 	chan->buf_num = chan_bufn;
 
 	return (0);
@@ -2862,6 +2861,7 @@ static int
 dpaa2_ni_build_single_fd(struct dpaa2_ni_softc *sc, struct mbuf *m,
     struct dpaa2_fd *fd)
 {
+	/* TBD */
 	return (0);
 }
 
@@ -2872,6 +2872,7 @@ static int
 dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *sc, struct mbuf *m,
     struct dpaa2_fd *fd)
 {
+	/* TBD */
 	return (0);
 }
 
