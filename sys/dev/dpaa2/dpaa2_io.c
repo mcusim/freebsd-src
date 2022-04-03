@@ -85,14 +85,12 @@ static struct resource_spec dpaa2_io_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-/* Forward declarations. */
-
-static int setup_dpio_irqs(device_t dev);
-static int setup_msi(struct dpaa2_io_softc *sc);
+/* Configuration routines. */
+static int dpaa2_io_setup_irqs(device_t dev);
+static int dpaa2_io_setup_msi(struct dpaa2_io_softc *sc);
 
 /* ISRs */
-
-static void dpio_msi_intr(void *arg);
+static void dpaa2_io_intr(void *arg);
 
 /*
  * Device interface.
@@ -251,7 +249,7 @@ dpaa2_io_attach(device_t dev)
 		goto err_close_io;
 	}
 
-	error = setup_dpio_irqs(dev);
+	error = dpaa2_io_setup_irqs(dev);
 	if (error) {
 		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_free_swp;
@@ -344,7 +342,7 @@ dpaa2_io_release_bufs(device_t iodev, uint16_t bpid, bus_addr_t *buf,
  * @brief Configure DPNI object to generate interrupts.
  */
 static int
-setup_dpio_irqs(device_t dev)
+dpaa2_io_setup_irqs(device_t dev)
 {
 	struct dpaa2_io_softc *sc = device_get_softc(dev);
 	int error;
@@ -356,7 +354,7 @@ setup_dpio_irqs(device_t dev)
 	dpaa2_swp_clear_intr_status(sc->swp, 0xFFFFFFFFu);
 
 	/* Configure IRQs. */
-	error = setup_msi(sc);
+	error = dpaa2_io_setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI: error=%d\n", error);
 		return (error);
@@ -367,7 +365,7 @@ setup_dpio_irqs(device_t dev)
 		return (ENXIO);
 	}
 	if (bus_setup_intr(dev, sc->irq_resource, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, dpio_msi_intr, sc, &sc->intr)) {
+	    NULL, dpaa2_io_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		return (ENXIO);
 	}
@@ -387,7 +385,7 @@ setup_dpio_irqs(device_t dev)
  * @brief Allocate MSI interrupts for this DPAA2 I/O object.
  */
 static int
-setup_msi(struct dpaa2_io_softc *sc)
+dpaa2_io_setup_msi(struct dpaa2_io_softc *sc)
 {
 	int val;
 
@@ -411,7 +409,7 @@ setup_msi(struct dpaa2_io_softc *sc)
  * @brief DPAA2 I/O interrupt handler.
  */
 static void
-dpio_msi_intr(void *arg)
+dpaa2_io_intr(void *arg)
 {
 	struct dpaa2_io_softc *sc = (struct dpaa2_io_softc *) arg;
 	struct dpaa2_io_notif_ctx *ctx[DPIO_POLL_MAX];
