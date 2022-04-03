@@ -111,8 +111,6 @@ __FBSDID("$FreeBSD$");
 #define RAR_VB(rar)			((rar) & 0x80u)
 #define RAR_SUCCESS(rar)		((rar) & 0x100u)
 
-#define PREFETCH_L1(ptr)  __asm__ __volatile__("prfm pldl1keep, %0" ::"Q"(*(ptr)))
-
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
 enum qbman_sdqcr_dct {
@@ -127,26 +125,22 @@ enum qbman_sdqcr_fc {
 	qbman_sdqcr_fc_up_to_3 = 1
 };
 
-/* Forward declarations. */
-
-static int cyc_diff(uint8_t ring_sz, uint8_t first, uint8_t last);
-
 /* Routines to execute software portal commands. */
-
-static int exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    struct dpaa2_swp_rsp *rsp, uint8_t cmdid);
-static int exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    uint32_t buf_num);
-static int exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd);
+static int dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *,
+    struct dpaa2_swp_cmd *, struct dpaa2_swp_rsp *, uint8_t);
+static int dpaa2_swp_exec_br_command(struct dpaa2_swp *, struct dpaa2_swp_cmd *,
+    uint32_t);
+static int dpaa2_swp_exec_vdc_command(struct dpaa2_swp *,
+    struct dpaa2_swp_cmd *);
 
 /* Management Commands helpers. */
+static int dpaa2_swp_send_mgmt_command(struct dpaa2_swp *,
+    struct dpaa2_swp_cmd *, uint8_t);
+static int dpaa2_swp_wait_for_mgmt_response(struct dpaa2_swp *,
+    struct dpaa2_swp_rsp *);
 
-static int send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
-    uint8_t cmdid);
-static int wait_for_mgmt_response(struct dpaa2_swp *swp,
-    struct dpaa2_swp_rsp *rsp);
-
-/* Management routines. */
+/* Helper subroutines. */
+static int dpaa2_swp_cyc_diff(uint8_t, uint8_t, uint8_t);
 
 int
 dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
@@ -572,7 +566,7 @@ dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
 	cmd.ctrl = cdan_en ? 1u : 0u;
 	cmd.ctx = ctx;	
 
-	error = exec_mgmt_command(swp, (struct dpaa2_swp_cmd *) &cmd,
+	error = dpaa2_swp_exec_mgmt_command(swp, (struct dpaa2_swp_cmd *) &cmd,
 	    (struct dpaa2_swp_rsp *) &rsp, CMDID_SWP_WQCHAN_CONFIGURE);
 	if (error)
 		return (error);
@@ -610,7 +604,8 @@ dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf,
 	cmd.bpid = bpid;
 	cmd.verb |= 1 << 5; /* Switch release buffer command to valid. */
 
-	error = exec_br_command(swp, (struct dpaa2_swp_cmd *) &cmd, buf_num);
+	error = dpaa2_swp_exec_br_command(swp, (struct dpaa2_swp_cmd *) &cmd,
+	    buf_num);
 	if (error) {
 		device_printf(swp->desc->dpio_dev, "buffers release command "
 		    "failed\n");
@@ -735,7 +730,8 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 
 	/* Retry while portal is busy */
 	do {
-		error = exec_vdc_command(swp, (struct dpaa2_swp_cmd *) &cmd);
+		error = dpaa2_swp_exec_vdc_command(swp,
+		    (struct dpaa2_swp_cmd *) &cmd);
 		dequeues++;
 		cpu_spinwait();
 	} while (error == EBUSY && dequeues < DPAA2_SWP_BUSY_RETRIES);
@@ -813,7 +809,7 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 		eqcr_ci = swp->eqcr.ci;
 		swp->eqcr.ci = val & full_mask;
 
-		swp->eqcr.available = cyc_diff(swp->eqcr.pi_ring_size,
+		swp->eqcr.available = dpaa2_swp_cyc_diff(swp->eqcr.pi_ring_size,
 		    eqcr_ci, swp->eqcr.ci);
 
 		if (swp->eqcr.available == 0) {
@@ -884,7 +880,7 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
  * @internal
  */
 static int
-cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
+dpaa2_swp_cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
 {
 	/* 'first' is included, 'last' is excluded */
 	return ((first <= last)
@@ -896,7 +892,7 @@ cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
  * @brief Execute Buffer Release Command (BRC).
  */
 static int
-exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     uint32_t buf_num)
 {
 	struct __packed with_verb {
@@ -967,7 +963,7 @@ exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
  *	 command is present in the SDQCR register.
  */
 static int
-exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
+dpaa2_swp_exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
 {
 	struct __packed with_verb {
 		uint8_t	verb;
@@ -1030,7 +1026,7 @@ exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
  * @brief Execute a QBMan management command.
  */
 static int
-exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     struct dpaa2_swp_rsp *rsp, uint8_t cmdid)
 {
 	struct __packed with_verb {
@@ -1054,8 +1050,8 @@ exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 	 * Send a command to QBMan using Management Command register and wait
 	 * for response from the Management Response registers.
 	 */
-	send_mgmt_command(swp, cmd, cmdid);
-	error = wait_for_mgmt_response(swp, rsp);
+	dpaa2_swp_send_mgmt_command(swp, cmd, cmdid);
+	error = dpaa2_swp_wait_for_mgmt_response(swp, rsp);
 	if (error) {
 		dpaa2_swp_unlock(swp);
 		return (error);
@@ -1074,7 +1070,7 @@ exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
  * @internal
  */
 static int
-send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     uint8_t cmdid)
 {
 	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
@@ -1110,7 +1106,7 @@ send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
  * @internal
  */
 static int
-wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
+dpaa2_swp_wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 {
 	const uint32_t attempts = swp->cfg.atomic
 	    ? CMD_SPIN_ATTEMPTS
