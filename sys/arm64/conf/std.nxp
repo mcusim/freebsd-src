@@ -23,7 +23,7 @@ device		sdhci
 
 # Ethernet NICs
 device		enetc			# QorIQ LS1028A NIC
-device		dpaa2
+#device		dpaa2
 
 options 	FDT
 device		acpi
