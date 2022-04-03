@@ -2073,13 +2073,14 @@ dpaa2_ni_mii_tick(void *arg)
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	int error;
 
-	error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev, sc->mac.dpmac_id);
+	error = DPAA2_MC_GET_PHY_DEV(sc->dev, &sc->mac.phy_dev,
+	    sc->mac.dpmac_id);
 	if (error == 0) {
 		error = mii_attach(sc->mac.phy_dev, &sc->miibus, sc->ifp,
 		    dpaa2_ni_media_change, dpaa2_ni_media_status,
 		    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
 		if (error != 0)
-			device_printf(dev, "%s: failed to attach "
+			device_printf(sc->dev, "%s: failed to attach "
 			    "miibus: error=%d\n", __func__, error);
 		else
 			sc->mii = device_get_softc(sc->miibus);
