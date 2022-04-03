@@ -449,6 +449,7 @@ static void dpaa2_ni_intr(void *);
 static int  dpaa2_ni_media_change(struct ifnet *);
 static void dpaa2_ni_media_status(struct ifnet *, struct ifmediareq *);
 static void dpaa2_ni_media_tick(void *);
+static void dpaa2_ni_mii_tick(void *);
 
 /* DMA mapping callback */
 static void dpaa2_ni_dmamap_cb(void *, bus_dma_segment_t *, int, int);
@@ -584,6 +585,8 @@ dpaa2_ni_attach(device_t dev)
 	}
 	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s events",
 	    device_get_nameunit(dev));
+
+	callout_init(&sc->mii_attach_callout, 0);
 
 	error = dpaa2_ni_setup(dev);
 	if (error) {
@@ -756,10 +759,9 @@ dpaa2_ni_setup(device_t dev)
 				else
 					sc->mii = device_get_softc(sc->miibus);
 			} else
-				device_printf(dev, "Failed to obtain PHY "
-				    "device: error=%d, dpmac_id=%d, "
-				    "mac_addr=%6D\n", error, sc->mac.dpmac_id,
-				    sc->mac.addr, ":");
+				/* Let's try to obtain PHY dev later. */
+				callout_reset(&sc->mii_attach_callout, hz,
+				    dpaa2_ni_mii_tick, sc);
 		}
 	}
 
@@ -2060,6 +2062,31 @@ dpaa2_ni_media_tick(void *arg)
 
 	/* Schedule another timeout one second from now */
 	callout_reset(&sc->mii_callout, hz, dpaa2_ni_media_tick, sc);
+}
+
+/**
+ * @brief Callout function to attach MII bus.
+ */
+static void
+dpaa2_ni_mii_tick(void *arg)
+{
+	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+	int error;
+
+	error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev, sc->mac.dpmac_id);
+	if (error == 0) {
+		error = mii_attach(sc->mac.phy_dev, &sc->miibus, sc->ifp,
+		    dpaa2_ni_media_change, dpaa2_ni_media_status,
+		    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
+		if (error != 0)
+			device_printf(dev, "%s: failed to attach "
+			    "miibus: error=%d\n", __func__, error);
+		else
+			sc->mii = device_get_softc(sc->miibus);
+	} else
+		/* Let's try to obtain PHY dev later. */
+		callout_reset(&sc->mii_attach_callout, hz,
+		    dpaa2_ni_mii_tick, sc);
 }
 
 static void
