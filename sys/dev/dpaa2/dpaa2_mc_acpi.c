@@ -207,7 +207,8 @@ static devclass_t dpaa2_mac_dev_devclass;
 
 DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver,
     dpaa2_mac_dev_devclass, 0, 0);
-MODULE_DEPEND(dpaa2_mac_dev, memacphy, 1, 1, 1);
+MODULE_DEPEND(dpaa2_mac_dev, memac_mdio, 1, 1, 1);
+MODULE_DEPEND(dpaa2_mac_dev, miibus, 1, 1, 1);
 
 /* -------------------------------------------------------------------------- */
 
@@ -413,3 +414,4 @@ static devclass_t dpaa2_mc_acpi_devclass;
 DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_devclass,
     0, 0);
 MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);
+MODULE_DEPEND(dpaa2_mc, miibus, 1, 1, 1);
