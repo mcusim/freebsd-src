@@ -433,7 +433,9 @@ DEFINE_CLASS_1(dpaa2_mc, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_methods,
 
 static devclass_t dpaa2_mc_acpi_devclass;
 
-DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_devclass,
-    0, 0);
+/* Make sure miibus gets procesed first. */
+DRIVER_MODULE_ORDERED(dpaa2_mc, acpi, dpaa2_mc_acpi_driver,
+    dpaa2_mc_acpi_devclass, NULL, NULL, SI_ORDER_ANY);
+
 MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);
 MODULE_DEPEND(dpaa2_mc, miibus, 1, 1, 1);
