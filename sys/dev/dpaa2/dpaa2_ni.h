@@ -596,7 +596,6 @@ struct dpaa2_ni_softc {
 	struct taskqueue	*tq;
 
 	/* Callouts */
-	struct callout		 mii_attach_callout;
 	struct callout		 mii_callout;
 
 	struct {

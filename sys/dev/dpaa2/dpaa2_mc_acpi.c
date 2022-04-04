@@ -70,22 +70,7 @@ struct dpaa2_mac_dev_softc {
 	char			phy_mode[64];
 	ACPI_HANDLE		phy_channel;
 	device_t		phy_dev;
-
-	/* To obtain PHY device later when it'll be attached. */
-	struct callout		phy_dev_callout;
 };
-
-static void
-dpaa2_mac_phy_dev_tick(void *arg)
-{
-	struct dpaa2_mac_dev_softc *sc = (struct dpaa2_mac_dev_softc *) arg;
-
-	sc->phy_dev = acpi_get_device(sc->phy_channel);
-	if (sc->phy_dev == NULL)
-		/* Let's try to get PHY device later. */
-		callout_reset(&sc->phy_dev_callout, hz,
-		    dpaa2_mac_phy_dev_tick, sc);
-}
 
 static int
 dpaa2_mac_dev_probe(device_t dev)
@@ -163,13 +148,6 @@ dpaa2_mac_dev_attach(device_t dev)
 		}
 
 		sc->phy_dev = acpi_get_device(sc->phy_channel);
-		if (sc->phy_dev == NULL) {
-			/* PHY device might not be available at the moment. */
-			callout_init(&sc->phy_dev_callout, 0);
-			/* Let's try to get it later. */
-			callout_reset(&sc->phy_dev_callout, hz,
-			    dpaa2_mac_phy_dev_tick, sc);
-		}
 	}
 out:
 	if (bootverbose)
@@ -301,7 +279,6 @@ dpaa2_mc_acpi_probe_child(ACPI_HANDLE h, device_t *dev, int level, void *arg)
 	ctx->countok++;
 	return (AE_OK);
 }
-
 
 static int
 dpaa2_mc_acpi_attach(device_t dev)
@@ -438,4 +415,3 @@ DRIVER_MODULE_ORDERED(dpaa2_mc, acpi, dpaa2_mc_acpi_driver,
     dpaa2_mc_acpi_devclass, NULL, NULL, SI_ORDER_ANY);
 
 MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);
-MODULE_DEPEND(dpaa2_mc, miibus, 1, 1, 1);
