@@ -586,7 +586,7 @@ dpaa2_ni_attach(device_t dev)
 	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s events",
 	    device_get_nameunit(dev));
 
-	callout_init(&sc->mii_attach_callout, CALLOUT_MPSAFE);
+	callout_init(&sc->mii_attach_callout, 0);
 
 	error = dpaa2_ni_setup(dev);
 	if (error) {
