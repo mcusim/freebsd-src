@@ -141,9 +141,10 @@ DEFINE_CLASS_0(memacphy, memacphy_acpi_driver, memacphy_acpi_methods,
 
 static devclass_t memacphy_devclass;
 
+DRIVER_MODULE(miibus, memacphy, miibus_driver, miibus_devclass, 0, 0);
 DRIVER_MODULE(memacphy, memac_mdio, memacphy_acpi_driver, memacphy_devclass,
     0, 0);
-DRIVER_MODULE(miibus, memacphy, miibus_driver, miibus_devclass, 0, 0);
+
 MODULE_DEPEND(memacphy, miibus, 1, 1, 1);
 
 /* -------------------------------------------------------------------------- */
