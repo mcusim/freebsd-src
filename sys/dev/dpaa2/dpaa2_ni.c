@@ -586,8 +586,6 @@ dpaa2_ni_attach(device_t dev)
 	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s events",
 	    device_get_nameunit(dev));
 
-	callout_init(&sc->mii_attach_callout, 0);
-
 	error = dpaa2_ni_setup(dev);
 	if (error) {
 		device_printf(dev, "Failed to setup DPNI: error=%d\n", error);
@@ -759,9 +757,8 @@ dpaa2_ni_setup(device_t dev)
 				else
 					sc->mii = device_get_softc(sc->miibus);
 			} else
-				/* Let's try to obtain PHY dev later. */
-				callout_reset(&sc->mii_attach_callout, hz,
-				    dpaa2_ni_mii_tick, sc);
+				device_printf(dev, "%s: failed to obtain PHY "
+				    "device: error=%d\n", __func__, error);
 		}
 	}
 
@@ -2062,32 +2059,6 @@ dpaa2_ni_media_tick(void *arg)
 
 	/* Schedule another timeout one second from now */
 	callout_reset(&sc->mii_callout, hz, dpaa2_ni_media_tick, sc);
-}
-
-/**
- * @brief Callout function to attach MII bus.
- */
-static void
-dpaa2_ni_mii_tick(void *arg)
-{
-	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
-	int error;
-
-	error = DPAA2_MC_GET_PHY_DEV(sc->dev, &sc->mac.phy_dev,
-	    sc->mac.dpmac_id);
-	if (error == 0) {
-		error = mii_attach(sc->mac.phy_dev, &sc->miibus, sc->ifp,
-		    dpaa2_ni_media_change, dpaa2_ni_media_status,
-		    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
-		if (error != 0)
-			device_printf(sc->dev, "%s: failed to attach "
-			    "miibus: error=%d\n", __func__, error);
-		else
-			sc->mii = device_get_softc(sc->miibus);
-	} else
-		/* Let's try to obtain PHY dev later. */
-		callout_reset(&sc->mii_attach_callout, hz,
-		    dpaa2_ni_mii_tick, sc);
 }
 
 static void
