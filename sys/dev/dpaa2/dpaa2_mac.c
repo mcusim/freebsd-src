@@ -73,21 +73,16 @@ __FBSDID("$FreeBSD$");
 #define DPMAC_IRQ_LINK_DOWN_REQ	0x00000008 /* link down request */
 #define DPMAC_IRQ_EP_CHANGED	0x00000010 /* DPAA2 endpoint dis/connected */
 
-/* Forward declarations. */
+/* Interrupt configuration routines. */
+static int dpaa2_mac_setup_irq(device_t);
+static int dpaa2_mac_setup_msi(struct dpaa2_mac_softc *);
 
-static int	setup_dpmac_irqs(device_t);
-static int	setup_msi(struct dpaa2_mac_softc *);
+/* Subroutines to get text representation. */
+static const char *dpaa2_mac_ethif_to_str(enum dpaa2_mac_eth_if);
+static const char *dpaa2_mac_link_type_to_str(enum dpaa2_mac_link_type);
 
-static const char *ethif_to_str(enum dpaa2_mac_eth_if);
-static const char *link_type_to_str(enum dpaa2_mac_link_type);
-
-/* ISRs */
-
-static void	dpmac_msi_intr(void *arg);
-
-/*
- * Device interface.
- */
+/* Interrupt handlers */
+static void dpaa2_mac_intr(void *arg);
 
 static int
 dpaa2_mac_probe(device_t dev)
@@ -153,11 +148,12 @@ dpaa2_mac_attach(device_t dev)
 	if (bootverbose) {
 		device_printf(dev, "ether %6D\n", sc->addr, ":");
 		device_printf(dev, "max_rate=%d, eth_if=%s, link_type=%s\n",
-		    sc->attr.max_rate, ethif_to_str(sc->attr.eth_if),
-		    link_type_to_str(sc->attr.link_type));
+		    sc->attr.max_rate,
+		    dpaa2_mac_ethif_to_str(sc->attr.eth_if),
+		    dpaa2_mac_link_type_to_str(sc->attr.link_type));
 	}
 
-	error = setup_dpmac_irqs(dev);
+	error = dpaa2_mac_setup_irq(dev);
 	if (error) {
 		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
 		goto err_close_mac;
@@ -191,16 +187,11 @@ dpaa2_mac_detach(device_t dev)
 	return (0);
 }
 
-/*
- * Internal functions.
- */
-
 /**
- * @internal
  * @brief Configure DPMAC object to generate interrupts.
  */
 static int
-setup_dpmac_irqs(device_t dev)
+dpaa2_mac_setup_irq(device_t dev)
 {
 	struct dpaa2_mac_softc *sc = device_get_softc(dev);
 	struct dpaa2_cmd *cmd = sc->cmd;
@@ -209,7 +200,7 @@ setup_dpmac_irqs(device_t dev)
 	int error;
 
 	/* Configure IRQs. */
-	error = setup_msi(sc);
+	error = dpaa2_mac_setup_msi(sc);
 	if (error) {
 		device_printf(dev, "Failed to allocate MSI\n");
 		return (error);
@@ -220,7 +211,7 @@ setup_dpmac_irqs(device_t dev)
 		return (ENXIO);
 	}
 	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
-	    NULL, dpmac_msi_intr, sc, &sc->intr)) {
+	    NULL, dpaa2_mac_intr, sc, &sc->intr)) {
 		device_printf(dev, "Failed to setup IRQ resource\n");
 		return (ENXIO);
 	}
@@ -250,11 +241,10 @@ setup_dpmac_irqs(device_t dev)
 }
 
 /**
- * @internal
  * @brief Allocate MSI interrupts for DPMAC.
  */
 static int
-setup_msi(struct dpaa2_mac_softc *sc)
+dpaa2_mac_setup_msi(struct dpaa2_mac_softc *sc)
 {
 	int val;
 
@@ -273,11 +263,8 @@ setup_msi(struct dpaa2_mac_softc *sc)
 	return (0);
 }
 
-/**
- * @internal
- */
 static void
-dpmac_msi_intr(void *arg)
+dpaa2_mac_intr(void *arg)
 {
 	struct dpaa2_mac_softc *sc = (struct dpaa2_mac_softc *) arg;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
@@ -285,26 +272,13 @@ dpmac_msi_intr(void *arg)
 
 	error = DPAA2_CMD_MAC_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->mac_token), DPMAC_IRQ_INDEX, &status);
-	if (error) {
-		device_printf(sc->dev, "Failed to obtain IRQ status: "
-		    "error=%d\n", error);
-		return;
-	}
-
-	printf("%s: invoked\n", __func__);
-
-	if (status & DPMAC_IRQ_LINK_CHANGED)
-		printf("%s: link state changed\n", __func__);
-
-	if (status & DPMAC_IRQ_EP_CHANGED)
-		printf("%s: endpoint changed\n", __func__);
+	if (error)
+		device_printf(sc->dev, "%s: failed to obtain IRQ status: "
+		    "error=%d\n", __func__, error);
 }
 
-/**
- * @internal
- */
 static const char *
-ethif_to_str(enum dpaa2_mac_eth_if eth_if)
+dpaa2_mac_ethif_to_str(enum dpaa2_mac_eth_if eth_if)
 {
 	switch (eth_if) {
 	case DPAA2_MAC_ETH_IF_MII:
@@ -336,11 +310,8 @@ ethif_to_str(enum dpaa2_mac_eth_if eth_if)
 	}
 }
 
-/**
- * @internal
- */
 static const char *
-link_type_to_str(enum dpaa2_mac_link_type link_type)
+dpaa2_mac_link_type_to_str(enum dpaa2_mac_link_type link_type)
 {
 	switch (link_type) {
 	case DPAA2_MAC_LINK_TYPE_NONE:
