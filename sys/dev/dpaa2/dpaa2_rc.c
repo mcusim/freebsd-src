@@ -453,8 +453,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_BP);
 	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_CON);
 
-	retval += printf(" at %s (id=%u, irqs=%u)", dpaa2_ttos(dinfo->dtype),
-	    dinfo->id, dinfo->msi.msi_msgnum);
+	retval += printf(" at %s (id=%u)", dpaa2_ttos(dinfo->dtype), dinfo->id);
 
 	retval += bus_print_child_domain(rcdev, child);
 	retval += bus_print_child_footer(rcdev, child);
@@ -3425,21 +3424,36 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 {
 	struct dpaa2_devinfo *dinfo;
 	struct resource_list_entry *rle;
-	int printed = 0;
+	uint32_t start_id, prev_id;
+	int printed = 0, series = 0;
 	int retval = 0;
 
 	STAILQ_FOREACH(rle, rl, link) {
 		if (rle->type == type) {
 			dinfo = device_get_ivars((device_t) rle->start);
 
-			if (printed == 0)
+			if (printed == 0) {
 				retval += printf(" %s (id=",
 				    dpaa2_ttos(dinfo->dtype));
-			else
-				retval += printf(",");
+			} else {
+				if (dinfo->id == start_id + 1) {
+					series = 1;
+					retval += printf("-");
+				} else {
+					if (series == 1) {
+						retval += printf("%u", prev_id);
+						series = 0;
+					}
+					retval += printf(",");
+				}
+			}
 			printed++;
 
-			retval += printf("%u", dinfo->id);
+			if (series == 0) {
+				retval += printf("%u", dinfo->id);
+				start_id = dinfo->id;
+			}
+			prev_id = dinfo->id;
 		}
 	}
 	if (printed)
