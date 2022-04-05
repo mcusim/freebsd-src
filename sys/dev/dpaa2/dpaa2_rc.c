@@ -3456,8 +3456,11 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 			prev_id = dinfo->id;
 		}
 	}
-	if (printed)
+	if (printed) {
+		if (series == 1)
+			retval += printf("%u", prev_id);
 		retval += printf(")");
+	}
 
 	return (retval);
 }
