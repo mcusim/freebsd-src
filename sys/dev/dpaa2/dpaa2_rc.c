@@ -3424,7 +3424,7 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 {
 	struct dpaa2_devinfo *dinfo;
 	struct resource_list_entry *rle;
-	uint32_t start_id, prev_id;
+	uint32_t prev_id;
 	int printed = 0, series = 0;
 	int retval = 0;
 
@@ -3437,8 +3437,10 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 				    dpaa2_ttos(dinfo->dtype));
 			} else {
 				if (dinfo->id == prev_id + 1) {
-					series = 1;
-					retval += printf("-");
+					if (series == 0) {
+						series = 1;
+						retval += printf("-");
+					}
 				} else {
 					if (series == 1) {
 						retval += printf("%u", prev_id);
@@ -3449,10 +3451,8 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 			}
 			printed++;
 
-			if (series == 0) {
+			if (series == 0)
 				retval += printf("%u", dinfo->id);
-				start_id = dinfo->id;
-			}
 			prev_id = dinfo->id;
 		}
 	}
