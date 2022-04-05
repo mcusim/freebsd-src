@@ -2216,16 +2216,9 @@ dpaa2_ni_intr(void *arg)
 
 	error = DPAA2_CMD_NI_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), DPNI_IRQ_INDEX, &status);
-	if (error) {
-		device_printf(sc->dev, "Failed to obtain IRQ status: error=%d\n",
-		    error);
-		return;
-	}
-
-	if (status & DPNI_IRQ_LINK_CHANGED)
-		device_printf(sc->dev, "irq: link state changed\n");
-	if (status & DPNI_IRQ_EP_CHANGED)
-		device_printf(sc->dev, "irq: endpoint changed\n");
+	if (error)
+		device_printf(sc->dev, "%s: failed to obtain IRQ status: "
+		    "error=%d\n", __func__, error);
 }
 
 /**
