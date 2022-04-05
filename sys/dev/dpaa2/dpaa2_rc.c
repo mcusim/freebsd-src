@@ -3436,7 +3436,7 @@ dpaa2_rc_print_type(struct resource_list *rl, enum dpaa2_dev_type type)
 				retval += printf(" %s (id=",
 				    dpaa2_ttos(dinfo->dtype));
 			} else {
-				if (dinfo->id == start_id + 1) {
+				if (dinfo->id == prev_id + 1) {
 					series = 1;
 					retval += printf("-");
 				} else {
