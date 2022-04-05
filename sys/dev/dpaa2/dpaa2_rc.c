@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <sys/smp.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -2998,6 +2999,8 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	struct dpaa2_devinfo *dinfo;
 	struct resource_spec *res_spec;
 	const char *devclass;
+	int dpio_n = 0; /* to limit DPIOs by # of CPUs */
+	int dpcon_n = 0; /* to limit DPCONs by # of CPUs */
 	int rid, error;
 
 	rcdev = sc->dev;
@@ -3048,11 +3051,27 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	/* Add DPAA2-specific resources to the resource list. */
 	for (; res_spec && res_spec->type != -1; res_spec++) {
 		rid = res_spec->rid;
+
+		/* Limit DPIOs and DPCONs by number of CPUs. */
+		if (res_spec->type == DPAA2_DEV_IO && dpio_n >= mp_ncpus) {
+			dpio_n++;
+			continue;
+		}
+		if (res_spec->type == DPAA2_DEV_CON && dpcon_n >= mp_ncpus) {
+			dpcon_n++;
+			continue;
+		}
+
 		error = dpaa2_rc_add_res(rcdev, dev, res_spec->type, &rid,
 		    res_spec->flags);
 		if (error)
 			device_printf(rcdev, "dpaa2_rc_add_res() failed: "
 			    "error=%d\n", error);
+
+		if (res_spec->type == DPAA2_DEV_IO)
+			dpio_n++;
+		if (res_spec->type == DPAA2_DEV_CON)
+			dpcon_n++;
 	}
 
 	return (0);
