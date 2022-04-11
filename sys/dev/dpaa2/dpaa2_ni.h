@@ -34,9 +34,12 @@
 #include <sys/taskqueue.h>
 #include <sys/mbuf.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <sys/buf_ring.h>
 
+#include <net/if.h>
 #include <net/ethernet.h>
+#include <net/if_media.h>
 
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
@@ -569,6 +572,8 @@ struct dpaa2_ni_softc {
 	struct mtx		 lock;
 	device_t		 miibus;
 	struct mii_data		*mii;
+	boolean_t		 fixed_link;
+	struct ifmedia		 fixed_ifmedia;
 	int			 media_status;
 
 	/* DMA resources */
