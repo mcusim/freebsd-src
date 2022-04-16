@@ -636,27 +636,35 @@ dpaa2_ni_fixed_media_status(if_t ifp, struct ifmediareq* ifmr)
 	ifmr->ifm_count = 0;
 	ifmr->ifm_mask = 0;
 	ifmr->ifm_status = IFM_AVALID | IFM_ACTIVE;
-	ifmr->ifm_current = ifmr->ifm_active = sc->fixed_ifmedia.ifm_cur->ifm_media;
-	/* In non-PHY usecases, we need to signal link state up, otherwise certain
-	 * things requiring a link event (e.g async DHCP client) from devd
-	 * do not happen
+	ifmr->ifm_current = ifmr->ifm_active =
+	    sc->fixed_ifmedia.ifm_cur->ifm_media;
+
+	/*
+	 * In non-PHY usecases, we need to signal link state up, otherwise
+	 * certain things requiring a link event (e.g async DHCP client) from
+	 * devd do not happen.
 	 */
 	if (ifp->if_link_state == LINK_STATE_UNKNOWN) {
 		if_link_state_change(ifp, LINK_STATE_UP);
 	}
-	/* TODO: Check the status of the link partner (DPMAC, DPNI or other) and reset if down
-	 * This is different to the DPAA2_MAC_LINK_TYPE_PHY as the MC firmware sets the status,
-	 * instead of us telling the MC what it is
+
+	/*
+	 * TODO: Check the status of the link partner (DPMAC, DPNI or other) and
+	 * reset if down. This is different to the DPAA2_MAC_LINK_TYPE_PHY as
+	 * the MC firmware sets the status, instead of us telling the MC what
+	 * it is.
 	 */
 	DPNI_UNLOCK(sc);
+
 	return;
 }
 
 static void
 dpaa2_ni_setup_fixed_link(struct dpaa2_ni_softc *sc)
 {
-	/* FIXME: When the DPNI is connected to a DPMAC, we can get
-	 * the 'apparent' speed from it
+	/*
+	 * FIXME: When the DPNI is connected to a DPMAC, we can get the
+	 * 'apparent' speed from it.
 	 */
 	sc->fixed_link = true;
 
@@ -782,58 +790,71 @@ dpaa2_ni_setup(device_t dev)
 			error = dpaa2_ni_set_mac_addr(dev, cmd, rc_token,
 			    ni_token);
 			if (error)
-				device_printf(dev, "Failed to set MAC address: "
-				    "error=%d\n", error);
+				device_printf(dev, "%s: failed to set MAC "
+				    "address: error=%d\n", __func__, error);
 
 			/*
 			 * Need to determine if DPMAC type is PHY (attached to
 			 * conventional MII PHY) or FIXED (usually SFP/SerDes,
 			 * link state managed by MC firmwre)
 			 */
-			error = DPAA2_CMD_MAC_OPEN(sc->dev, dpaa2_mcp_tk(sc->cmd,
-						   sc->rc_token), sc->mac.dpmac_id, &mac_token);
+			error = DPAA2_CMD_MAC_OPEN(sc->dev,
+			    dpaa2_mcp_tk(sc->cmd, sc->rc_token),
+			    sc->mac.dpmac_id, &mac_token);
 			if (error) {
-				device_printf(dev, "%s: failed to open attached DPMAC: %d\n",
-					      __func__, sc->mac.dpmac_id);
+				device_printf(dev, "%s: failed to open attached "
+				    "DPMAC: %d\n", __func__, sc->mac.dpmac_id);
 				link_type = DPAA2_MAC_LINK_TYPE_NONE;
 			} else {
-				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, sc->cmd, &attr);
+				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev,
+				    sc->cmd, &attr);
 				if (error) {
-					device_printf(dev, "Failed to get DPMAC attributes: id=%d, "
-						      "error=%d\n", dinfo->id, error);
+					device_printf(dev, "%s: failed to get "
+					    "DPMAC attributes: id=%d, "
+					    "error=%d\n", __func__, dinfo->id,
+					    error);
 				}
 				link_type = attr.link_type;
 				device_printf(dev, "DPMAC %d link type: %d\n",
 					      sc->mac.dpmac_id, link_type);
 			}
-			DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, mac_token));
+			DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd,
+			    mac_token));
 
 			if (link_type == DPAA2_MAC_LINK_TYPE_FIXED) {
-				device_printf(dev, "Attached dpmac %d is in fixed mode\n",
-					      ep2_desc.obj_id);
+				if (bootverbose)
+					device_printf(dev, "Attached DPMAC %d "
+					    "is in FIXED mode\n",
+					    ep2_desc.obj_id);
 				dpaa2_ni_setup_fixed_link(sc);
 			} else if (link_type == DPAA2_MAC_LINK_TYPE_PHY) {
-				error = DPAA2_MC_GET_PHY_DEV(dev, &sc->mac.phy_dev,
-							     sc->mac.dpmac_id);
+				error = DPAA2_MC_GET_PHY_DEV(dev,
+				    &sc->mac.phy_dev, sc->mac.dpmac_id);
 				if (error == 0) {
 					error = mii_attach(sc->mac.phy_dev,
-							   &sc->miibus, sc->ifp,
-							   dpaa2_ni_media_change,
-							   dpaa2_ni_media_status,
-							   BMSR_DEFCAPMASK, MII_PHY_ANY,
-							   0, 0);
-					if (error != 0)
-						device_printf(dev, "Failed to attach "
-						    "miibus: error=%d\n", error);
-					else
-						sc->mii = device_get_softc(sc->miibus);
-			} else
+					    &sc->miibus, sc->ifp,
+					    dpaa2_ni_media_change,
+					    dpaa2_ni_media_status,
+					    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
+				}
+
+				if (error != 0)
+					device_printf(dev, "%s: failed to "
+					    "attach miibus: error=%d\n",
+					    __func__, error);
+				else
+					sc->mii = device_get_softc(sc->miibus);
+			} else {
 				device_printf(dev, "%s: failed to obtain PHY "
 				    "device: error=%d\n", __func__, error);
 			}
-		} else if (ep2_desc.type == DPAA2_DEV_NI) { // TODO: Also DPSW, DPDMUX
-			device_printf(dev, "Attached to DPNI %d\n", ep2_desc.obj_id);
+		} else if (ep2_desc.type == DPAA2_DEV_NI) {
+			if (bootverbose)
+				device_printf(dev, "Attached to DPNI %d\n",
+				    ep2_desc.obj_id);
 			dpaa2_ni_setup_fixed_link(sc);
+		} else {
+			/* TODO: Also DPSW, DPDMUX */
 		}
 	}
 
@@ -3237,6 +3258,7 @@ static driver_t dpaa2_ni_driver = {
 
 static devclass_t dpaa2_ni_devclass;
 
-DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, dpaa2_ni_devclass, 0, 0);
 DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, miibus_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, dpaa2_ni_devclass, 0, 0);
+
 MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1);
