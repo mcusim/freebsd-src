@@ -58,9 +58,6 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_mc_if.h"
 
-
-/* -------------------------------------------------------------------------- */
-
 struct dpaa2_mac_dev_softc {
 	int			uid;
 	uint64_t		reg;
@@ -205,10 +202,9 @@ static devclass_t dpaa2_mac_dev_devclass;
 
 DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver,
     dpaa2_mac_dev_devclass, 0, 0);
+
 MODULE_DEPEND(dpaa2_mac_dev, memac_mdio, 1, 1, 1);
 MODULE_DEPEND(dpaa2_mac_dev, miibus, 1, 1, 1);
-
-/* -------------------------------------------------------------------------- */
 
 /*
  * Device interface.

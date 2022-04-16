@@ -455,8 +455,10 @@ DEFINE_CLASS_0(memac_mdio, memac_mdio_acpi_driver, memac_mdio_acpi_methods,
 
 static devclass_t memac_mdio_acpi_devclass;
 
+DRIVER_MODULE(miibus, memac_mdio, miibus_driver, miibus_devclass, 0, 0);
 DRIVER_MODULE(memac_mdio, acpi, memac_mdio_acpi_driver, memac_mdio_acpi_devclass,
     0, 0);
-MODULE_VERSION(memac_mdio, 1);
-DRIVER_MODULE(miibus, memac_mdio, miibus_driver, miibus_devclass, 0, 0);
+
 MODULE_DEPEND(memac_mdio, miibus, 1, 1, 1);
+
+MODULE_VERSION(memac_mdio, 1);
