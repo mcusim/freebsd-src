@@ -563,15 +563,15 @@ dpaa2_ni_attach(device_t dev)
 	/* Open resource container and network interface object. */
 	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
 	if (error) {
-		device_printf(dev, "%s: failed to open DPRC: id=%d, error=%d\n",
-		    __func__, rcinfo->id, error);
+		device_printf(dev, "%s: failed to open resource container: "
+		    "id=%d, error=%d\n", __func__, rcinfo->id, error);
 		goto err_free_cmd;
 	}
 	error = DPAA2_CMD_NI_OPEN(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token),
 	    dinfo->id, &sc->ni_token);
 	if (error) {
-		device_printf(dev, "Failed to open DPNI: id=%d, error=%d\n",
-		    dinfo->id, error);
+		device_printf(dev, "%s: failed to open network interface: "
+		    "id=%d, error=%d\n", __func__, dinfo->id, error);
 		goto err_close_rc;
 	}
 
@@ -579,7 +579,8 @@ dpaa2_ni_attach(device_t dev)
 	sc->tq = taskqueue_create("dpaa2_ni_taskq", M_WAITOK,
 	    taskqueue_thread_enqueue, &sc->tq);
 	if (sc->tq == NULL) {
-		device_printf(dev, "Failed to allocate task queue\n");
+		device_printf(dev, "%s: failed to allocate task queue\n",
+		    __func__);
 		goto err_close_ni;
 	}
 	taskqueue_start_threads(&sc->tq, 1, PI_NET, "%s events",
@@ -587,28 +588,32 @@ dpaa2_ni_attach(device_t dev)
 
 	error = dpaa2_ni_setup(dev);
 	if (error) {
-		device_printf(dev, "Failed to setup DPNI: error=%d\n", error);
+		device_printf(dev, "%s: failed to setup DPNI: error=%d\n",
+		    __func__, error);
 		goto err_close_ni;
 	}
 	error = dpaa2_ni_setup_channels(dev);
 	if (error) {
-		device_printf(dev, "Failed to setup QBMan channels: error=%d\n",
-		    error);
+		device_printf(dev, "%s: failed to setup QBMan channels: "
+		    "error=%d\n", __func__, error);
 		goto err_close_ni;
 	}
 	error = dpaa2_ni_bind(dev);
 	if (error) {
-		device_printf(dev, "Failed to bind DPNI: error=%d\n", error);
+		device_printf(dev, "%s: failed to bind DPNI: error=%d\n",
+		    __func__, error);
 		goto err_close_ni;
 	}
 	error = dpaa2_ni_setup_irqs(dev);
 	if (error) {
-		device_printf(dev, "Failed to setup IRQs: error=%d\n", error);
+		device_printf(dev, "%s: failed to setup IRQs: error=%d\n",
+		    __func__, error);
 		goto err_close_ni;
 	}
 	error = dpaa2_ni_setup_sysctls(sc);
 	if (error) {
-		device_printf(dev, "Failed to setup sysctls: error=%d\n", error);
+		device_printf(dev, "%s: failed to setup sysctls: error=%d\n",
+		    __func__, error);
 		goto err_close_ni;
 	}
 
@@ -713,12 +718,13 @@ dpaa2_ni_setup(device_t dev)
 	error = DPAA2_CMD_NI_GET_API_VERSION(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    &sc->api_major, &sc->api_minor);
 	if (error) {
-		device_printf(dev, "Failed to get DPNI API version\n");
+		device_printf(dev, "%s: failed to get DPNI API version\n",
+		    __func__);
 		return (error);
 	}
 	if (dpaa2_ni_cmp_api_version(sc, DPNI_VER_MAJOR, DPNI_VER_MINOR) < 0) {
-		device_printf(dev, "DPNI API version %u.%u not supported, "
-		    "need >= %u.%u\n", sc->api_major, sc->api_minor,
+		device_printf(dev, "%s: DPNI API version %u.%u not supported, "
+		    "need >= %u.%u\n", __func__, sc->api_major, sc->api_minor,
 		    DPNI_VER_MAJOR, DPNI_VER_MINOR);
 		error = ENODEV;
 		return (error);
@@ -727,15 +733,16 @@ dpaa2_ni_setup(device_t dev)
 	/* Reset the DPNI object. */
 	error = DPAA2_CMD_NI_RESET(dev, cmd);
 	if (error) {
-		device_printf(dev, "Failed to reset DPNI: id=%d\n", dinfo->id);
+		device_printf(dev, "%s: failed to reset DPNI: id=%d\n",
+		    __func__, dinfo->id);
 		return (error);
 	}
 
 	/* Obtain attributes of the DPNI object. */
 	error = DPAA2_CMD_NI_GET_ATTRIBUTES(dev, cmd, &sc->attr);
 	if (error) {
-		device_printf(dev, "Failed to obtain DPNI attributes: id=%d\n",
-		    dinfo->id);
+		device_printf(dev, "%s: failed to obtain DPNI attributes: "
+		    "id=%d\n", __func__, dinfo->id);
 		return (error);
 	}
 	if (bootverbose) {
@@ -755,7 +762,8 @@ dpaa2_ni_setup(device_t dev)
 	/* Configure buffer layouts of the DPNI queues. */
 	error = dpaa2_ni_set_buf_layout(dev, cmd);
 	if (error) {
-		device_printf(dev, "Failed to configure buffer layout\n");
+		device_printf(dev, "%s: failed to configure buffer layout\n",
+		    __func__);
 		return (error);
 	}
 
@@ -774,8 +782,8 @@ dpaa2_ni_setup(device_t dev)
 	error = DPAA2_CMD_RC_GET_CONN(dev, dpaa2_mcp_tk(cmd, rc_token),
 	    &ep1_desc, &ep2_desc, &link);
 	if (error)
-		device_printf(dev, "Failed to obtain an object DPNI is "
-		    "connected to: error=%d\n", error);
+		device_printf(dev, "%s: failed to obtain an object DPNI is "
+		    "connected to: error=%d\n", __func__, error);
 	else {
 		device_printf(dev, "connected to %s (id=%d)\n",
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id);
@@ -815,6 +823,7 @@ dpaa2_ni_setup(device_t dev)
 					    error);
 				}
 				link_type = attr.link_type;
+
 				device_printf(dev, "DPMAC %d link type: %d\n",
 					      sc->mac.dpmac_id, link_type);
 			}
@@ -870,30 +879,31 @@ dpaa2_ni_setup(device_t dev)
 	 */
 	error = dpaa2_ni_set_pause_frame(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error) {
-		device_printf(dev, "Failed to configure Rx/Tx pause frames:\n");
+		device_printf(dev, "%s: failed to configure Rx/Tx pause "
+		    "frames\n", __func__);
 		return (error);
 	}
 
 	/* Configure ingress traffic classification. */
 	error = dpaa2_ni_set_qos_table(dev, dpaa2_mcp_tk(cmd, ni_token));
 	if (error)
-		device_printf(dev, "Failed to configure QoS table: error=%d\n",
-		    error);
+		device_printf(dev, "%s: failed to configure QoS table: "
+		    "error=%d\n", __func__, error);
 
 	/* Add broadcast physical address to the MAC filtering table. */
 	memset(eth_bca, 0xff, ETHER_ADDR_LEN);
 	error = DPAA2_CMD_NI_ADD_MAC_ADDR(dev, cmd, eth_bca);
 	if (error) {
-		device_printf(dev, "Failed to add broadcast physical address to "
-		    "the MAC filtering table\n");
+		device_printf(dev, "%s: failed to add broadcast physical "
+		    "address to the MAC filtering table\n", __func__);
 		return (error);
 	}
 
 	/* Set the maximum allowed length for received frames. */
 	error = DPAA2_CMD_NI_SET_MFL(dev, cmd, DPAA2_ETH_MFL);
 	if (error) {
-		device_printf(dev, "Failed to set maximum length for received "
-		    "frames\n");
+		device_printf(dev, "%s: failed to set maximum length for "
+		    "received frames\n", __func__);
 		return (error);
 	}
 
@@ -963,8 +973,8 @@ dpaa2_ni_setup_channels(device_t dev)
 		error = DPAA2_CMD_CON_ENABLE(dev, dpaa2_mcp_tk(consc->cmd,
 		    consc->con_token));
 		if (error) {
-			device_printf(dev, "Failed to enable channel: "
-			    "dpcon_id=%d, chan_id=%d\n", con_info->id,
+			device_printf(dev, "%s: failed to enable channel: "
+			    "dpcon_id=%d, chan_id=%d\n", __func__, con_info->id,
 			    consc->attr.chan_id);
 			return (error);
 		}
@@ -972,7 +982,8 @@ dpaa2_ni_setup_channels(device_t dev)
 		channel = malloc(sizeof(struct dpaa2_ni_channel), M_DPAA2_NI,
 		    M_WAITOK | M_ZERO);
 		if (!channel) {
-			device_printf(dev, "Failed to allocate a channel\n");
+			device_printf(dev, "%s: failed to allocate a channel\n",
+			    __func__);
 			return (ENOMEM);
 		}
 
@@ -1009,7 +1020,8 @@ dpaa2_ni_setup_channels(device_t dev)
 		/* Register the new notification context. */
 		error = DPAA2_SWP_CONF_WQ_CHANNEL(channel->io_dev, ctx);
 		if (error) {
-			device_printf(dev, "Failed to register notification\n");
+			device_printf(dev, "%s: failed to register notification "
+			    "context\n", __func__);
 			return (error);
 		}
 
@@ -1020,21 +1032,23 @@ dpaa2_ni_setup_channels(device_t dev)
 		error = DPAA2_CMD_CON_SET_NOTIF(dev, dpaa2_mcp_tk(consc->cmd,
 		    consc->con_token), &notif_cfg);
 		if (error) {
-			device_printf(dev, "Failed to set DPCON notification: "
-			    "dpcon_id=%d, chan_id=%d\n", con_info->id,
-			    consc->attr.chan_id);
+			device_printf(dev, "%s: failed to set DPCON "
+			    "notification: dpcon_id=%d, chan_id=%d\n", __func__,
+			    con_info->id, consc->attr.chan_id);
 			return (error);
 		}
 
 		/* Allocate buffers and channel storage. */
 		error = dpaa2_ni_seed_buf_pool(sc, channel);
 		if (error) {
-			device_printf(dev, "Failed to seed buffer pool\n");
+			device_printf(dev, "%s: failed to seed buffer pool\n",
+			    __func__);
 			return (error);
 		}
 		error = dpaa2_ni_seed_chan_storage(sc, channel);
 		if (error) {
-			device_printf(dev, "Failed to seed channel storage\n");
+			device_printf(dev, "%s: failed to seed channel "
+			    "storage\n", __func__);
 			return (error);
 		}
 
@@ -1159,15 +1173,15 @@ dpaa2_ni_bind(device_t dev)
 	error = DPAA2_CMD_NI_SET_POOLS(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    &pools_cfg);
 	if (error) {
-		device_printf(dev, "Failed to set buffer pools\n");
+		device_printf(dev, "%s: failed to set buffer pools\n", __func__);
 		return (error);
 	}
 
 	/* Setup ingress traffic distribution. */
 	error = dpaa2_ni_setup_rx_dist(dev);
 	if (error && error != EOPNOTSUPP) {
-		device_printf(dev, "Failed to setup ingress traffic "
-		    "distribution\n");
+		device_printf(dev, "%s: failed to setup ingress traffic "
+		    "distribution\n", __func__);
 		return (error);
 	}
 	if (bootverbose && error == EOPNOTSUPP)
@@ -1180,7 +1194,8 @@ dpaa2_ni_bind(device_t dev)
 	err_cfg.action = DPAA2_NI_ERR_DISCARD;
 	error = DPAA2_CMD_NI_SET_ERR_BEHAVIOR(dev, cmd, &err_cfg);
 	if (error) {
-		device_printf(dev, "Failed to set errors behavior\n");
+		device_printf(dev, "%s: failed to set errors behavior\n",
+		    __func__);
 		return (error);
 	}
 
@@ -1222,7 +1237,8 @@ dpaa2_ni_bind(device_t dev)
 	 */
 	error = DPAA2_CMD_NI_GET_QDID(dev, cmd, DPAA2_NI_QUEUE_TX, &sc->tx_qdid);
 	if (error) {
-		device_printf(dev, "Failed to get Tx queuing destination ID\n");
+		device_printf(dev, "%s: failed to get Tx queuing destination "
+		    "ID\n", __func__);
 		return (error);
 	}
 
@@ -1424,8 +1440,8 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.idx = fq->flowid; /* ignored */
 	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
 	if (error) {
-		device_printf(dev, "Failed to obtain RxErr queue "
-		    "configuration\n");
+		device_printf(dev, "%s: failed to obtain RxErr queue "
+		    "configuration\n", __func__);
 		return (error);
 	}
 
@@ -1440,8 +1456,8 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	    DPAA2_NI_QUEUE_OPT_DEST;
 	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
 	if (error) {
-		device_printf(dev, "Failed to update RxErr queue "
-		    "configuration\n");
+		device_printf(dev, "%s: failed to update RxErr queue "
+		    "configuration\n", __func__);
 		return (error);
 	}
 
@@ -1462,17 +1478,19 @@ dpaa2_ni_setup_irqs(device_t dev)
 	/* Configure IRQs. */
 	error = dpaa2_ni_setup_msi(sc);
 	if (error) {
-		device_printf(dev, "Failed to allocate MSI\n");
+		device_printf(dev, "%s: failed to allocate MSI\n", __func__);
 		return (error);
 	}
 	if ((sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
 	    &sc->irq_rid[0], RF_ACTIVE | RF_SHAREABLE)) == NULL) {
-		device_printf(dev, "Failed to allocate IRQ resource\n");
+		device_printf(dev, "%s: failed to allocate IRQ resource\n",
+		    __func__);
 		return (ENXIO);
 	}
 	if (bus_setup_intr(dev, sc->irq_res, INTR_TYPE_NET | INTR_MPSAFE,
 	    NULL, dpaa2_ni_intr, sc, &sc->intr)) {
-		device_printf(dev, "Failed to setup IRQ resource\n");
+		device_printf(dev, "%s: failed to setup IRQ resource\n",
+		    __func__);
 		return (ENXIO);
 	}
 
@@ -1480,14 +1498,15 @@ dpaa2_ni_setup_irqs(device_t dev)
 	error = DPAA2_CMD_NI_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    DPNI_IRQ_INDEX, DPNI_IRQ_LINK_CHANGED | DPNI_IRQ_EP_CHANGED);
 	if (error) {
-		device_printf(dev, "Failed to set DPNI IRQ mask\n");
+		device_printf(dev, "%s: failed to set DPNI IRQ mask\n",
+		    __func__);
 		return (error);
 	}
 
 	/* Enable IRQ. */
 	error = DPAA2_CMD_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
 	if (error) {
-		device_printf(dev, "Failed to enable DPNI IRQ\n");
+		device_printf(dev, "%s: failed to enable DPNI IRQ\n", __func__);
 		return (error);
 	}
 
@@ -1532,15 +1551,15 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), DPAA2_NI_OFL_RX_L3_CSUM, en_rxcsum);
 	if (error) {
-		device_printf(dev, "Failed to %s L3 checksum validation\n",
-		    en_rxcsum ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s L3 checksum validation\n",
+		    __func__, en_rxcsum ? "enable" : "disable");
 		return (error);
 	}
 	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_RX_L4_CSUM,
 	    en_rxcsum);
 	if (error) {
-		device_printf(dev, "Failed to %s L4 checksum validation\n",
-		    en_rxcsum ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s L4 checksum validation\n",
+		    __func__, en_rxcsum ? "enable" : "disable");
 		return (error);
 	}
 
@@ -1548,15 +1567,15 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_TX_L3_CSUM,
 	    en_txcsum);
 	if (error) {
-		device_printf(dev, "Failed to %s L3 checksum generation\n",
-		    en_txcsum ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s L3 checksum generation\n",
+		    __func__, en_txcsum ? "enable" : "disable");
 		return (error);
 	}
 	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_TX_L4_CSUM,
 	    en_txcsum);
 	if (error) {
-		device_printf(dev, "Failed to %s L4 checksum generation\n",
-		    en_txcsum ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s L4 checksum generation\n",
+		    __func__, en_txcsum ? "enable" : "disable");
 		return (error);
 	}
 
@@ -1577,15 +1596,15 @@ dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *sc)
 	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), en_promisc ? true : en_allmulti);
 	if (error) {
-		device_printf(dev, "Failed to %s multicast promiscuous mode\n",
-		    en_allmulti ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s multicast promiscuous "
+		    "mode\n", __func__, en_allmulti ? "enable" : "disable");
 		return (error);
 	}
 
 	error = DPAA2_CMD_NI_SET_UNI_PROMISC(dev, sc->cmd, en_promisc);
 	if (error) {
-		device_printf(dev, "Failed to %s unicast promiscuous mode\n",
-		    en_promisc ? "enable" : "disable");
+		device_printf(dev, "%s: failed to %s unicast promiscuous mode\n",
+		    __func__, en_promisc ? "enable" : "disable");
 		return (error);
 	}
 
@@ -1818,7 +1837,8 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set Tx buffer layout\n");
+		device_printf(dev, "%s: failed to set Tx buffer layout\n",
+		    __func__);
 		return (error);
 	}
 
@@ -1829,7 +1849,8 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	    BUF_LOPT_FRAME_STATUS;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set TxConf buffer layout\n");
+		device_printf(dev, "%s: failed to set TxConf buffer layout\n",
+		    __func__);
 		return (error);
 	}
 
@@ -1839,7 +1860,8 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 */
 	error = DPAA2_CMD_NI_GET_TX_DATA_OFF(dev, cmd, &sc->tx_data_off);
 	if (error) {
-		device_printf(dev, "Failed to obtain Tx data offset\n");
+		device_printf(dev, "%s: failed to obtain Tx data offset\n",
+		    __func__);
 		return (error);
 	}
 
@@ -1888,7 +1910,8 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	    BUF_LOPT_TIMESTAMP;
 	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
 	if (error) {
-		device_printf(dev, "Failed to set Rx buffer layout\n");
+		device_printf(dev, "%s: failed to set Rx buffer layout\n",
+		    __func__);
 		return (error);
 	}
 
@@ -1910,8 +1933,8 @@ dpaa2_ni_set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 
 	error = DPAA2_CMD_NI_GET_LINK_CFG(dev, cmd, &link_cfg);
 	if (error) {
-		device_printf(dev, "Failed to obtain link configuration: "
-		    "error=%d\n", error);
+		device_printf(dev, "%s: failed to obtain link configuration: "
+		    "error=%d\n", __func__, error);
 		return (error);
 	}
 
@@ -1921,8 +1944,8 @@ dpaa2_ni_set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 
 	error = DPAA2_CMD_NI_SET_LINK_CFG(dev, cmd, &link_cfg);
 	if (error) {
-		device_printf(dev, "Failed to set link configuration: "
-		    "error=%d\n", error);
+		device_printf(dev, "%s: failed to set link configuration: "
+		    "error=%d\n", __func__, error);
 		return (error);
 	}
 
@@ -1958,8 +1981,8 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	error = bus_dmamem_alloc(sc->qos_dmat, &sc->qos_kcfg.vaddr,
 	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->qos_kcfg.dmap);
 	if (error) {
-		device_printf(dev, "Failed to allocate a buffer for QoS key "
-		    "configuration\n");
+		device_printf(dev, "%s: failed to allocate a buffer for QoS key "
+		    "configuration\n", __func__);
 		return (error);
 	}
 
@@ -1967,8 +1990,8 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	    sc->qos_kcfg.vaddr, ETH_QOS_KCFG_BUF_SIZE, dpaa2_ni_dmamap_cb,
 	    &sc->qos_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (error) {
-		device_printf(dev, "Failed to map QoS key configuration buffer "
-		    "into bus space\n");
+		device_printf(dev, "%s: failed to map QoS key configuration "
+		    "buffer into bus space\n", __func__);
 		return (error);
 	}
 
@@ -1978,13 +2001,13 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	tbl.kcfg_busaddr = sc->qos_kcfg.paddr;
 	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, cmd, &tbl);
 	if (error) {
-		device_printf(dev, "Failed to set QoS table\n");
+		device_printf(dev, "%s: failed to set QoS table\n", __func__);
 		return (error);
 	}
 
 	error = DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd);
 	if (error) {
-		device_printf(dev, "Failed to clear QoS table\n");
+		device_printf(dev, "%s: failed to clear QoS table\n", __func__);
 		return (error);
 	}
 
@@ -2010,15 +2033,16 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 	error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, dpaa2_mcp_tk(cmd, ni_token),
 	    mac_addr);
 	if (error) {
-		device_printf(dev, "Failed to obtain the MAC address "
-		    "associated with the physical port\n");
+		device_printf(dev, "%s: failed to obtain the MAC address "
+		    "associated with the physical port\n", __func__);
 		return (error);
 	}
 
 	/* Get primary MAC address from the DPNI attributes. */
 	error = DPAA2_CMD_NI_GET_PRIM_MAC_ADDR(dev, cmd, dpni_mac_addr);
 	if (error) {
-		device_printf(dev, "Failed to obtain primary MAC address\n");
+		device_printf(dev, "%s: failed to obtain primary MAC address\n",
+		    __func__);
 		return (error);
 	}
 
@@ -2026,8 +2050,8 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 		/* Set MAC address of the physical port as DPNI's primary one. */
 		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
 		if (error) {
-			device_printf(dev, "Failed to set primary MAC "
-			    "address\n");
+			device_printf(dev, "%s: failed to set primary MAC "
+			    "address\n", __func__);
 			return (error);
 		}
 		for (int i = 0; i < ETHER_ADDR_LEN; i++)
@@ -2040,8 +2064,8 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 
 		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
 		if (error) {
-			device_printf(dev, "Failed to set random primary MAC "
-			    "address\n");
+			device_printf(dev, "%s: failed to set random primary "
+			    "MAC address\n", __func__);
 			return (error);
 		}
 		for (int i = 0; i < ETHER_ADDR_LEN; i++)
@@ -2067,7 +2091,8 @@ dpaa2_ni_media_change(struct ifnet *ifp)
 		mii_mediachg(sc->mii);
 		sc->media_status = sc->mii->mii_media.ifm_media;
 	} else if (sc->fixed_link) {
-		if_printf(ifp, "Can't change media in fixed mode.\n");
+		if_printf(ifp, "%s: can't change media in fixed mode\n",
+		    __func__);
 	}
 	DPNI_UNLOCK(sc);
 
@@ -2100,8 +2125,9 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 		error = DPAA2_CMD_MAC_OPEN(sc->dev, dpaa2_mcp_tk(sc->cmd,
 		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
 		if (error) {
-			device_printf(sc->dev, "Failed to open DPMAC: id=%d, "
-			    "error=%d\n", sc->mac.dpmac_id, error);
+			device_printf(sc->dev, "%s: failed to open DPMAC: "
+			    "id=%d, error=%d\n", __func__, sc->mac.dpmac_id,
+			    error);
 			goto err_exit;
 		}
 
@@ -2121,8 +2147,8 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, sc->cmd,
 			    &mac_link);
 			if (error) {
-				device_printf(sc->dev, "Failed to set DPMAC "
-				    "link state: id=%d, error=%d\n",
+				device_printf(sc->dev, "%s: failed to set DPMAC "
+				    "link state: id=%d, error=%d\n", __func__,
 				    sc->mac.dpmac_id, error);
 				goto err_close_mac;
 			}
@@ -2176,7 +2202,8 @@ dpaa2_ni_init(void *arg)
 
 	error = DPAA2_CMD_NI_ENABLE(dev, dpaa2_mcp_tk(sc->cmd, sc->ni_token));
 	if (error)
-		device_printf(dev, "Failed to enable DPNI: error=%d\n", error);
+		device_printf(dev, "%s: failed to enable DPNI: error=%d\n",
+		    __func__, error);
 
 	DPNI_LOCK(sc);
 	if (sc->mii)
@@ -2261,7 +2288,7 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		rc = dpaa2_ni_setup_if_caps(sc);
 		if (rc) {
-			printf("%s: Failed to update iface capabilities: "
+			printf("%s: failed to update iface capabilities: "
 			    "error=%d\n", __func__, rc);
 			rc = ENXIO;
 		}
@@ -2364,8 +2391,8 @@ dpaa2_ni_poll_task(void *arg, int count)
 		error = dpaa2_swp_pull(swp, chan->id, chan->store.paddr,
 		    ETH_STORE_FRAMES);
 		if (error) {
-			device_printf(chan->ni_dev, "failed to pull frames: "
-			    "chan_id=%d, error=%d\n", chan->id, error);
+			device_printf(chan->ni_dev, "%s: failed to pull frames: "
+			    "chan_id=%d, error=%d\n", __func__, chan->id, error);
 			break;
 		}
 
@@ -2377,15 +2404,15 @@ dpaa2_ni_poll_task(void *arg, int count)
 		if (error == ENOENT)
 			break;
 		if (error == ETIMEDOUT)
-			device_printf(chan->ni_dev, "timeout to consume frames: "
-			    "chan_id=%d\n", chan->id);
+			device_printf(chan->ni_dev, "%s: timeout to consume "
+			    "frames: chan_id=%d\n", __func__, chan->id);
 	} while (true);
 
 	/* Re-arm channel to generate CDAN. */
 	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, &chan->ctx);
 	if (error)
-		device_printf(chan->ni_dev, "failed to re-arm: chan_id=%d, "
-		    "error=%d\n", chan->id, error);
+		device_printf(chan->ni_dev, "%s: failed to rearm: chan_id=%d, "
+		    "error=%d\n", __func__, chan->id, error);
 }
 
 /**
@@ -2644,8 +2671,9 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 			KASSERT(error == 0, ("Failed to seed recycled buffer: "
 			    "error=%d", error));
 			if (__predict_false(error != 0)) {
-				device_printf(sc->dev, "Failed to seed recycled "
-				    "buffer: error=%d\n", error);
+				device_printf(sc->dev, "%s: failed to seed "
+				    "recycled buffer: error=%d\n", __func__,
+				    error);
 				continue;
 			}
 
@@ -2660,8 +2688,8 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    released, released_n);
 		if (__predict_false(error != 0)) {
-			device_printf(sc->dev, "failed to release buffers to "
-			    "the pool: error=%d\n", error);
+			device_printf(sc->dev, "%s: failed to release buffers "
+			    "to the pool: error=%d\n", __func__, error);
 			return (error);
 		}
 
@@ -2711,8 +2739,8 @@ dpaa2_ni_rx_err(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	/* Release buffer to QBMan buffer pool. */
 	error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid, &paddr, 1);
 	if (error) {
-		device_printf(sc->dev, "failed to release frame buffer to the "
-		    "pool: error=%d\n", error);
+		device_printf(sc->dev, "%s: failed to release frame buffer to "
+		    "the pool: error=%d\n", __func__, error);
 		return (error);
 	}
 
@@ -2831,8 +2859,8 @@ dpaa2_ni_seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 		error = DPAA2_SWP_RELEASE_BUFS(chan->io_dev, bpsc->attr.bpid,
 		    paddr, bufn);
 		if (error) {
-			device_printf(sc->dev, "Failed to release buffers to "
-			    "the buffer pool\n");
+			device_printf(sc->dev, "%s: failed to release buffers "
+			    "to the buffer pool\n", __func__);
 			return (error);
 		}
 
@@ -2860,8 +2888,9 @@ dpaa2_ni_seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 	if (buf->dmap == NULL) {
 		error = bus_dmamap_create(sc->bp_dmat, 0, &dmap);
 		if (error) {
-			device_printf(sc->dev, "Failed to create DMA map for "
-			    "buffer: buf_idx=%d, error=%d\n", buf_idx, error);
+			device_printf(sc->dev, "%s: failed to create DMA map "
+			    "for buffer: buf_idx=%d, error=%d\n", __func__,
+			    buf_idx, error);
 			return (error);
 		}
 		buf->dmap = dmap;
@@ -2871,8 +2900,8 @@ dpaa2_ni_seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 	if (buf->m == NULL) {
 		m = m_getjcl(M_NOWAIT, MT_DATA, M_PKTHDR, BUF_SIZE);
 		if (__predict_false(m == NULL)) {
-			device_printf(sc->dev, "Failed to allocate mbuf for "
-			    "buffer\n");
+			device_printf(sc->dev, "%s: failed to allocate mbuf for "
+			    "buffer\n", __func__);
 			return (ENOMEM);
 		}
 		m->m_len = m->m_ext.ext_size;
@@ -2886,8 +2915,8 @@ dpaa2_ni_seed_buf(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan,
 	KASSERT(nsegs == 1, ("too many segments: nsegs=%d", nsegs));
 	KASSERT(error == 0, ("failed to map mbuf: error=%d", error));
 	if (__predict_false(error != 0 || nsegs != 1)) {
-		device_printf(sc->dev, "Failed to map mbuf: error=%d, "
-		    "nsegs=%d\n", error, nsegs);
+		device_printf(sc->dev, "%s: failed to map mbuf: error=%d, "
+		    "nsegs=%d\n", __func__, error, nsegs);
 		bus_dmamap_unload(sc->bp_dmat, buf->dmap);
 		m_freem(m);
 		return (error);
@@ -2930,14 +2959,16 @@ dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *sc,
 	error = bus_dmamem_alloc(sc->st_dmat, (void *) &store->vaddr,
 	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &store->dmap);
 	if (error) {
-		device_printf(sc->dev, "Failed to allocate channel storage\n");
+		device_printf(sc->dev, "%s: failed to allocate channel "
+		    "storage\n", __func__);
 		return (error);
 	}
 
 	error = bus_dmamap_load(sc->st_dmat, store->dmap, (void *) store->vaddr,
 	    ETH_STORE_SIZE, dpaa2_ni_dmamap_cb, &store->paddr, BUS_DMA_NOWAIT);
 	if (error) {
-		device_printf(sc->dev, "Failed to map channel storage\n");
+		device_printf(sc->dev, "%s: failed to map channel storage\n",
+		    __func__);
 		return (error);
 	}
 
@@ -3083,8 +3114,11 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 	int i, err = 0;
 
 	/* DMA tag for Rx traffic distribution key must already be created. */
-	if (sc->rxd_dmat == NULL)
+	if (sc->rxd_dmat == NULL) {
+		device_printf(dev, "%s: DMA tag for Rx traffic distribution "
+		    "key is NULL\n", __func__);
 		return (ENXIO);
+	}
 
 	memset(&cls_cfg, 0, sizeof(cls_cfg));
 
@@ -3098,8 +3132,8 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 			rx_hash_fields |= dist_fields[i].rxnfc_field;
 
 		if (cls_cfg.num_extracts >= DPKG_MAX_NUM_OF_EXTRACTS) {
-			device_printf(dev, "Failed to add key extraction rule "
-			    "(too many rules?)\n");
+			device_printf(dev, "%s: failed to add key extraction "
+			    "rule\n", __func__);
 			return (E2BIG);
 		}
 
@@ -3113,14 +3147,15 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 	err = bus_dmamem_alloc(sc->rxd_dmat, &sc->rxd_kcfg.vaddr,
 	    BUS_DMA_ZERO | BUS_DMA_COHERENT, &sc->rxd_kcfg.dmap);
 	if (err) {
-		device_printf(dev, "Failed to allocate a buffer for Rx traffic "
-		    "distribution key configuration\n");
+		device_printf(dev, "%s: failed to allocate a buffer for Rx "
+		    "traffic distribution key configuration\n", __func__);
 		return (err);
 	}
 
 	err = dpaa2_ni_prepare_key_cfg(&cls_cfg, (uint8_t *) sc->rxd_kcfg.vaddr);
 	if (err) {
-		device_printf(dev, "prepare_key_cfg error %d\n", err);
+		device_printf(dev, "%s: failed to prepare key configuration: "
+		    "error=%d\n", __func__, err);
 		return (err);
 	}
 
@@ -3129,8 +3164,8 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 	    sc->rxd_kcfg.vaddr, DPAA2_CLASSIFIER_DMA_SIZE, dpaa2_ni_dmamap_cb,
 	    &sc->rxd_kcfg.paddr, BUS_DMA_NOWAIT);
 	if (err) {
-		device_printf(sc->dev, "Failed to map a buffer for Rx traffic "
-		    "distribution key configuration\n");
+		device_printf(sc->dev, "%s: failed to map a buffer for Rx "
+		    "traffic distribution key configuration\n", __func__);
 		return (err);
 	}
 
@@ -3139,8 +3174,8 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 		    sc->ni_token), sc->attr.num.queues, 0,
 		    DPAA2_NI_DIST_MODE_HASH, sc->rxd_kcfg.paddr);
 		if (err)
-			device_printf(dev, "Failed to set distribution mode "
-			    "and size for the traffic class\n");
+			device_printf(dev, "%s: failed to set distribution mode "
+			    "and size for the traffic class\n", __func__);
 	}
 
 	return err;
