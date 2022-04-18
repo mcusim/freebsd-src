@@ -812,8 +812,9 @@ dpaa2_ni_setup(device_t dev)
 			    dpaa2_mcp_tk(sc->cmd, sc->rc_token),
 			    sc->mac.dpmac_id, &mac_token);
 			if (error) {
-				device_printf(dev, "%s: failed to open attached "
-				    "DPMAC: %d\n", __func__, sc->mac.dpmac_id);
+				device_printf(dev, "%s: failed to open "
+				    "connected DPMAC: %d\n", __func__,
+				    sc->mac.dpmac_id);
 			} else {
 				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev,
 				    sc->cmd, &attr);
@@ -824,21 +825,16 @@ dpaa2_ni_setup(device_t dev)
 					    error);
 				else
 					link_type = attr.link_type;
-
-				if (bootverbose)
-					device_printf(dev, "DPMAC %d link "
-					    "type: %d\n", sc->mac.dpmac_id,
-					    link_type);
 			}
 			DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd,
 			    mac_token));
 
 			if (link_type == DPAA2_MAC_LINK_TYPE_FIXED) {
-				device_printf(dev, "attached DPMAC is in FIXED "
+				device_printf(dev, "connected DPMAC is in FIXED "
 				    "mode\n");
 				dpaa2_ni_setup_fixed_link(sc);
 			} else if (link_type == DPAA2_MAC_LINK_TYPE_PHY) {
-				device_printf(dev, "attached DPMAC is in PHY "
+				device_printf(dev, "connected DPMAC is in PHY "
 				    "mode\n");
 				error = DPAA2_MC_GET_PHY_DEV(dev,
 				    &sc->mac.phy_dev, sc->mac.dpmac_id);
