@@ -774,7 +774,7 @@ dpaa2_ni_setup(device_t dev)
 		return (error);
 	}
 
-	/* Attach miibus and PHY in case of DPNI<->DPMAC. */
+	/* Setup link between DPNI and an object it's connected to. */
 	ep1_desc.obj_id = dinfo->id;
 	ep1_desc.if_id = 0; /* DPNI has the only endpoint */
 	ep1_desc.type = dinfo->dtype;
@@ -801,10 +801,12 @@ dpaa2_ni_setup(device_t dev)
 				device_printf(dev, "%s: failed to set MAC "
 				    "address: error=%d\n", __func__, error);
 
+			link_type = DPAA2_MAC_LINK_TYPE_NONE;
+
 			/*
 			 * Need to determine if DPMAC type is PHY (attached to
 			 * conventional MII PHY) or FIXED (usually SFP/SerDes,
-			 * link state managed by MC firmwre)
+			 * link state managed by MC firmware).
 			 */
 			error = DPAA2_CMD_MAC_OPEN(sc->dev,
 			    dpaa2_mcp_tk(sc->cmd, sc->rc_token),
@@ -812,31 +814,32 @@ dpaa2_ni_setup(device_t dev)
 			if (error) {
 				device_printf(dev, "%s: failed to open attached "
 				    "DPMAC: %d\n", __func__, sc->mac.dpmac_id);
-				link_type = DPAA2_MAC_LINK_TYPE_NONE;
 			} else {
 				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev,
 				    sc->cmd, &attr);
-				if (error) {
+				if (error)
 					device_printf(dev, "%s: failed to get "
 					    "DPMAC attributes: id=%d, "
 					    "error=%d\n", __func__, dinfo->id,
 					    error);
-				}
-				link_type = attr.link_type;
+				else
+					link_type = attr.link_type;
 
-				device_printf(dev, "DPMAC %d link type: %d\n",
-					      sc->mac.dpmac_id, link_type);
+				if (bootverbose)
+					device_printf(dev, "DPMAC %d link "
+					    "type: %d\n", sc->mac.dpmac_id,
+					    link_type);
 			}
 			DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd,
 			    mac_token));
 
 			if (link_type == DPAA2_MAC_LINK_TYPE_FIXED) {
-				if (bootverbose)
-					device_printf(dev, "Attached DPMAC %d "
-					    "is in FIXED mode\n",
-					    ep2_desc.obj_id);
+				device_printf(dev, "attached DPMAC is in FIXED "
+				    "mode\n");
 				dpaa2_ni_setup_fixed_link(sc);
 			} else if (link_type == DPAA2_MAC_LINK_TYPE_PHY) {
+				device_printf(dev, "attached DPMAC is in PHY "
+				    "mode\n");
 				error = DPAA2_MC_GET_PHY_DEV(dev,
 				    &sc->mac.phy_dev, sc->mac.dpmac_id);
 				if (error == 0) {
@@ -847,20 +850,18 @@ dpaa2_ni_setup(device_t dev)
 					    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
 				}
 
-				if (error != 0)
+				if (error != 0) {
 					device_printf(dev, "%s: failed to "
 					    "attach miibus: error=%d\n",
 					    __func__, error);
-				else
+				} else {
 					sc->mii = device_get_softc(sc->miibus);
+				}
 			} else {
-				device_printf(dev, "%s: failed to obtain PHY "
-				    "device: error=%d\n", __func__, error);
+				device_printf(dev, "%s: DPMAC link type is not "
+				    "supported\n", __func__);
 			}
 		} else if (ep2_desc.type == DPAA2_DEV_NI) {
-			if (bootverbose)
-				device_printf(dev, "Attached to DPNI %d\n",
-				    ep2_desc.obj_id);
 			dpaa2_ni_setup_fixed_link(sc);
 		} else {
 			/* TODO: Also DPSW, DPDMUX */
