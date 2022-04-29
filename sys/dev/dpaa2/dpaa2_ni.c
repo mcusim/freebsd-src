@@ -915,7 +915,6 @@ static int
 dpaa2_ni_setup_channels(device_t dev)
 {
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	struct dpaa2_io_softc *iosc;
 	struct dpaa2_con_softc *consc;
 	struct dpaa2_devinfo *io_info, *con_info;
 	device_t io_dev, con_dev;
@@ -959,7 +958,6 @@ dpaa2_ni_setup_channels(device_t dev)
 	for (uint32_t i = 0; i < sc->chan_n; i++) {
 		/* Select software portal. */
 		io_dev = (device_t) rman_get_start(sc->res[IO_RID(i)]);
-		iosc = device_get_softc(io_dev);
 		io_info = device_get_ivars(io_dev);
 
 		/* Select DPCON (channel). */
@@ -2515,7 +2513,6 @@ dpaa2_ni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
     uint32_t *consumed)
 {
 	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
-	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_ni_fq *fq = NULL;
 	struct dpaa2_dq *dq;
 	struct dpaa2_fd *fd;
@@ -3106,7 +3103,6 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpkg_profile_cfg cls_cfg;
 	struct dpkg_extract *key;
-	uint32_t rx_hash_fields = 0;
 	int i, err = 0;
 
 	/* DMA tag for Rx traffic distribution key must already be created. */
@@ -3124,8 +3120,6 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 
 		if (!(flags & dist_fields[i].id))
 			continue;
-		if (type == DPAA2_NI_DIST_MODE_HASH)
-			rx_hash_fields |= dist_fields[i].rxnfc_field;
 
 		if (cls_cfg.num_extracts >= DPKG_MAX_NUM_OF_EXTRACTS) {
 			device_printf(dev, "%s: failed to add key extraction "
