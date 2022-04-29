@@ -3195,7 +3195,6 @@ static int
 dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
     uint32_t data)
 {
-	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_cmd *cmd;
@@ -3203,7 +3202,6 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 	int rc = EINVAL;
 
 	if (device_get_parent(child) == rcdev && rid >= 1) {
-		rcsc = device_get_softc(rcdev);
 		rcinfo = device_get_ivars(rcdev);
 		dinfo = device_get_ivars(child);
 
