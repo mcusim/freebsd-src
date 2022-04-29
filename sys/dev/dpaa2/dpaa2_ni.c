@@ -2545,11 +2545,9 @@ dpaa2_ni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 				fq->consume(chan, fq, fd);
 				frames++;
 			}
-			/* Make VDQ command available again. */
-			atomic_xchg(&swp->vdq.avail, 1);
 			break;
 		} else {
-			/* Should not reach here. */
+			KASSERT(1 == 0, ("%s: should not reach here", __func__));
 		}
 		retries = 0;
 	} while (true);
@@ -3245,14 +3243,20 @@ dpaa2_ni_prepare_key_cfg(struct dpkg_profile_cfg *cfg, uint8_t *key_cfg_buf)
 static int
 dpaa2_ni_chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 {
+	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
+	struct dpaa2_swp *swp = iosc->swp;
 	struct dpaa2_dq *msg = &chan->store.vaddr[chan->store_idx];
 	int rc = EAGAIN;
 
 	if ((msg->fdr.desc.stat & DPAA2_DQ_STAT_VOLATILE) &&
-	    (msg->fdr.desc.tok == DPAA2_SWP_VDQCR_TOKEN))
-		msg->fdr.desc.tok = 0; /* Reset tokent. */
-	else
+	    (msg->fdr.desc.tok == DPAA2_SWP_VDQCR_TOKEN)) {
+		/* Reset token. */
+		msg->fdr.desc.tok = 0;
+		/* Make VDQ command available again. */
+		atomic_xchg(&swp->vdq.avail, 1);
+	} else {
 		return (rc); /* DQ response is not available yet. */
+	}
 
 	rc = EINPROGRESS;
 	chan->store_idx++;
