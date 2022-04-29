@@ -2512,7 +2512,6 @@ static int
 dpaa2_ni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
     uint32_t *consumed)
 {
-	struct dpaa2_io_softc *iosc = device_get_softc(chan->io_dev);
 	struct dpaa2_ni_fq *fq = NULL;
 	struct dpaa2_dq *dq;
 	struct dpaa2_fd *fd;
