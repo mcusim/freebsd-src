@@ -409,9 +409,6 @@ memac_miibus_writereg(device_t dev, int phy, int reg, int data)
 static void
 memac_miibus_statchg(device_t dev)
 {
-	struct memac_mdio_softc *sc;
-
-	sc = device_get_softc(dev);
 	device_printf(dev, "statchg\n");
 }
 
