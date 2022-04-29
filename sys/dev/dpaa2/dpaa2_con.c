@@ -103,7 +103,6 @@ static int
 dpaa2_con_attach(device_t dev)
 {
 	device_t pdev;
-	struct dpaa2_rc_softc *rcsc;
 	struct dpaa2_con_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -112,7 +111,6 @@ dpaa2_con_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	pdev = device_get_parent(dev);
-	rcsc = device_get_softc(pdev);
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
