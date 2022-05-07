@@ -1235,7 +1235,8 @@ dpaa2_ni_bind(device_t dev)
 	 * Get the Queuing Destination ID (QDID) that should be used for frame
 	 * enqueue operations.
 	 */
-	error = DPAA2_CMD_NI_GET_QDID(dev, cmd, DPAA2_NI_QUEUE_TX, &sc->tx_qdid);
+	error = DPAA2_CMD_NI_GET_QDID(dev, child, cmd, DPAA2_NI_QUEUE_TX,
+	    &sc->tx_qdid);
 	if (error) {
 		device_printf(dev, "%s: failed to get Tx queuing destination "
 		    "ID\n", __func__);
@@ -1265,6 +1266,7 @@ static int
 dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_fq *fq)
 {
+	device_t child = dev;
 	struct dpaa2_devinfo *con_info;
 	struct dpaa2_ni_queue_cfg queue_cfg = {0};
 	int error;
@@ -1275,7 +1277,7 @@ dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.type = DPAA2_NI_QUEUE_RX;
 	queue_cfg.tc = fq->tc;
 	queue_cfg.idx = fq->flowid;
-	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain Rx queue "
 		    "configuration: tc=%d, flowid=%d\n", __func__, queue_cfg.tc,
@@ -1292,7 +1294,7 @@ dpaa2_ni_setup_rx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.options =
 	    DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
-	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to update Rx queue "
 		    "configuration: tc=%d, flowid=%d\n", __func__, queue_cfg.tc,
@@ -1307,6 +1309,7 @@ static int
 dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_fq *fq)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *con_info;
 	struct dpaa2_ni_queue_cfg queue_cfg = {0};
@@ -1327,7 +1330,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 		queue_cfg.tc = i;
 		queue_cfg.idx = fq->flowid;
 
-		error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+		error = DPAA2_CMD_NI_GET_QUEUE(dev, child, cmd, &queue_cfg);
 		if (error) {
 			device_printf(dev, "%s: failed to obtain Tx queue "
 			    "configuration: tc=%d, flowid=%d\n", __func__,
@@ -1396,7 +1399,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.type = DPAA2_NI_QUEUE_TX_CONF;
 	queue_cfg.tc = 0; /* ignored for TxConf queue */
 	queue_cfg.idx = fq->flowid;
-	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain TxConf queue "
 		    "configuration: tc=%d, flowid=%d\n", __func__, queue_cfg.tc,
@@ -1413,7 +1416,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.options =
 	    DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
-	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to update TxConf queue "
 		    "configuration: tc=%d, flowid=%d\n", __func__, queue_cfg.tc,
@@ -1428,6 +1431,7 @@ static int
 dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_fq *fq)
 {
+	device_t child = dev;
 	struct dpaa2_devinfo *con_info;
 	struct dpaa2_ni_queue_cfg queue_cfg = {0};
 	int error;
@@ -1438,7 +1442,7 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.type = DPAA2_NI_QUEUE_RX_ERR;
 	queue_cfg.tc = fq->tc; /* ignored */
 	queue_cfg.idx = fq->flowid; /* ignored */
-	error = DPAA2_CMD_NI_GET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_GET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain RxErr queue "
 		    "configuration\n", __func__);
@@ -1454,7 +1458,7 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 	queue_cfg.options =
 	    DPAA2_NI_QUEUE_OPT_USER_CTX |
 	    DPAA2_NI_QUEUE_OPT_DEST;
-	error = DPAA2_CMD_NI_SET_QUEUE(dev, cmd, &queue_cfg);
+	error = DPAA2_CMD_NI_SET_QUEUE(dev, child, cmd, &queue_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to update RxErr queue "
 		    "configuration\n", __func__);
@@ -1470,6 +1474,7 @@ dpaa2_ni_setup_rx_err_flow(device_t dev, struct dpaa2_cmd *cmd,
 static int
 dpaa2_ni_setup_irqs(device_t dev)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_cmd *cmd = sc->cmd;
 	uint16_t ni_token = sc->ni_token;
@@ -1504,7 +1509,8 @@ dpaa2_ni_setup_irqs(device_t dev)
 	}
 
 	/* Enable IRQ. */
-	error = DPAA2_CMD_NI_SET_IRQ_ENABLE(dev, cmd, DPNI_IRQ_INDEX, true);
+	error = DPAA2_CMD_NI_SET_IRQ_ENABLE(dev, child, cmd, DPNI_IRQ_INDEX,
+	    true);
 	if (error) {
 		device_printf(dev, "%s: failed to enable DPNI IRQ\n", __func__);
 		return (error);
@@ -1785,6 +1791,7 @@ dpaa2_ni_setup_dma(struct dpaa2_ni_softc *sc)
 static int
 dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_ni_buf_layout buf_layout = {0};
 	int error;
@@ -1837,7 +1844,7 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	    BUF_LOPT_PRIV_DATA_SZ |
 	    BUF_LOPT_TIMESTAMP | /* requires 128 bytes in HWA */
 	    BUF_LOPT_FRAME_STATUS;
-	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, child, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "%s: failed to set Tx buffer layout\n",
 		    __func__);
@@ -1849,7 +1856,7 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	buf_layout.options =
 	    BUF_LOPT_TIMESTAMP |
 	    BUF_LOPT_FRAME_STATUS;
-	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, child, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "%s: failed to set TxConf buffer layout\n",
 		    __func__);
@@ -1860,7 +1867,7 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	 * Driver should reserve the amount of space indicated by this command
 	 * as headroom in all Tx frames.
 	 */
-	error = DPAA2_CMD_NI_GET_TX_DATA_OFF(dev, cmd, &sc->tx_data_off);
+	error = DPAA2_CMD_NI_GET_TX_DATA_OFF(dev, child, cmd, &sc->tx_data_off);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain Tx data offset\n",
 		    __func__);
@@ -1910,7 +1917,7 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 	    BUF_LOPT_FRAME_STATUS |
 	    BUF_LOPT_PARSER_RESULT |
 	    BUF_LOPT_TIMESTAMP;
-	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, cmd, &buf_layout);
+	error = DPAA2_CMD_NI_SET_BUF_LAYOUT(dev, child, cmd, &buf_layout);
 	if (error) {
 		device_printf(dev, "%s: failed to set Rx buffer layout\n",
 		    __func__);
@@ -1929,11 +1936,12 @@ dpaa2_ni_set_buf_layout(device_t dev, struct dpaa2_cmd *cmd)
 static int
 dpaa2_ni_set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_ni_link_cfg link_cfg = {0};
 	int error;
 
-	error = DPAA2_CMD_NI_GET_LINK_CFG(dev, cmd, &link_cfg);
+	error = DPAA2_CMD_NI_GET_LINK_CFG(dev, child, cmd, &link_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain link configuration: "
 		    "error=%d\n", __func__, error);
@@ -1944,7 +1952,7 @@ dpaa2_ni_set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 	link_cfg.options |= DPAA2_NI_LINK_OPT_PAUSE;
 	link_cfg.options &= ~DPAA2_NI_LINK_OPT_ASYM_PAUSE;
 
-	error = DPAA2_CMD_NI_SET_LINK_CFG(dev, cmd, &link_cfg);
+	error = DPAA2_CMD_NI_SET_LINK_CFG(dev, child, cmd, &link_cfg);
 	if (error) {
 		device_printf(dev, "%s: failed to set link configuration: "
 		    "error=%d\n", __func__, error);
@@ -1963,6 +1971,7 @@ dpaa2_ni_set_pause_frame(device_t dev, struct dpaa2_cmd *cmd)
 static int
 dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_ni_qos_table tbl;
 	int error;
@@ -2001,13 +2010,13 @@ dpaa2_ni_set_qos_table(device_t dev, struct dpaa2_cmd *cmd)
 	tbl.discard_on_miss = false;
 	tbl.keep_entries = false;
 	tbl.kcfg_busaddr = sc->qos_kcfg.paddr;
-	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, cmd, &tbl);
+	error = DPAA2_CMD_NI_SET_QOS_TABLE(dev, child, cmd, &tbl);
 	if (error) {
 		device_printf(dev, "%s: failed to set QoS table\n", __func__);
 		return (error);
 	}
 
-	error = DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, cmd);
+	error = DPAA2_CMD_NI_CLEAR_QOS_TABLE(dev, child, cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to clear QoS table\n", __func__);
 		return (error);
@@ -2020,6 +2029,7 @@ static int
 dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
     uint16_t ni_token)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct ifnet *ifp = sc->ifp;
 	struct ether_addr rnd_mac_addr;
@@ -2041,7 +2051,7 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 	}
 
 	/* Get primary MAC address from the DPNI attributes. */
-	error = DPAA2_CMD_NI_GET_PRIM_MAC_ADDR(dev, cmd, dpni_mac_addr);
+	error = DPAA2_CMD_NI_GET_PRIM_MAC_ADDR(dev, child, cmd, dpni_mac_addr);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain primary MAC address\n",
 		    __func__);
@@ -2050,7 +2060,8 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 
 	if (!ETHER_IS_ZERO(mac_addr)) {
 		/* Set MAC address of the physical port as DPNI's primary one. */
-		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
+		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, child, cmd,
+		    mac_addr);
 		if (error) {
 			device_printf(dev, "%s: failed to set primary MAC "
 			    "address\n", __func__);
@@ -2064,7 +2075,8 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 		for (int i = 0; i < ETHER_ADDR_LEN; i++)
 			mac_addr[i] = rnd_mac_addr.octet[i];
 
-		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, cmd, mac_addr);
+		error = DPAA2_CMD_NI_SET_PRIM_MAC_ADDR(dev, child, cmd,
+		    mac_addr);
 		if (error) {
 			device_printf(dev, "%s: failed to set random primary "
 			    "MAC address\n", __func__);
