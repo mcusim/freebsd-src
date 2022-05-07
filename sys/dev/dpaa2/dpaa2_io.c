@@ -122,7 +122,7 @@ dpaa2_io_detach(device_t dev)
 static int
 dpaa2_io_attach(device_t dev)
 {
-	device_t pdev;
+	device_t pdev, child;
 	struct dpaa2_io_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -132,6 +132,7 @@ dpaa2_io_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	pdev = device_get_parent(dev);
+	child = dev;
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
@@ -186,12 +187,13 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Open resource container and DPIO object. */
-	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, child, sc->cmd, rcinfo->id,
+	    &sc->rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_IO_OPEN(dev, sc->cmd, dinfo->id, &sc->io_token);
+	error = DPAA2_CMD_IO_OPEN(dev, child, sc->cmd, dinfo->id, &sc->io_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
@@ -199,19 +201,19 @@ dpaa2_io_attach(device_t dev)
 	}
 
 	/* Prepare DPIO object. */
-	error = DPAA2_CMD_IO_RESET(dev, sc->cmd);
+	error = DPAA2_CMD_IO_RESET(dev, child, sc->cmd);
 	if (error) {
 		device_printf(dev, "Failed to reset DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
 		goto err_close_io;
 	}
-	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, sc->cmd, &sc->attr);
+	error = DPAA2_CMD_IO_GET_ATTRIBUTES(dev, child, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPIO attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
 		goto err_close_io;
 	}
-	error = DPAA2_CMD_IO_ENABLE(dev, sc->cmd);
+	error = DPAA2_CMD_IO_ENABLE(dev, child, sc->cmd);
 	if (error) {
 		device_printf(dev, "Failed to enable DPIO: id=%d, error=%d\n",
 		    dinfo->id, error);
@@ -266,9 +268,9 @@ dpaa2_io_attach(device_t dev)
 err_free_swp:
 	dpaa2_swp_free_portal(sc->swp);
 err_close_io:
-	DPAA2_CMD_IO_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->io_token));
+	DPAA2_CMD_IO_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->io_token));
 err_close_rc:
-	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
 err_free_cmd:
 	dpaa2_mcp_free_command(sc->cmd);
 err_exit:
