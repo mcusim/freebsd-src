@@ -74,7 +74,7 @@ struct resource_spec dpaa2_bp_spec[] = {
 	{ DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE },
 	/* --- */
 	RESOURCE_SPEC_END
-}
+};
 
 static int
 dpaa2_bp_detach(device_t dev)
@@ -93,7 +93,7 @@ dpaa2_bp_probe(device_t dev)
 static int
 dpaa2_bp_attach(device_t dev)
 {
-	device_t pdev;
+	device_t pdev, child;
 	struct dpaa2_bp_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -104,6 +104,7 @@ dpaa2_bp_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	pdev = device_get_parent(dev);
+	child = dev;
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
@@ -116,13 +117,13 @@ dpaa2_bp_attach(device_t dev)
 	}
 
 	/* Open resource container and DPBP object. */
-	error = DPAA2_CMD_RC_OPEN(dev, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &rc_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
 		    __func__, error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_BP_OPEN(dev, cmd, dinfo->id, &bp_token);
+	error = DPAA2_CMD_BP_OPEN(dev, child, cmd, dinfo->id, &bp_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
@@ -130,19 +131,19 @@ dpaa2_bp_attach(device_t dev)
 	}
 
 	/* Prepare DPBP object. */
-	error = DPAA2_CMD_BP_RESET(dev, cmd);
+	error = DPAA2_CMD_BP_RESET(dev, child, cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to reset DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
 		goto err_close_bp;
 	}
-	error = DPAA2_CMD_BP_ENABLE(dev, cmd);
+	error = DPAA2_CMD_BP_ENABLE(dev, child, cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to enable DPBP: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
 		goto err_close_bp;
 	}
-	error = DPAA2_CMD_BP_GET_ATTRIBUTES(dev, cmd, &sc->attr);
+	error = DPAA2_CMD_BP_GET_ATTRIBUTES(dev, child, cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "%s: failed to get DPBP attributes: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
@@ -150,13 +151,13 @@ dpaa2_bp_attach(device_t dev)
 	}
 
 	/* Close the DPBP object and the resource container. */
-	error = DPAA2_CMD_BP_CLOSE(dev, cmd);
+	error = DPAA2_CMD_BP_CLOSE(dev, child, cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to close DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
 		goto err_close_rc;
 	}
-	error = DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	error = DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
 	if (error) {
 		device_printf(dev, "%s: failed to close DPRC: error=%d\n",
 		    __func__, error);
@@ -166,11 +167,11 @@ dpaa2_bp_attach(device_t dev)
 	return (0);
 
 err_disable_bp:
-	DPAA2_CMD_BP_DISABLE(dev, cmd);
+	DPAA2_CMD_BP_DISABLE(dev, child, cmd);
 err_close_bp:
-	DPAA2_CMD_BP_CLOSE(dev, dpaa2_mcp_tk(cmd, bp_token));
+	DPAA2_CMD_BP_CLOSE(dev, child, dpaa2_mcp_tk(cmd, bp_token));
 err_close_rc:
-	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(cmd, rc_token));
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
 err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
 err_exit:
