@@ -59,6 +59,23 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_swp_if.h"
 #include "dpaa2_cmd_if.h"
 
+/* DPAA2 Buffer Pool resource specification. */
+struct resource_spec dpaa2_bp_spec[] = {
+	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPBP.
+	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(0u)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
+	{ DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE },
+	/* --- */
+	RESOURCE_SPEC_END
+}
+
 static int
 dpaa2_bp_detach(device_t dev)
 {
