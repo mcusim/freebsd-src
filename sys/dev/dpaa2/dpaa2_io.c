@@ -106,10 +106,11 @@ dpaa2_io_probe(device_t dev)
 static int
 dpaa2_io_detach(device_t dev)
 {
+	device_t child = dev;
 	struct dpaa2_io_softc *sc = device_get_softc(dev);
 
-	DPAA2_CMD_IO_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->io_token));
-	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	DPAA2_CMD_IO_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->io_token));
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
 	dpaa2_mcp_free_command(sc->cmd);
 
 	sc->cmd = NULL;
