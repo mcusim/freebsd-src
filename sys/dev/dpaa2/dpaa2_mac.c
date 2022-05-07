@@ -94,7 +94,7 @@ dpaa2_mac_probe(device_t dev)
 static int
 dpaa2_mac_attach(device_t dev)
 {
-	device_t pdev;
+	device_t pdev, child;
 	struct dpaa2_mac_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
@@ -103,6 +103,7 @@ dpaa2_mac_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	pdev = device_get_parent(dev);
+	child = dev;
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
@@ -117,25 +118,27 @@ dpaa2_mac_attach(device_t dev)
 	}
 
 	/* Open resource container and DPMAC object. */
-	error = DPAA2_CMD_RC_OPEN(dev, sc->cmd, rcinfo->id, &sc->rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, child, sc->cmd, rcinfo->id,
+	    &sc->rc_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPRC: error=%d\n", error);
 		goto err_free_cmd;
 	}
-	error = DPAA2_CMD_MAC_OPEN(dev, sc->cmd, dinfo->id, &sc->mac_token);
+	error = DPAA2_CMD_MAC_OPEN(dev, child, sc->cmd, dinfo->id,
+	    &sc->mac_token);
 	if (error) {
 		device_printf(dev, "Failed to open DPMAC: id=%d, error=%d\n",
 		    dinfo->id, error);
 		goto err_close_rc;
 	}
 
-	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, sc->cmd, &sc->attr);
+	error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, child, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "Failed to get DPMAC attributes: id=%d, "
 		    "error=%d\n", dinfo->id, error);
 		goto err_close_mac;
 	}
-	error = DPAA2_CMD_MAC_GET_ADDR(dev, sc->cmd, sc->addr);
+	error = DPAA2_CMD_MAC_GET_ADDR(dev, child, sc->cmd, sc->addr);
 	if (error)
 		device_printf(dev, "Failed to get physical address: error=%d\n",
 		    error);
@@ -159,9 +162,9 @@ dpaa2_mac_attach(device_t dev)
 	return (0);
 
 err_close_mac:
-	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
+	DPAA2_CMD_MAC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
 err_close_rc:
-	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
 err_free_cmd:
 	dpaa2_mcp_free_command(sc->cmd);
 err_exit:
@@ -171,10 +174,11 @@ err_exit:
 static int
 dpaa2_mac_detach(device_t dev)
 {
+	device_t child = dev;
 	struct dpaa2_mac_softc *sc = device_get_softc(dev);
 
-	DPAA2_CMD_MAC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
-	DPAA2_CMD_RC_CLOSE(dev, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
+	DPAA2_CMD_MAC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->mac_token));
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd, sc->rc_token));
 	dpaa2_mcp_free_command(sc->cmd);
 
 	sc->cmd = NULL;
@@ -190,6 +194,7 @@ dpaa2_mac_detach(device_t dev)
 static int
 dpaa2_mac_setup_irq(device_t dev)
 {
+	device_t child = dev;
 	struct dpaa2_mac_softc *sc = device_get_softc(dev);
 	struct dpaa2_cmd *cmd = sc->cmd;
 	uint16_t mac_token = sc->mac_token;
@@ -220,15 +225,16 @@ dpaa2_mac_setup_irq(device_t dev)
 	    DPMAC_IRQ_LINK_UP_REQ |
 	    DPMAC_IRQ_LINK_DOWN_REQ |
 	    DPMAC_IRQ_EP_CHANGED;
-	error = DPAA2_CMD_MAC_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, mac_token),
-	    DPMAC_IRQ_INDEX, irq_mask);
+	error = DPAA2_CMD_MAC_SET_IRQ_MASK(dev, child, dpaa2_mcp_tk(cmd,
+	    mac_token), DPMAC_IRQ_INDEX, irq_mask);
 	if (error) {
 		device_printf(dev, "Failed to set IRQ mask\n");
 		return (error);
 	}
 
 	/* Enable IRQ. */
-	error = DPAA2_CMD_MAC_SET_IRQ_ENABLE(dev, cmd, DPMAC_IRQ_INDEX, true);
+	error = DPAA2_CMD_MAC_SET_IRQ_ENABLE(dev, child, cmd, DPMAC_IRQ_INDEX,
+	    true);
 	if (error) {
 		device_printf(dev, "Failed to enable IRQ\n");
 		return (error);
@@ -264,11 +270,12 @@ static void
 dpaa2_mac_intr(void *arg)
 {
 	struct dpaa2_mac_softc *sc = (struct dpaa2_mac_softc *) arg;
+	device_t child = sc->dev;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
 	int error;
 
-	error = DPAA2_CMD_MAC_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
-	    sc->mac_token), DPMAC_IRQ_INDEX, &status);
+	error = DPAA2_CMD_MAC_GET_IRQ_STATUS(sc->dev, child,
+	    dpaa2_mcp_tk(sc->cmd, sc->mac_token), DPMAC_IRQ_INDEX, &status);
 	if (error)
 		device_printf(sc->dev, "%s: failed to obtain IRQ status: "
 		    "error=%d\n", __func__, error);
