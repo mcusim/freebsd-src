@@ -146,10 +146,12 @@ struct dpaa2_msinfo {
  *
  * pdev:	Parent device.
  * dev:		Device this devinfo is associated with.
+ *
  * id:		ID of a logical DPAA2 object resource.
  * portal_id:	ID of the MC portal which belongs to the object's container.
  * icid:	Isolation context ID of the DPAA2 object. It is shared
  *		between a resource container and all of its children.
+ *
  * dtype:	Type of the DPAA2 object.
  * resources:	Resources available for this DPAA2 device.
  * msi:		Information about MSI messages supported by the DPAA2 object.
@@ -157,12 +159,21 @@ struct dpaa2_msinfo {
 struct dpaa2_devinfo {
 	device_t		 pdev;
 	device_t		 dev;
+
 	uint32_t		 id;
 	uint32_t		 portal_id;
 	uint16_t		 icid;
+
 	enum dpaa2_dev_type	 dtype;
 	struct resource_list	 resources;
 	struct dpaa2_msinfo	 msi;
+
+	/*
+	 * DPAA2 object might or might not have its own portal allocated to
+	 * execute MC commands. If the portal has been allocated, it takes
+	 * precedence over the portal owned by the resource container.
+	 */
+	struct dpaa2_mcp	*portal;
 };
 
 DECLARE_CLASS(dpaa2_mc_driver);
