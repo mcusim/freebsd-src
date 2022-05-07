@@ -2920,7 +2920,7 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	if (rc) {
 		device_printf(rcdev, "Failed to count objects in container "
 		    "ID=%u: error=%d\n", sc->cont_id, rc);
-		DPAA2_CMD_RC_CLOSE(rcdev, cmd);
+		DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -2932,7 +2932,7 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	if (rc) {
 		device_printf(rcdev, "Failed to get attributes of the "
 		    "container ID=%u: error=%d\n", sc->cont_id, rc);
-		DPAA2_CMD_RC_CLOSE(rcdev, cmd);
+		DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
