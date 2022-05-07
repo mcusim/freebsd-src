@@ -3087,11 +3087,12 @@ dpaa2_ni_collect_stats(SYSCTL_HANDLER_ARGS)
 {
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg1;
 	struct dpni_stat *stat = &dpni_stat_sysctls[oidp->oid_number];
+	device_t child = sc->dev;
 	uint64_t cnt[DPAA2_NI_STAT_COUNTERS];
 	uint64_t result = 0;
 	int error;
 
-	error = DPAA2_CMD_NI_GET_STATISTICS(sc->dev,
+	error = DPAA2_CMD_NI_GET_STATISTICS(sc->dev, child,
 	    dpaa2_mcp_tk(sc->cmd, sc->ni_token), stat->page, 0, cnt);
 	if (!error)
 		result = cnt[stat->cnt];
