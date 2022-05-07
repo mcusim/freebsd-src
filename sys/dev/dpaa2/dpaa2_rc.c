@@ -637,8 +637,8 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
  */
 
 static int
-dpaa2_rc_mng_get_version(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t *major,
-    uint32_t *minor, uint32_t *rev)
+dpaa2_rc_mng_get_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -660,8 +660,8 @@ dpaa2_rc_mng_get_version(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t *major,
 }
 
 static int
-dpaa2_rc_mng_get_soc_version(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint32_t *pvr, uint32_t *svr)
+dpaa2_rc_mng_get_soc_version(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint32_t *pvr, uint32_t *svr)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -682,8 +682,8 @@ dpaa2_rc_mng_get_soc_version(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mng_get_container_id(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint32_t *cont_id)
+dpaa2_rc_mng_get_container_id(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint32_t *cont_id)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -702,8 +702,8 @@ dpaa2_rc_mng_get_container_id(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t cont_id,
-    uint16_t *token)
+dpaa2_rc_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t cont_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -727,7 +727,7 @@ dpaa2_rc_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t cont_id,
 }
 
 static int
-dpaa2_rc_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -741,7 +741,7 @@ dpaa2_rc_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_get_obj_count(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_obj_count(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t *obj_count)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -761,8 +761,8 @@ dpaa2_rc_get_obj_count(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_obj(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t obj_idx,
-    struct dpaa2_obj *obj)
+dpaa2_rc_get_obj(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t obj_idx, struct dpaa2_obj *obj)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -812,8 +812,9 @@ dpaa2_rc_get_obj(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t obj_idx,
 }
 
 static int
-dpaa2_rc_get_obj_descriptor(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint32_t obj_id, enum dpaa2_dev_type dtype, struct dpaa2_obj *obj)
+dpaa2_rc_get_obj_descriptor(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint32_t obj_id, enum dpaa2_dev_type dtype,
+    struct dpaa2_obj *obj)
 {
 	struct __packed get_obj_desc_args {
 		uint32_t	obj_id;
@@ -871,7 +872,7 @@ dpaa2_rc_get_obj_descriptor(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_rc_attr *attr)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -903,8 +904,9 @@ dpaa2_rc_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_obj_region(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t obj_id,
-    uint8_t reg_idx, enum dpaa2_dev_type dtype, struct dpaa2_rc_obj_region *reg)
+dpaa2_rc_get_obj_region(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t obj_id, uint8_t reg_idx, enum dpaa2_dev_type dtype,
+    struct dpaa2_rc_obj_region *reg)
 {
 	struct __packed obj_region_args {
 		uint32_t	obj_id;
@@ -985,8 +987,8 @@ dpaa2_rc_get_obj_region(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t obj_id,
 }
 
 static int
-dpaa2_rc_get_api_version(device_t rcdev, struct dpaa2_cmd *cmd, uint16_t *major,
-    uint16_t *minor)
+dpaa2_rc_get_api_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint16_t *major, uint16_t *minor)
 {
 	struct __packed rc_api_version {
 		uint16_t	major;
@@ -1012,8 +1014,8 @@ dpaa2_rc_get_api_version(device_t rcdev, struct dpaa2_cmd *cmd, uint16_t *major,
 }
 
 static int
-dpaa2_rc_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint8_t enable)
+dpaa2_rc_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint8_t enable)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1026,9 +1028,9 @@ dpaa2_rc_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
 }
 
 static int
-dpaa2_rc_set_obj_irq(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint64_t addr, uint32_t data, uint32_t irq_usr, uint32_t obj_id,
-    enum dpaa2_dev_type dtype)
+dpaa2_rc_set_obj_irq(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint64_t addr, uint32_t data, uint32_t irq_usr,
+    uint32_t obj_id, enum dpaa2_dev_type dtype)
 {
 	struct __packed set_obj_irq_args {
 		uint32_t	data;
@@ -1060,7 +1062,7 @@ dpaa2_rc_set_obj_irq(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
 }
 
 static int
-dpaa2_rc_get_conn(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_conn(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ep_desc *ep1_desc, struct dpaa2_ep_desc *ep2_desc,
     uint32_t *link_stat)
 {
@@ -1106,8 +1108,8 @@ dpaa2_rc_get_conn(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpni_id,
-    uint16_t *token)
+dpaa2_rc_ni_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpni_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1130,7 +1132,7 @@ dpaa2_rc_ni_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpni_id,
 }
 
 static int
-dpaa2_rc_ni_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1144,7 +1146,7 @@ dpaa2_rc_ni_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_ni_enable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1158,7 +1160,7 @@ dpaa2_rc_ni_enable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_ni_disable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1172,8 +1174,8 @@ dpaa2_rc_ni_disable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_ni_get_api_version(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint16_t *major, uint16_t *minor)
+dpaa2_rc_ni_get_api_version(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint16_t *major, uint16_t *minor)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1194,7 +1196,7 @@ dpaa2_rc_ni_get_api_version(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_reset(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1208,7 +1210,7 @@ dpaa2_rc_ni_reset(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_ni_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_attr *attr)
 {
 	struct __packed ni_attr {
@@ -1266,7 +1268,7 @@ dpaa2_rc_ni_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_buf_layout(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_buf_layout(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_buf_layout *bl)
 {
 	struct __packed set_buf_layout_args {
@@ -1308,8 +1310,8 @@ dpaa2_rc_ni_set_buf_layout(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint16_t *offset)
+dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint16_t *offset)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1328,8 +1330,8 @@ dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint8_t *mac)
+dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint8_t *mac)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1354,8 +1356,8 @@ dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_prim_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint8_t *mac)
+dpaa2_rc_ni_set_prim_mac_addr(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint8_t *mac)
 {
 	struct __packed set_prim_mac_args {
 		uint8_t		_reserved[2];
@@ -1377,8 +1379,8 @@ dpaa2_rc_ni_set_prim_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint8_t *mac)
+dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint8_t *mac)
 {
 	struct __packed get_prim_mac_resp {
 		uint8_t		_reserved[2];
@@ -1404,7 +1406,7 @@ dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_link_cfg(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_cfg *cfg)
 {
 	struct __packed link_cfg_args {
@@ -1432,7 +1434,7 @@ dpaa2_rc_ni_set_link_cfg(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_link_cfg(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_cfg *cfg)
 {
 	struct __packed link_cfg_resp {
@@ -1464,7 +1466,7 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_link_state(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_link_state(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_state *state)
 {
 	struct __packed link_state_resp {
@@ -1503,7 +1505,7 @@ dpaa2_rc_ni_get_link_state(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_qos_table(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_qos_table(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_qos_table *tbl)
 {
 	struct __packed qos_table_args {
@@ -1535,7 +1537,8 @@ dpaa2_rc_ni_set_qos_table(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_clear_qos_table(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_clear_qos_table(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -1549,7 +1552,7 @@ dpaa2_rc_ni_clear_qos_table(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_ni_set_pools(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_pools(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_pools_cfg *cfg)
 {
 	struct __packed set_pools_args {
@@ -1584,8 +1587,8 @@ dpaa2_rc_ni_set_pools(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_err_behavior(device_t rcdev, struct dpaa2_cmd *cmd,
-    struct dpaa2_ni_err_cfg *cfg)
+dpaa2_rc_ni_set_err_behavior(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, struct dpaa2_ni_err_cfg *cfg)
 {
 	struct __packed err_behavior_args {
 		uint32_t	err_mask;
@@ -1611,7 +1614,7 @@ dpaa2_rc_ni_set_err_behavior(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_queue(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_queue_cfg *cfg)
 {
 	struct __packed get_queue_args {
@@ -1673,7 +1676,7 @@ dpaa2_rc_ni_get_queue(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_queue(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_queue_cfg *cfg)
 {
 	struct __packed set_queue_args {
@@ -1722,7 +1725,7 @@ dpaa2_rc_ni_set_queue(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_qdid(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_qdid(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     enum dpaa2_ni_queue_type type, uint16_t *qdid)
 {
 	struct __packed get_qdid_args {
@@ -1755,7 +1758,8 @@ dpaa2_rc_ni_get_qdid(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_add_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t *mac)
+dpaa2_rc_ni_add_mac_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t *mac)
 {
 	struct __packed add_mac_args {
 		uint8_t		flags;
@@ -1782,8 +1786,8 @@ dpaa2_rc_ni_add_mac_addr(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t *mac)
 }
 
 static int
-dpaa2_rc_ni_clear_mac_filters(device_t rcdev, struct dpaa2_cmd *cmd, bool rm_uni,
-    bool rm_multi)
+dpaa2_rc_ni_clear_mac_filters(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, bool rm_uni, bool rm_multi)
 {
 	struct __packed clear_mac_filters_args {
 		uint8_t		flags;
@@ -1806,7 +1810,8 @@ dpaa2_rc_ni_clear_mac_filters(device_t rcdev, struct dpaa2_cmd *cmd, bool rm_uni
 }
 
 static int
-dpaa2_rc_ni_set_mfl(device_t rcdev, struct dpaa2_cmd *cmd, uint16_t length)
+dpaa2_rc_ni_set_mfl(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint16_t length)
 {
 	struct __packed set_mfl_args {
 		uint16_t length;
@@ -1828,7 +1833,7 @@ dpaa2_rc_ni_set_mfl(device_t rcdev, struct dpaa2_cmd *cmd, uint16_t length)
 }
 
 static int
-dpaa2_rc_ni_set_offload(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_offload(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     enum dpaa2_ni_ofl_type ofl_type, bool en)
 {
 	struct __packed set_ofl_args {
@@ -1854,8 +1859,8 @@ dpaa2_rc_ni_set_offload(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint32_t mask)
+dpaa2_rc_ni_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint32_t mask)
 {
 	struct __packed set_irq_mask_args {
 		uint32_t	mask;
@@ -1879,7 +1884,7 @@ dpaa2_rc_ni_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
 }
 
 static int
-dpaa2_rc_ni_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, bool en)
 {
 	struct __packed set_irq_enable_args {
@@ -1904,7 +1909,7 @@ dpaa2_rc_ni_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t *status)
 {
 	struct __packed get_irq_stat_args {
@@ -1939,7 +1944,8 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_uni_promisc(device_t rcdev, struct dpaa2_cmd *cmd, bool en)
+dpaa2_rc_ni_set_uni_promisc(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, bool en)
 {
 	struct __packed set_uni_promisc_args {
 		uint8_t	en;
@@ -1961,7 +1967,8 @@ dpaa2_rc_ni_set_uni_promisc(device_t rcdev, struct dpaa2_cmd *cmd, bool en)
 }
 
 static int
-dpaa2_rc_ni_set_multi_promisc(device_t rcdev, struct dpaa2_cmd *cmd, bool en)
+dpaa2_rc_ni_set_multi_promisc(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, bool en)
 {
 	/* TODO: Implementation is the same as for ni_set_uni_promisc(). */
 	struct __packed set_multi_promisc_args {
@@ -1984,8 +1991,8 @@ dpaa2_rc_ni_set_multi_promisc(device_t rcdev, struct dpaa2_cmd *cmd, bool en)
 }
 
 static int
-dpaa2_rc_ni_get_statistics(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t page,
-    uint16_t param, uint64_t *cnt)
+dpaa2_rc_ni_get_statistics(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t page, uint16_t param, uint64_t *cnt)
 {
 	struct __packed get_statistics_args {
 		uint8_t		page;
@@ -2020,7 +2027,7 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t page,
 }
 
 static int
-dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint16_t dist_size, uint8_t tc, enum dpaa2_ni_dist_mode dist_mode,
     bus_addr_t key_cfg_buf)
 {
@@ -2052,8 +2059,8 @@ dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_io_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpio_id,
-    uint16_t *token)
+dpaa2_rc_io_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpio_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2076,7 +2083,7 @@ dpaa2_rc_io_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpio_id,
 }
 
 static int
-dpaa2_rc_io_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2090,7 +2097,7 @@ dpaa2_rc_io_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_io_enable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2104,7 +2111,7 @@ dpaa2_rc_io_enable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_io_disable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2118,7 +2125,7 @@ dpaa2_rc_io_disable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_io_reset(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2132,7 +2139,7 @@ dpaa2_rc_io_reset(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_io_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_io_attr *attr)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -2175,8 +2182,8 @@ dpaa2_rc_io_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_io_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint32_t mask)
+dpaa2_rc_io_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint32_t mask)
 {
 	/* TODO: Extract similar *_set_irq_mask() into one function. */
 	struct __packed set_irq_mask_args {
@@ -2201,7 +2208,7 @@ dpaa2_rc_io_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
 }
 
 static int
-dpaa2_rc_io_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t *status)
 {
 	/* TODO: Extract similar *_get_irq_status() into one function. */
@@ -2237,7 +2244,7 @@ dpaa2_rc_io_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_io_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, bool en)
 {
 	/* TODO: Extract similar *_set_irq_enable() into one function. */
@@ -2263,8 +2270,8 @@ dpaa2_rc_io_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_io_add_static_dq_chan(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint32_t dpcon_id, uint8_t *chan_idx)
+dpaa2_rc_io_add_static_dq_chan(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint32_t dpcon_id, uint8_t *chan_idx)
 {
 	struct __packed add_static_dq_chan_args {
 		uint32_t	dpcon_id;
@@ -2296,8 +2303,8 @@ dpaa2_rc_io_add_static_dq_chan(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_bp_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpbp_id,
-    uint16_t *token)
+dpaa2_rc_bp_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpbp_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2320,7 +2327,7 @@ dpaa2_rc_bp_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpbp_id,
 }
 
 static int
-dpaa2_rc_bp_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2334,7 +2341,7 @@ dpaa2_rc_bp_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_bp_enable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2348,7 +2355,7 @@ dpaa2_rc_bp_enable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_bp_disable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2362,7 +2369,7 @@ dpaa2_rc_bp_disable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_bp_reset(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2376,7 +2383,7 @@ dpaa2_rc_bp_reset(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_bp_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_bp_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_bp_attr *attr)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
@@ -2405,8 +2412,8 @@ dpaa2_rc_bp_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpmac_id,
-    uint16_t *token)
+dpaa2_rc_mac_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpmac_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2429,7 +2436,7 @@ dpaa2_rc_mac_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpmac_id,
 }
 
 static int
-dpaa2_rc_mac_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_mac_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2443,7 +2450,7 @@ dpaa2_rc_mac_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_mac_reset(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_mac_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2457,8 +2464,8 @@ dpaa2_rc_mac_reset(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_mac_mdio_read(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t phy,
-    uint16_t reg, uint16_t *val)
+dpaa2_rc_mac_mdio_read(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t phy, uint16_t reg, uint16_t *val)
 {
 	struct __packed mdio_read_args {
 		uint8_t		clause; /* set to 0 by default */
@@ -2489,8 +2496,8 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t phy,
 }
 
 static int
-dpaa2_rc_mac_mdio_write(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t phy,
-    uint16_t reg, uint16_t val)
+dpaa2_rc_mac_mdio_write(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t phy, uint16_t reg, uint16_t val)
 {
 	struct __packed mdio_write_args {
 		uint8_t		clause; /* set to 0 by default */
@@ -2518,7 +2525,8 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t phy,
 }
 
 static int
-dpaa2_rc_mac_get_addr(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t *mac)
+dpaa2_rc_mac_get_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t *mac)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2543,8 +2551,8 @@ dpaa2_rc_mac_get_addr(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t *mac)
 }
 
 static int
-dpaa2_rc_mac_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
-    struct dpaa2_mac_attr *attr)
+dpaa2_rc_mac_get_attributes(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, struct dpaa2_mac_attr *attr)
 {
 	struct __packed mac_attr_resp {
 		uint8_t		eth_if;
@@ -2590,8 +2598,8 @@ dpaa2_rc_mac_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_set_link_state(device_t rcdev, struct dpaa2_cmd *cmd,
-    struct dpaa2_mac_link_state *state)
+dpaa2_rc_mac_set_link_state(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, struct dpaa2_mac_link_state *state)
 {
 	struct __packed mac_set_link_args {
 		uint64_t	options;
@@ -2625,8 +2633,8 @@ dpaa2_rc_mac_set_link_state(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx,
-    uint32_t mask)
+dpaa2_rc_mac_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint32_t mask)
 {
 	/* TODO: Implementation is the same as for ni_set_irq_mask(). */
 	struct __packed set_irq_mask_args {
@@ -2651,8 +2659,8 @@ dpaa2_rc_mac_set_irq_mask(device_t rcdev, struct dpaa2_cmd *cmd, uint8_t irq_idx
 }
 
 static int
-dpaa2_rc_mac_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint8_t irq_idx, bool en)
+dpaa2_rc_mac_set_irq_enable(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint8_t irq_idx, bool en)
 {
 	/* TODO: Implementation is the same as for ni_set_irq_enable(). */
 	struct __packed set_irq_enable_args {
@@ -2677,8 +2685,8 @@ dpaa2_rc_mac_set_irq_enable(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
-    uint8_t irq_idx, uint32_t *status)
+dpaa2_rc_mac_get_irq_status(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, uint8_t irq_idx, uint32_t *status)
 {
 	/* TODO: Implementation is the same as ni_get_irq_status(). */
 	struct __packed get_irq_stat_args {
@@ -2713,8 +2721,8 @@ dpaa2_rc_mac_get_irq_status(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_con_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpcon_id,
-    uint16_t *token)
+dpaa2_rc_con_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpcon_id, uint16_t *token)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2738,7 +2746,7 @@ dpaa2_rc_con_open(device_t rcdev, struct dpaa2_cmd *cmd, uint32_t dpcon_id,
 
 
 static int
-dpaa2_rc_con_close(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2752,7 +2760,7 @@ dpaa2_rc_con_close(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_con_reset(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2766,7 +2774,7 @@ dpaa2_rc_con_reset(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_con_enable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2780,7 +2788,7 @@ dpaa2_rc_con_enable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_con_disable(device_t rcdev, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
 {
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
@@ -2794,8 +2802,8 @@ dpaa2_rc_con_disable(device_t rcdev, struct dpaa2_cmd *cmd)
 }
 
 static int
-dpaa2_rc_con_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
-    struct dpaa2_con_attr *attr)
+dpaa2_rc_con_get_attributes(device_t rcdev, device_t child,
+    struct dpaa2_cmd *cmd, struct dpaa2_con_attr *attr)
 {
 	struct __packed con_attr_resp {
 		uint32_t	id;
@@ -2825,7 +2833,7 @@ dpaa2_rc_con_get_attributes(device_t rcdev, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_con_set_notif(device_t rcdev, struct dpaa2_cmd *cmd,
+dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_con_notif_cfg *cfg)
 {
 	struct __packed set_notif_args {
