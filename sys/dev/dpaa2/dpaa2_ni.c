@@ -1500,8 +1500,9 @@ dpaa2_ni_setup_irqs(device_t dev)
 	}
 
 	/* Configure DPNI to generate interrupts. */
-	error = DPAA2_CMD_NI_SET_IRQ_MASK(dev, dpaa2_mcp_tk(cmd, ni_token),
-	    DPNI_IRQ_INDEX, DPNI_IRQ_LINK_CHANGED | DPNI_IRQ_EP_CHANGED);
+	error = DPAA2_CMD_NI_SET_IRQ_MASK(dev, child, dpaa2_mcp_tk(cmd,
+	    ni_token), DPNI_IRQ_INDEX,
+	    DPNI_IRQ_LINK_CHANGED | DPNI_IRQ_EP_CHANGED);
 	if (error) {
 		device_printf(dev, "%s: failed to set DPNI IRQ mask\n",
 		    __func__);
@@ -1555,7 +1556,7 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 	int error;
 
 	/* Setup checksums validation. */
-	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, dpaa2_mcp_tk(sc->cmd,
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, child, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), DPAA2_NI_OFL_RX_L3_CSUM, en_rxcsum);
 	if (error) {
 		device_printf(dev, "%s: failed to %s L3 checksum validation\n",
@@ -1601,7 +1602,7 @@ dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *sc)
 	device_t child = dev;
 	int error;
 
-	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
+	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, child, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), en_promisc ? true : en_allmulti);
 	if (error) {
 		device_printf(dev, "%s: failed to %s multicast promiscuous "
@@ -2042,8 +2043,8 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 	 * connected to a DPMAC directly associated with one of the physical
 	 * ports.
 	 */
-	error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, dpaa2_mcp_tk(cmd, ni_token),
-	    mac_addr);
+	error = DPAA2_CMD_NI_GET_PORT_MAC_ADDR(dev, child, dpaa2_mcp_tk(cmd,
+	    ni_token), mac_addr);
 	if (error) {
 		device_printf(dev, "%s: failed to obtain the MAC address "
 		    "associated with the physical port\n", __func__);
@@ -2207,6 +2208,7 @@ dpaa2_ni_init(void *arg)
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
 	struct ifnet *ifp = sc->ifp;
 	device_t dev = sc->dev;
+	device_t child = dev;
 	int error;
 
 	DPNI_LOCK(sc);
@@ -2216,7 +2218,8 @@ dpaa2_ni_init(void *arg)
 	}
 	DPNI_UNLOCK(sc);
 
-	error = DPAA2_CMD_NI_ENABLE(dev, dpaa2_mcp_tk(sc->cmd, sc->ni_token));
+	error = DPAA2_CMD_NI_ENABLE(dev, child, dpaa2_mcp_tk(sc->cmd,
+	    sc->ni_token));
 	if (error)
 		device_printf(dev, "%s: failed to enable DPNI: error=%d\n",
 		    __func__, error);
@@ -3120,6 +3123,7 @@ dpaa2_ni_set_hash(device_t dev, uint64_t flags)
 static int
 dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags)
 {
+	device_t child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpkg_profile_cfg cls_cfg;
 	struct dpkg_extract *key;
@@ -3180,8 +3184,8 @@ dpaa2_ni_set_dist_key(device_t dev, enum dpaa2_ni_dist_mode type, uint64_t flags
 	}
 
 	if (type == DPAA2_NI_DIST_MODE_HASH) {
-		err = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, dpaa2_mcp_tk(sc->cmd,
-		    sc->ni_token), sc->attr.num.queues, 0,
+		err = DPAA2_CMD_NI_SET_RX_TC_DIST(dev, child, dpaa2_mcp_tk(
+		    sc->cmd, sc->ni_token), sc->attr.num.queues, 0,
 		    DPAA2_NI_DIST_MODE_HASH, sc->rxd_kcfg.paddr);
 		if (err)
 			device_printf(dev, "%s: failed to set distribution mode "
