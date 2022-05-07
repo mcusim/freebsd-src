@@ -1545,6 +1545,7 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 	const bool en_rxcsum = sc->ifp->if_capenable & IFCAP_RXCSUM;
 	const bool en_txcsum = sc->ifp->if_capenable & IFCAP_TXCSUM;
 	device_t dev = sc->dev;
+	device_t child = dev;
 	int error;
 
 	/* Setup checksums validation. */
@@ -1555,8 +1556,8 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 		    __func__, en_rxcsum ? "enable" : "disable");
 		return (error);
 	}
-	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_RX_L4_CSUM,
-	    en_rxcsum);
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, child, sc->cmd,
+	    DPAA2_NI_OFL_RX_L4_CSUM, en_rxcsum);
 	if (error) {
 		device_printf(dev, "%s: failed to %s L4 checksum validation\n",
 		    __func__, en_rxcsum ? "enable" : "disable");
@@ -1564,15 +1565,15 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 	}
 
 	/* Setup checksums generation. */
-	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_TX_L3_CSUM,
-	    en_txcsum);
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, child, sc->cmd,
+	    DPAA2_NI_OFL_TX_L3_CSUM, en_txcsum);
 	if (error) {
 		device_printf(dev, "%s: failed to %s L3 checksum generation\n",
 		    __func__, en_txcsum ? "enable" : "disable");
 		return (error);
 	}
-	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, sc->cmd, DPAA2_NI_OFL_TX_L4_CSUM,
-	    en_txcsum);
+	error = DPAA2_CMD_NI_SET_OFFLOAD(dev, child, sc->cmd,
+	    DPAA2_NI_OFL_TX_L4_CSUM, en_txcsum);
 	if (error) {
 		device_printf(dev, "%s: failed to %s L4 checksum generation\n",
 		    __func__, en_txcsum ? "enable" : "disable");
@@ -1591,6 +1592,7 @@ dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *sc)
 	const bool en_promisc = sc->ifp->if_flags & IFF_PROMISC;
 	const bool en_allmulti = sc->ifp->if_flags & IFF_ALLMULTI;
 	device_t dev = sc->dev;
+	device_t child = dev;
 	int error;
 
 	error = DPAA2_CMD_NI_SET_MULTI_PROMISC(dev, dpaa2_mcp_tk(sc->cmd,
@@ -1601,7 +1603,7 @@ dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *sc)
 		return (error);
 	}
 
-	error = DPAA2_CMD_NI_SET_UNI_PROMISC(dev, sc->cmd, en_promisc);
+	error = DPAA2_CMD_NI_SET_UNI_PROMISC(dev, child, sc->cmd, en_promisc);
 	if (error) {
 		device_printf(dev, "%s: failed to %s unicast promiscuous mode\n",
 		    __func__, en_promisc ? "enable" : "disable");
@@ -2107,6 +2109,7 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct dpaa2_mac_link_state mac_link = {0};
+	device_t child = sc->dev;
 	uint16_t mac_token;
 	int link_state = ifp->if_link_state;
 	int error;
@@ -2122,7 +2125,7 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 	if (link_state != sc->link_state) {
 		sc->link_state = link_state;
 
-		error = DPAA2_CMD_MAC_OPEN(sc->dev, dpaa2_mcp_tk(sc->cmd,
+		error = DPAA2_CMD_MAC_OPEN(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
 		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
 		if (error) {
 			device_printf(sc->dev, "%s: failed to open DPMAC: "
@@ -2144,8 +2147,8 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 			mac_link.state_valid = true;
 
 			/* Inform DPMAC about link state. */
-			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, sc->cmd,
-			    &mac_link);
+			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, child,
+			    sc->cmd, &mac_link);
 			if (error) {
 				device_printf(sc->dev, "%s: failed to set DPMAC "
 				    "link state: id=%d, error=%d\n", __func__,
@@ -2153,12 +2156,13 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 				goto err_close_mac;
 			}
 		}
-		DPAA2_CMD_MAC_CLOSE(sc->dev, dpaa2_mcp_tk(sc->cmd, mac_token));
+		DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
+		    mac_token));
 	}
 	return;
 
  err_close_mac:
-	DPAA2_CMD_MAC_CLOSE(sc->dev, dpaa2_mcp_tk(sc->cmd, mac_token));
+	DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd, mac_token));
  err_exit:
 	return;
 }
@@ -2339,10 +2343,11 @@ static void
 dpaa2_ni_intr(void *arg)
 {
 	struct dpaa2_ni_softc *sc = (struct dpaa2_ni_softc *) arg;
+	device_t child = sc->dev;
 	uint32_t status = ~0u; /* clear all IRQ status bits */
 	int error;
 
-	error = DPAA2_CMD_NI_GET_IRQ_STATUS(sc->dev, dpaa2_mcp_tk(sc->cmd,
+	error = DPAA2_CMD_NI_GET_IRQ_STATUS(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), DPNI_IRQ_INDEX, &status);
 	if (error)
 		device_printf(sc->dev, "%s: failed to obtain IRQ status: "
