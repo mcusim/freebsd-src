@@ -129,6 +129,8 @@ __FBSDID("$FreeBSD$");
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
+#define DPAA2_TX_BUFRING_SZ	(1024)
+
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
 
@@ -1322,10 +1324,6 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	    ("too many Tx traffic classes: tx_tcs=%d\n",
 	    sc->attr.num.tx_tcs));
 
-	/* Check and limit Tx ring buffer size. */
-	if (sc->tx_bufring_sz < 1024u || sc->tx_bufring_sz > 10240u)
-		sc->tx_bufring_sz = 1024;
-
 	/* Setup Tx rings. */
 	for (int i = 0; i < sc->attr.num.tx_tcs; i++) {
 		queue_cfg.type = DPAA2_NI_QUEUE_TX;
@@ -1349,14 +1347,14 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 		mtx_init(&tx->idx_lock, "dpaa2_tx_idx_br", NULL, MTX_DEF);
 
 		/* Allocate Tx ring buffers. */
-		tx->mbuf_br = buf_ring_alloc(sc->tx_bufring_sz, M_DEVBUF,
+		tx->mbuf_br = buf_ring_alloc(DPAA2_TX_BUFRING_SZ, M_DEVBUF,
 		    M_NOWAIT, &tx->mbuf_lock);
 		if (tx->mbuf_br == NULL) {
 			device_printf(dev, "%s: failed to setup Tx ring buffer"
 			    " (1) fqid=%d\n", __func__, tx->fqid);
 			return (ENOMEM);
 		}
-		tx->idx_br = buf_ring_alloc(sc->tx_bufring_sz, M_DEVBUF,
+		tx->idx_br = buf_ring_alloc(DPAA2_TX_BUFRING_SZ, M_DEVBUF,
 		    M_NOWAIT, &tx->idx_lock);
 		if (tx->idx_br == NULL) {
 			device_printf(dev, "%s: failed to setup Tx ring buffer"
@@ -1679,15 +1677,6 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 		    CTLFLAG_RD, &sc->channels[i]->tx_dropped,
 		    "Tx dropped counter");
 	}
-
- 	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
-
-	/* Add DPNI configuration. */
-	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "config",
-	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPNI Configuration");
-	parent = SYSCTL_CHILDREN(node);
-	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "tx_bufring_sz", CTLFLAG_RW,
-	    &sc->tx_bufring_sz, "Size of the Tx ring buffer per traffic class");
 
 	return (0);
 }
@@ -2277,8 +2266,7 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	/* Enqueue and schedule taskqueue. */
 	error = drbr_enqueue(ifp, tx->mbuf_br, m);
 	if (__predict_false(error != 0)) {
-		device_printf(sc->dev, "%s: drbr_enqueue() failed: error=%d\n",
-		    __func__, error);
+		device_printf(sc->dev, "%s: drbr_enqueue() failed\n", __func__);
 		return (error);
 	}
 	taskqueue_enqueue(tx->taskq, &tx->task);
