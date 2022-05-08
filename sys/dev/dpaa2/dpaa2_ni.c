@@ -129,7 +129,7 @@ __FBSDID("$FreeBSD$");
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
-#define DPAA2_TX_BUFRING_SZ	(1024)
+#define DPAA2_TX_BUFRING_SZ	(4096)
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
