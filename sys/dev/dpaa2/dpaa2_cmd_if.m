@@ -849,6 +849,57 @@ CODE {
 		return (ENXIO);
 	}
 
+	/* Data Path MC Portal (DPMCP) commands. */
+
+	static int
+	bypass_mcp_create(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+		uint32_t portal_id, uint32_t options, uint32_t *dpmcp_id)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MCP_CREATE(
+				device_get_parent(dev), child, cmd, portal_id,
+				options, dpmcp_id));
+		return (ENXIO);
+	}
+	static int
+	bypass_mcp_destroy(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+		uint32_t dpmcp_id)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MCP_DESTROY(
+				device_get_parent(dev), child, cmd, dpmcp_id));
+		return (ENXIO);
+	}
+	static int
+	bypass_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+		uint32_t dpmcp_id)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MCP_OPEN(
+				device_get_parent(dev), child, cmd, dpmcp_id));
+		return (ENXIO);
+	}
+	static int
+	bypass_mcp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MCP_CLOSE(
+				device_get_parent(dev), child, cmd));
+		return (ENXIO);
+	}
+	static int
+	bypass_mcp_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_MCP_RESET(
+				device_get_parent(dev), child, cmd));
+		return (ENXIO);
+	}
 };
 
 /**
@@ -1472,3 +1523,40 @@ METHOD int con_set_notif {
 	struct dpaa2_cmd *cmd;
 	struct dpaa2_con_notif_cfg *cfg;
 } DEFAULT bypass_con_set_notif;
+
+/* Data Path MC Portal (DPMCP) commands. */
+
+METHOD int mcp_create {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 portal_id;
+	uint32_t	 options;
+	uint32_t	*dpmcp_id;
+} DEFAULT bypass_mcp_create;
+
+METHOD int mcp_destroy {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpmcp_id;
+} DEFAULT bypass_mcp_destroy;
+
+METHOD int mcp_open {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+	uint32_t	 dpmcp_id;
+} DEFAULT bypass_mcp_open;
+
+METHOD int mcp_close {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+} DEFAULT bypass_mcp_close;
+
+METHOD int mcp_reset {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+} DEFAULT bypass_mcp_reset;

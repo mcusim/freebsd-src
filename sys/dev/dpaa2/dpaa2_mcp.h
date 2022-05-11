@@ -223,7 +223,7 @@
 #define CMD_CON_BASE_VERSION	1
 #define CMD_CON_ID_OFFSET	4
 
-#define CMD_CON(id)	(((id) << CMD_BP_ID_OFFSET) | CMD_BP_BASE_VERSION)
+#define CMD_CON(id)	(((id) << CMD_CON_ID_OFFSET) | CMD_CON_BASE_VERSION)
 
 #define CMDID_CON_OPEN				CMD_CON(0x808)
 #define CMDID_CON_CLOSE				CMD_CON(0x800)
@@ -233,9 +233,19 @@
 #define CMDID_CON_RESET				CMD_CON(0x005)
 #define CMDID_CON_SET_NOTIF			CMD_CON(0x100)
 
-/*
- * Public types.
- */
+/* ------------------------- DPMCP command IDs ------------------------------ */
+#define CMD_MCP_BASE_VERSION	1
+#define CMD_MCP_2ND_VERSION	2
+#define CMD_MCP_ID_OFFSET	4
+
+#define CMD_MCP(id)	(((id) << CMD_MCP_ID_OFFSET) | CMD_MCP_BASE_VERSION)
+#define CMD_MCP_V2(id)	(((id) << CMD_MCP_ID_OFFSET) | CMD_MCP_2ND_VERSION)
+
+#define CMDID_MCP_CREATE			CMD_MCP_V2(0x90B)
+#define CMDID_MCP_DESTROY			CMD_MCP(0x98B)
+#define CMDID_MCP_OPEN				CMD_MCP(0x80B)
+#define CMDID_MCP_CLOSE				CMD_MCP(0x800)
+#define CMDID_MCP_RESET				CMD_MCP(0x005)
 
 enum dpaa2_rc_region_type {
 	DPAA2_RC_REG_MC_PORTAL,
@@ -362,18 +372,6 @@ struct dpaa2_rc_obj_region {
 	uint32_t	size;
 	uint32_t	flags;
 	enum dpaa2_rc_region_type type;
-};
-
-/**
- * @brief Attributes of the DPBP object.
- *
- * id:		 DPBP object ID.
- * bpid:	 Hardware buffer pool ID; should be used as an argument in
- *		 acquire/release operations on buffers.
- */
-struct dpaa2_bp_attr {
-	uint32_t	id;
-	uint16_t	bpid;
 };
 
 /**
