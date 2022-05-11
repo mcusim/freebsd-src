@@ -3229,7 +3229,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	device_t rcdev, dev, child;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
 	struct dpaa2_rc_obj_region reg;
-	struct resource_spec *res_spec = NULL;
+	/* struct resource_spec *res_spec = NULL; */
 	const char *devclass;
 	uint64_t start, end, count;
 	uint32_t flags = 0;
@@ -3246,7 +3246,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		break;
 	case DPAA2_DEV_BP:
 		devclass = "dpaa2_bp";
-		res_spec = dpaa2_bp_spec;
+		/* res_spec = dpaa2_bp_spec; */
 		flags = DPAA2_MC_DEV_ALLOCATABLE;
 		break;
 	case DPAA2_DEV_CON:
