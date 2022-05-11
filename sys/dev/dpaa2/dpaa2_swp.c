@@ -1028,10 +1028,12 @@ static int
 dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     struct dpaa2_swp_rsp *rsp, uint8_t cmdid)
 {
+#if (defined(_KERNEL) && defined(INVARIANTS)) || defined(_STANDALONE)
 	struct __packed with_verb {
 		uint8_t	verb;
 		uint8_t	_reserved[63];
 	} *r;
+#endif
 	uint16_t flags;
 	int error;
 
@@ -1057,10 +1059,12 @@ dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 	}
 	dpaa2_swp_unlock(swp);
 
+#if (defined(_KERNEL) && defined(INVARIANTS)) || defined(_STANDALONE)
 	r = (struct with_verb *) rsp;
 	KASSERT((r->verb & CMD_VERB_MASK) == cmdid,
 	    ("wrong VERB byte in response: resp=0x%02x, expected=0x%02x",
 	    r->verb, cmdid));
+#endif
 
 	return (0);
 }
