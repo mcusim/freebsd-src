@@ -72,12 +72,14 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_RC, "dpaa2_rc", "DPAA2 Resource Container");
 
+/* Discover and add devices to the resource container. */
 static int dpaa2_rc_discover(struct dpaa2_rc_softc *);
 static int dpaa2_rc_add_child(struct dpaa2_rc_softc *, struct dpaa2_cmd *,
     struct dpaa2_obj *);
 static int dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *,
     struct dpaa2_cmd *, struct dpaa2_obj *);
 
+/* Helper routines. */
 static int dpaa2_rc_enable_irq(struct dpaa2_mcp *, struct dpaa2_cmd *, uint8_t,
     bool, uint16_t);
 static int dpaa2_rc_configure_irq(device_t, device_t, int, uint64_t, uint32_t);
@@ -93,7 +95,7 @@ static int dpaa2_rc_reset_cmd_params(struct dpaa2_cmd *);
 static int
 dpaa2_rc_probe(device_t dev)
 {
-	/* DPRC device will be added by a parent DPRC or by MC bus itself. */
+	/* DPRC device will be added by the parent DPRC or MC bus itself. */
 	device_set_desc(dev, "DPAA2 Resource Container");
 	return (BUS_PROBE_DEFAULT);
 }
@@ -2860,6 +2862,131 @@ dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_SET_NOTIF));
 }
 
+static int
+dpaa2_rc_mcp_create(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t portal_id, uint32_t options, uint32_t *dpmcp_id)
+)
+{
+	struct __packed mcp_create_args {
+		uint32_t	portal_id;
+		uint32_t	options;
+		uint64_t	_reserved[6];
+	} *args;
+	struct __packed mcp_create_resp {
+		uint32_t	dpmcp_id;
+	} *resp;
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
+	int error;
+
+	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd || !dpmcp_id)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct mcp_create_args *) &cmd->params[0];
+	args->portal_id = portal_id;
+	args->options = options;
+
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_CREATE);
+	if (!error) {
+		resp = (struct mcp_create_resp *) &cmd->params[0];
+		*dpmcp_id = resp->dpmcp_id;
+	}
+
+	return (error);
+}
+
+static int
+dpaa2_rc_mcp_destroy(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpmcp_id)
+{
+	struct __packed mcp_destroy_args {
+		uint32_t	dpmcp_id;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
+
+	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct mcp_destroy_args *) &cmd->params[0];
+	args->dpmcp_id = dpmcp_id;
+
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_DESTROY));
+}
+
+static int
+dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t dpmcp_id)
+{
+	struct __packed mcp_open_args {
+		uint32_t	dpmcp_id;
+	} *args;
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
+
+	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	args = (struct mcp_open_args *) &cmd->params[0];
+	args->dpmcp_id = dpmcp_id;
+
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_OPEN));
+}
+
+static int
+dpaa2_rc_mcp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
+
+	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_CLOSE));
+}
+
+static int
+dpaa2_rc_mcp_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
+{
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
+
+	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+		return (DPAA2_CMD_STAT_ERR);
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd)
+		return (DPAA2_CMD_STAT_ERR);
+
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_RESET));
+}
+
 /**
  * @brief Create and add devices for DPAA2 objects in this resource container.
  */
@@ -3103,6 +3230,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	device_t rcdev, dev, child;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
 	struct dpaa2_rc_obj_region reg;
+	struct resource_spec *res_spec = NULL;
 	const char *devclass;
 	uint64_t start, end, count;
 	uint32_t flags = 0;
@@ -3119,6 +3247,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		break;
 	case DPAA2_DEV_BP:
 		devclass = "dpaa2_bp";
+		res_spec = dpaa2_bp_spec;
 		flags = DPAA2_MC_DEV_ALLOCATABLE;
 		break;
 	case DPAA2_DEV_CON:
@@ -3398,8 +3527,8 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	/* Request a free DPAA2 device of the given type from MC. */
 	error = DPAA2_MC_GET_FREE_DEV(rcdev, &dpaa2_dev, devtype);
 	if (error && !(flags & RF_SHAREABLE)) {
-		device_printf(rcdev, "Failed to obtain a free %s (rid=%d) for: "
-		    "%s (id=%u)\n", dpaa2_ttos(devtype), *rid,
+		device_printf(rcdev, "%s: failed to obtain a free %s (rid=%d) "
+		    "for: %s (id=%u)\n", __func__, dpaa2_ttos(devtype), *rid,
 		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (error);
 	}
@@ -3408,9 +3537,10 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	if (error) {
 		error = DPAA2_MC_GET_SHARED_DEV(rcdev, &dpaa2_dev, devtype);
 		if (error) {
-			device_printf(rcdev, "Failed to obtain a shared "
-			    "%s (rid=%d) for: %s (id=%u)\n", dpaa2_ttos(devtype),
-			    *rid, dpaa2_ttos(dinfo->dtype), dinfo->id);
+			device_printf(rcdev, "%s: failed to obtain a shared "
+			    "%s (rid=%d) for: %s (id=%u)\n", __func__,
+			    dpaa2_ttos(devtype), *rid, dpaa2_ttos(dinfo->dtype),
+			    dinfo->id);
 			return (error);
 		}
 		shared = true;
@@ -3425,8 +3555,8 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	    rid, (rman_res_t) dpaa2_dev, (rman_res_t) dpaa2_dev, 1,
 	    flags & ~RF_ACTIVE);
 	if (!res) {
-		device_printf(rcdev, "Failed to reserve %s (rid=%d) for: %s "
-		    "(id=%u)\n", dpaa2_ttos(devtype), *rid,
+		device_printf(rcdev, "%s: failed to reserve %s (rid=%d) for: %s "
+		    "(id=%u)\n", __func__, dpaa2_ttos(devtype), *rid,
 		    dpaa2_ttos(dinfo->dtype), dinfo->id);
 		return (EBUSY);
 	}
@@ -3435,9 +3565,10 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	if (shared) {
 		error = DPAA2_MC_RESERVE_DEV(rcdev, dpaa2_dev, devtype);
 		if (error) {
-			device_printf(rcdev, "Failed to reserve a shared "
-			    "%s (rid=%d) for: %s (id=%u)\n", dpaa2_ttos(devtype),
-			    *rid, dpaa2_ttos(dinfo->dtype), dinfo->id);
+			device_printf(rcdev, "%s: failed to reserve a shared "
+			    "%s (rid=%d) for: %s (id=%u)\n", __func__,
+			    dpaa2_ttos(devtype), *rid, dpaa2_ttos(dinfo->dtype),
+			    dinfo->id);
 			return (error);
 		}
 	}
@@ -3618,6 +3749,12 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_con_disable,	dpaa2_rc_con_disable),
 	DEVMETHOD(dpaa2_cmd_con_get_attributes,	dpaa2_rc_con_get_attributes),
 	DEVMETHOD(dpaa2_cmd_con_set_notif,	dpaa2_rc_con_set_notif),
+	/*	DPMCP commands */
+	DEVMETHOD(dpaa2_cmd_mcp_create,		dpaa2_rc_mcp_create),
+	DEVMETHOD(dpaa2_cmd_mcp_destroy,	dpaa2_rc_mcp_destroy),
+	DEVMETHOD(dpaa2_cmd_mcp_open,		dpaa2_rc_mcp_open),
+	DEVMETHOD(dpaa2_cmd_mcp_close,		dpaa2_rc_mcp_close),
+	DEVMETHOD(dpaa2_cmd_mcp_reset,		dpaa2_rc_mcp_reset),
 
 	DEVMETHOD_END
 };

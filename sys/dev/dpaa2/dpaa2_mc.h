@@ -45,6 +45,7 @@
 #include "dpaa2_io.h"
 #include "dpaa2_mac.h"
 #include "dpaa2_con.h"
+#include "dpaa2_bp.h"
 
 /*
  * Maximum number of MSIs supported by the MC for its children without IOMMU.
@@ -115,17 +116,9 @@ struct dpaa2_mc_softc {
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
-	struct dpaa2_mcp	*portal;
+	struct dpaa2_mcp	*portal; /* TODO: use devinfo's portal instead */
 	int			 unit;
 	uint32_t		 cont_id;
-};
-
-/**
- * @brief Software context for the DPAA2 Buffer Pool driver.
- */
-struct dpaa2_bp_softc {
-	device_t		 dev;
-	struct dpaa2_bp_attr	 attr;
 };
 
 /**
