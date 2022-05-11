@@ -151,7 +151,8 @@ dpaa2_rc_attach(device_t dev)
 		dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
 		    M_WAITOK | M_ZERO);
 		if (!dinfo) {
-			device_printf(dev, "Failed to allocate dpaa2_devinfo\n");
+			device_printf(dev, "%s: failed to allocate "
+			    "dpaa2_devinfo\n", __func__);
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
 		}
@@ -165,8 +166,8 @@ dpaa2_rc_attach(device_t dev)
 		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF, true);
 		if (error) {
-			device_printf(dev, "Failed to initialize dpaa2_mcp: "
-			    "error=%d\n", error);
+			device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
+			    "error=%d\n", __func__, error);
 			dpaa2_rc_detach(dev);
 			return (ENXIO);
 		}
@@ -178,8 +179,8 @@ dpaa2_rc_attach(device_t dev)
 	/* Create DPAA2 devices for objects in this container. */
 	error = dpaa2_rc_discover(sc);
 	if (error) {
-		device_printf(dev, "Failed to discover objects in container: "
-		    "error=%d\n", error);
+		device_printf(dev, "%s: failed to discover objects in "
+		    "container: error=%d\n", __func__, error);
 		dpaa2_rc_detach(dev);
 		return (error);
 	}
@@ -218,9 +219,8 @@ dpaa2_rc_delete_resource(device_t rcdev, device_t child, int type, int rid)
 	if (rle->res) {
 		if (rman_get_flags(rle->res) & RF_ACTIVE ||
 		    resource_list_busy(rl, type, rid)) {
-			device_printf(rcdev, "delete_resource: "
-			    "Resource still owned by child, oops. "
-			    "(type=%d, rid=%d, addr=%jx)\n",
+			device_printf(rcdev, "%s: resource still owned by "
+			    "child: type=%d, rid=%d, start=%jx\n", __func__,
 			    type, rid, rman_get_start(rle->res));
 			return;
 		}
@@ -298,9 +298,8 @@ dpaa2_rc_child_deleted(device_t rcdev, device_t child)
 		if (rle->res) {
 			if (rman_get_flags(rle->res) & RF_ACTIVE ||
 			    resource_list_busy(rl, rle->type, rle->rid)) {
-				device_printf(child,
-				    "Resource still owned, oops. "
-				    "(type=%d, rid=%d, addr=%lx)\n",
+				device_printf(child, "%s: resource still owned: "
+				    "type=%d, rid=%d, addr=%lx\n", __func__,
 				    rle->type, rle->rid,
 				    rman_get_start(rle->res));
 				bus_release_resource(child, rle->type, rle->rid,
@@ -326,14 +325,14 @@ dpaa2_rc_child_detached(device_t rcdev, device_t child)
 	rl = &dinfo->resources;
 
 	if (resource_list_release_active(rl, rcdev, child, SYS_RES_IRQ) != 0)
-		device_printf(child, "Leaked IRQ resources!\n");
+		device_printf(child, "%s: leaked IRQ resources!\n", __func__);
 	if (dinfo->msi.msi_alloc != 0) {
-		device_printf(child, "Leaked %d MSI vectors!\n",
+		device_printf(child, "%s: leaked %d MSI vectors!\n", __func__,
 		    dinfo->msi.msi_alloc);
 		PCI_RELEASE_MSI(rcdev, child);
 	}
 	if (resource_list_release_active(rl, rcdev, child, SYS_RES_MEMORY) != 0)
-		device_printf(child, "Leaked memory resources!\n");
+		device_printf(child, "%s: leaked memory resources!\n", __func__);
 }
 
 static int
@@ -350,8 +349,8 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 	error = bus_generic_setup_intr(rcdev, child, irq, flags, filter, intr,
 	    arg, &cookie);
 	if (error) {
-		device_printf(rcdev, "bus_generic_setup_intr() failed: "
-		    "error=%d\n", error);
+		device_printf(rcdev, "%s: bus_generic_setup_intr() failed: "
+		    "error=%d\n", __func__, error);
 		return (error);
 	}
 
@@ -364,8 +363,9 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 	rid = rman_get_rid(irq);
 	if (rid == 0) {
 		if (bootverbose)
-			device_printf(rcdev, "Cannot setup interrupt with rid=0:"
-			    " INTx are not supported by DPAA2 objects yet\n");
+			device_printf(rcdev, "%s: cannot setup interrupt with "
+			    "rid=0: INTx are not supported by DPAA2 objects "
+			    "yet\n", __func__);
 		return (EINVAL);
 	} else {
 		dinfo = device_get_ivars(child);
@@ -380,8 +380,8 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		error = PCIB_MAP_MSI(device_get_parent(rcdev), child,
 		    rman_get_start(irq), &addr, &data);
 		if (error) {
-			device_printf(rcdev, "PCIB_MAP_MSI failed: error=%d\n",
-			    error);
+			device_printf(rcdev, "%s: PCIB_MAP_MSI failed: "
+			    "error=%d\n", __func__, error);
 			(void)bus_generic_teardown_intr(rcdev, child, irq,
 			    cookie);
 			return (error);
@@ -390,9 +390,10 @@ dpaa2_rc_setup_intr(device_t rcdev, device_t child, struct resource *irq,
 		/* Configure MSI for this DPAA2 object. */
 		error = dpaa2_rc_configure_irq(rcdev, child, rid, addr, data);
 		if (error) {
-			device_printf(rcdev, "Failed to configure IRQ for "
-			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", rid,
-			    dpaa2_ttos(dinfo->dtype), device_get_unit(child));
+			device_printf(rcdev, "%s: failed to configure IRQ for "
+			    "DPAA2 object: rid=%d, type=%s, unit=%d\n", __func__,
+			    rid, dpaa2_ttos(dinfo->dtype),
+			    device_get_unit(child));
 			return (error);
 		}
 		dinfo->msi.msi_handlers++;
@@ -419,8 +420,9 @@ dpaa2_rc_teardown_intr(device_t rcdev, device_t child, struct resource *irq,
 	rid = rman_get_rid(irq);
 	if (rid == 0) {
 		if (bootverbose)
-			device_printf(rcdev, "Cannot teardown interrupt with "
-			    "rid=0: INTx are not supported by DPAA2 objects\n");
+			device_printf(rcdev, "%s: cannot teardown interrupt "
+			    "with rid=0: INTx are not supported by DPAA2 "
+			    "objects yet\n", __func__);
 		return (EINVAL);
 	} else {
 		dinfo = device_get_ivars(child);
@@ -526,14 +528,14 @@ dpaa2_rc_alloc_msi(device_t rcdev, device_t child, int *count)
 
 	if (bootverbose) {
 		if (actual == 1) {
-			device_printf(child, "Using IRQ %d for MSI\n", irqs[0]);
+			device_printf(child, "using IRQ %d for MSI\n", irqs[0]);
 		} else {
 			/*
 			 * Be fancy and try to print contiguous runs
 			 * of IRQ values as ranges.  'run' is true if
 			 * we are in a range.
 			 */
-			device_printf(child, "Using IRQs %d", irqs[0]);
+			device_printf(child, "using IRQs %d", irqs[0]);
 			run = 0;
 			for (i = 1; i < actual; i++) {
 				/* Still in a run? */
@@ -3005,16 +3007,16 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	/* Allocate a command to send to MC hardware. */
 	rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (rc) {
-		device_printf(rcdev, "Failed to allocate dpaa2_cmd: error=%d\n",
-		    rc);
+		device_printf(rcdev, "%s: failed to allocate dpaa2_cmd: "
+		    "error=%d\n", __func__, rc);
 		return (ENXIO);
 	}
 
 	/* Print MC firmware version. */
 	rc = DPAA2_CMD_MNG_GET_VERSION(rcdev, child, cmd, &major, &minor, &rev);
 	if (rc) {
-		device_printf(rcdev, "Failed to get MC firmware version: "
-		    "error=%d\n", rc);
+		device_printf(rcdev, "%s: failed to get MC firmware version: "
+		    "error=%d\n", __func__, rc);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -3024,8 +3026,8 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	/* Obtain container ID associated with a given MC portal. */
 	rc = DPAA2_CMD_MNG_GET_CONTAINER_ID(rcdev, child, cmd, &sc->cont_id);
 	if (rc) {
-		device_printf(rcdev, "Failed to get container ID: error=%d\n",
-		    rc);
+		device_printf(rcdev, "%s: failed to get container id: "
+		    "error=%d\n", __func__, rc);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -3035,8 +3037,8 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	/* Open the resource container. */
 	rc = DPAA2_CMD_RC_OPEN(rcdev, child, cmd, sc->cont_id, &rc_token);
 	if (rc) {
-		device_printf(rcdev, "Failed to open container ID=%u: "
-		    "error=%d\n", sc->cont_id, rc);
+		device_printf(rcdev, "%s: failed to open container: cont_id=%u, "
+		    "error=%d\n", __func__, sc->cont_id, rc);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
@@ -3044,8 +3046,8 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	/* Obtain a number of objects in this container. */
 	rc = DPAA2_CMD_RC_GET_OBJ_COUNT(rcdev, child, cmd, &obj_count);
 	if (rc) {
-		device_printf(rcdev, "Failed to count objects in container "
-		    "ID=%u: error=%d\n", sc->cont_id, rc);
+		device_printf(rcdev, "%s: failed to count objects in container: "
+		    "cont_id=%u, error=%d\n", __func__, sc->cont_id, rc);
 		DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
@@ -3056,14 +3058,16 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	/* Obtain container attributes (including ICID). */
 	rc = DPAA2_CMD_RC_GET_ATTRIBUTES(rcdev, child, cmd, &dprc_attr);
 	if (rc) {
-		device_printf(rcdev, "Failed to get attributes of the "
-		    "container ID=%u: error=%d\n", sc->cont_id, rc);
+		device_printf(rcdev, "%s: failed to get attributes of the "
+		    "container: cont_id=%u, error=%d\n", __func__, sc->cont_id,
+		    rc);
 		DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
 		dpaa2_mcp_free_command(cmd);
 		return (ENXIO);
 	}
 	if (bootverbose)
-		device_printf(rcdev, "ICID: %u\n", dprc_attr.icid);
+		device_printf(rcdev, "isolation context id: %u\n",
+		    dprc_attr.icid);
 	if (rcinfo) {
 		rcinfo->id = dprc_attr.cont_id;
 		rcinfo->portal_id = dprc_attr.portal_id;
@@ -3075,14 +3079,13 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, child, cmd, i, &obj);
 		if (rc && bootverbose) {
 			if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ) {
-				device_printf(rcdev, "Skip unsupported DPAA2 "
-				    "object: index=%u, objects=%u\n", i,
-				    obj_count);
+				device_printf(rcdev, "%s: skip unsupported "
+				    "DPAA2 object: idx=%u\n", __func__, i);
 				continue;
 			} else {
-				device_printf(rcdev, "Failed to get information "
-				    "about DPAA2 object: index=%u, error=%d\n",
-				    i, rc);
+				device_printf(rcdev, "%s: failed to get "
+				    "information about DPAA2 object: idx=%u, "
+				    "error=%d\n", __func__, i, rc);
 				continue;
 			}
 		}
@@ -3102,12 +3105,12 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 	for (uint32_t i = 0; i < obj_count; i++) {
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, child, cmd, i, &obj);
 		if (rc == DPAA2_CMD_STAT_UNKNOWN_OBJ && bootverbose) {
-			device_printf(rcdev, "Skip unsupported DPAA2 object: "
-			    "index=%u, objects=%u\n", i, obj_count);
+			device_printf(rcdev, "%s: skip unsupported DPAA2 "
+			    "object: idx=%u\n", __func__, i);
 			continue;
 		} else if (rc) {
-			device_printf(rcdev, "Failed to get object: index=%u, "
-			    "error=%d\n", i, rc);
+			device_printf(rcdev, "%s: failed to get object: "
+			    "idx=%u, error=%d\n", __func__, i, rc);
 			continue;
 		}
 		dpaa2_rc_add_child(sc, cmd, &obj);
@@ -3152,8 +3155,9 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
 	if (dev == NULL) {
-		device_printf(rcdev, "Failed to add a child device for DPAA2 "
-		    "object: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
+		device_printf(rcdev, "%s: failed to add a device for DPAA2 "
+		    "object: type=%s, id=%u\n", __func__, dpaa2_ttos(obj->type),
+		    obj->id);
 		return (ENXIO);
 	}
 
@@ -3161,8 +3165,9 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
-		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-		    "for: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
+		device_printf(rcdev, "%s: failed to allocate dpaa2_devinfo "
+		    "for: type=%s, id=%u\n", __func__, dpaa2_ttos(obj->type),
+		    obj->id);
 		return (ENXIO);
 	}
 	device_set_ivars(dev, dinfo);
@@ -3199,8 +3204,8 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		error = dpaa2_rc_add_res(rcdev, dev, res_spec->type, &rid,
 		    res_spec->flags);
 		if (error)
-			device_printf(rcdev, "dpaa2_rc_add_res() failed: "
-			    "error=%d\n", error);
+			device_printf(rcdev, "%s: dpaa2_rc_add_res() failed: "
+			    "error=%d\n", __func__, error);
 
 		if (res_spec->type == DPAA2_DEV_IO)
 			dpio_n++;
@@ -3265,9 +3270,9 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	/* Add a device for the DPAA2 object. */
 	dev = device_add_child(rcdev, devclass, -1);
 	if (dev == NULL) {
-		device_printf(rcdev, "Failed to add a child device for "
-		    "managed DPAA2 object: type=%s, id=%u\n",
-		    dpaa2_ttos(obj->type), obj->id);
+		device_printf(rcdev, "%s: failed to add a device for DPAA2 "
+		    "object: type=%s, id=%u\n", __func__, dpaa2_ttos(obj->type),
+		    obj->id);
 		return (ENXIO);
 	}
 
@@ -3275,8 +3280,9 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
 	    M_WAITOK | M_ZERO);
 	if (!dinfo) {
-		device_printf(rcdev, "Failed to allocate dpaa2_devinfo "
-		    "for: type=%s, id=%u\n", dpaa2_ttos(obj->type), obj->id);
+		device_printf(rcdev, "%s: failed to allocate dpaa2_devinfo "
+		    "for: type=%s, id=%u\n", __func__, dpaa2_ttos(obj->type),
+		    obj->id);
 		return (ENXIO);
 	}
 	device_set_ivars(dev, dinfo);
@@ -3301,9 +3307,9 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		error = DPAA2_CMD_RC_GET_OBJ_REGION(rcdev, child, cmd, obj->id,
 		    i, obj->type, &reg);
 		if (error) {
-			device_printf(rcdev, "Failed to obtain memory region "
-			    "for type=%s, id=%u, reg_idx=%u: error=%d\n",
-			    dpaa2_ttos(obj->type), obj->id, i, error);
+			device_printf(rcdev, "%s: failed to obtain memory "
+			    "region for type=%s, id=%u, reg_idx=%u: error=%d\n",
+			    __func__, dpaa2_ttos(obj->type), obj->id, i, error);
 			continue;
 		}
 		count = reg.size;
@@ -3317,9 +3323,9 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	/* Inform MC about a new managed device. */
 	error = DPAA2_MC_MANAGE_DEV(rcdev, dev, flags);
 	if (error) {
-		device_printf(rcdev, "Failed to add a managed DPAA2 device: "
-		    "type=%s, id=%u, error=%d\n", dpaa2_ttos(obj->type),
-		    obj->id, error);
+		device_printf(rcdev, "%s: failed to add a managed DPAA2 device: "
+		    "type=%s, id=%u, error=%d\n", __func__,
+		    dpaa2_ttos(obj->type), obj->id, error);
 		return (ENXIO);
 	}
 
@@ -3346,8 +3352,8 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		/* Allocate a command to send to MC hardware. */
 		rc = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 		if (rc) {
-			device_printf(rcdev, "Failed to allocate dpaa2_cmd: "
-			    "error=%d\n", rc);
+			device_printf(rcdev, "%s: failed to allocate dpaa2_cmd: "
+			    "error=%d\n", __func__, rc);
 			return (ENODEV);
 		}
 
@@ -3355,8 +3361,8 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		rc = DPAA2_CMD_RC_OPEN(rcdev, child, cmd, rcinfo->id, &rc_token);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to open DPRC: error=%d\n",
-			    rc);
+			device_printf(rcdev, "%s: failed to open DPRC: "
+			    "error=%d\n", __func__, rc);
 			return (ENODEV);
 		}
 		/* Set MSI address and value. */
@@ -3364,8 +3370,8 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		    data, rid, dinfo->id, dinfo->dtype);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to setup IRQ: "
-			    "rid=%d, addr=%jx, data=%x, error=%d\n",
+			device_printf(rcdev, "%s: failed to setup IRQ: "
+			    "rid=%d, addr=%jx, data=%x, error=%d\n", __func__,
 			    rid, addr, data, rc);
 			return (ENODEV);
 		}
@@ -3373,8 +3379,8 @@ dpaa2_rc_configure_irq(device_t rcdev, device_t child, int rid, uint64_t addr,
 		rc = DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
 		if (rc) {
 			dpaa2_mcp_free_command(cmd);
-			device_printf(rcdev, "Failed to close DPRC: "
-			    "error=%d\n", rc);
+			device_printf(rcdev, "%s: failed to close DPRC: "
+			    "error=%d\n", __func__, rc);
 			return (ENODEV);
 		}
 
