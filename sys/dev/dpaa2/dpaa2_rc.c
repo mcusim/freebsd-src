@@ -2865,7 +2865,6 @@ dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 static int
 dpaa2_rc_mcp_create(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t portal_id, uint32_t options, uint32_t *dpmcp_id)
-)
 {
 	struct __packed mcp_create_args {
 		uint32_t	portal_id;
