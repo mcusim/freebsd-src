@@ -1524,7 +1524,9 @@ METHOD int con_set_notif {
 	struct dpaa2_con_notif_cfg *cfg;
 } DEFAULT bypass_con_set_notif;
 
-/* Data Path MC Portal (DPMCP) commands. */
+/**
+ * @brief Data Path MC Portal (DPMCP) commands.
+ */
 
 METHOD int mcp_create {
 	device_t	 dev;
