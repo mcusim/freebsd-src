@@ -3069,7 +3069,7 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 		return (ENXIO);
 	}
 	if (bootverbose)
-		device_printf(rcdev, "isolation context id: %u\n",
+		device_printf(rcdev, "Isolation context ID: %u\n",
 		    dprc_attr.icid);
 	if (rcinfo) {
 		rcinfo->id = dprc_attr.cont_id;
@@ -3077,7 +3077,29 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 		rcinfo->icid = dprc_attr.icid;
 	}
 
-	/* Add managed devices to the resource container. */
+	/*
+	 * Add MC portals before everything else.
+	 * TODO: Discover DPAA2 objects on-demand.
+	 */
+	for (uint32_t i = 0; i < obj_count; i++) {
+		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, child, cmd, i, &obj);
+		if (rc)
+			continue; /* Skip silently for now. */
+		if (obj.type != DPAA2_DEV_MCP)
+			continue;
+
+		dpaa2_rc_add_managed_child(sc, cmd, &obj);
+	}
+	/* Probe and attach MC portals. */
+	bus_generic_probe(rcdev);
+	rc = bus_generic_attach(rcdev);
+	if (rc) {
+		DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
+		dpaa2_mcp_free_command(cmd);
+		return (rc);
+	}
+
+	/* Add managed devices (except DPMCPs) to the resource container. */
 	for (uint32_t i = 0; i < obj_count; i++) {
 		rc = DPAA2_CMD_RC_GET_OBJ(rcdev, child, cmd, i, &obj);
 		if (rc && bootverbose) {
@@ -3092,9 +3114,11 @@ dpaa2_rc_discover(struct dpaa2_rc_softc *sc)
 				continue;
 			}
 		}
+		if (obj.type == DPAA2_DEV_MCP)
+			continue; /* Already added. */
+
 		dpaa2_rc_add_managed_child(sc, cmd, &obj);
 	}
-
 	/* Probe and attach managed devices properly. */
 	bus_generic_probe(rcdev);
 	rc = bus_generic_attach(rcdev);
