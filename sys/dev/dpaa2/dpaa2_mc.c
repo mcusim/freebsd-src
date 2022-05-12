@@ -167,35 +167,46 @@ dpaa2_mc_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Initialize resource manager for DPAA2 DPIO. */
+	/* Initialize a resource manager for the DPAA2 I/O objects. */
 	sc->dpio_rman.rm_type = RMAN_ARRAY;
 	sc->dpio_rman.rm_descr = "DPAA2 DPIO objects";
 	error = rman_init(&sc->dpio_rman);
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
-		    "DPAA2 DPIO objects: error=%d\n", error);
+		    "the DPAA2 I/O objects: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
 
-	/* Initialize resource manager for DPAA2 DPBP. */
+	/* Initialize a resource manager for the DPAA2 buffer pools. */
 	sc->dpbp_rman.rm_type = RMAN_ARRAY;
 	sc->dpbp_rman.rm_descr = "DPAA2 DPBP objects";
 	error = rman_init(&sc->dpbp_rman);
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
-		    "DPAA2 DPBP objects: error=%d\n", error);
+		    "the DPAA2 buffer pools: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
 
-	/* Initialize resource manager for DPAA2 DPCON. */
+	/* Initialize a resource manager for the DPAA2 concentrators. */
 	sc->dpcon_rman.rm_type = RMAN_ARRAY;
 	sc->dpcon_rman.rm_descr = "DPAA2 DPCON objects";
 	error = rman_init(&sc->dpcon_rman);
 	if (error) {
 		device_printf(dev, "Failed to initialize a resource manager for "
-		    "DPAA2 DPCON objects: error=%d\n", error);
+		    "the DPAA2 concentrators: error=%d\n", error);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Initialize a resource manager for the DPAA2 MC portals. */
+	sc->dpmcp_rman.rm_type = RMAN_ARRAY;
+	sc->dpmcp_rman.rm_descr = "DPAA2 DPMCP objects";
+	error = rman_init(&sc->dpmcp_rman);
+	if (error) {
+		device_printf(dev, "Failed to initialize a resource manager for "
+		    "the DPAA2 MC portals: error=%d\n", error);
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
@@ -751,6 +762,8 @@ dpaa2_mc_rman(device_t mcdev, int type)
 		return (&sc->dpbp_rman);
 	case DPAA2_DEV_CON:
 		return (&sc->dpcon_rman);
+	case DPAA2_DEV_MCP:
+		return (&sc->dpmcp_rman);
 	default:
 		break;
 	}

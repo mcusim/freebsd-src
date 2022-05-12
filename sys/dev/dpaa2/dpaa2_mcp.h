@@ -402,6 +402,25 @@ struct dpaa2_con_notif_cfg {
 	uint8_t		prior;
 };
 
+/**
+ * @brief Attributes of the DPMCP object.
+ *
+ * id:		 DPMCP object ID.
+ * options:	 Options of the MC portal (disabled high-prio commands, etc.).
+ */
+struct dpaa2_mcp_attr {
+	uint32_t		id;
+	uint32_t		options;
+};
+
+/**
+ * @brief Software context for the DPAA2 MC portal.
+ */
+struct dpaa2_mcp_softc {
+	device_t		dev;
+	struct dpaa2_mcp_attr	attr;
+};
+
 int	dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
 	    struct resource_map *map, uint16_t flags, bool atomic);
 int	dpaa2_mcp_init_command(struct dpaa2_cmd **cmd, uint16_t flags);

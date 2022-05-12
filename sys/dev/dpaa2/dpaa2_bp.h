@@ -30,6 +30,9 @@
 
 #include <sys/bus.h>
 
+/* Maximum resources per DPBP: 1 DPMCP. */
+#define DPAA2_BP_MAX_RESOURCES	1
+
 /**
  * @brief Attributes of the DPBP object.
  *
@@ -47,6 +50,8 @@ struct dpaa2_bp_attr {
  */
 struct dpaa2_bp_softc {
 	device_t		dev;
+	struct resource 	*res[DPAA2_BP_MAX_RESOURCES];
+
 	struct dpaa2_bp_attr	attr;
 };
 

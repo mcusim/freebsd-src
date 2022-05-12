@@ -55,7 +55,7 @@
 #define DPAA2_MC_MSI_COUNT	 32
 
 /* Flags for DPAA2 devices as resources. */
-#define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to manage by DPAA2-specific rman */
+#define DPAA2_MC_DEV_ALLOCATABLE 0x01u /* to be managed by DPAA2-specific rman */
 #define DPAA2_MC_DEV_ASSOCIATED	 0x02u /* to obtain info about DPAA2 device  */
 #define DPAA2_MC_DEV_SHAREABLE	 0x04u /* to be shared among DPAA2 devices */
 
@@ -72,9 +72,10 @@ struct dpaa2_mc_devinfo; /* about managed DPAA2 devices */
  * res:		Unmapped MC command portal and control registers resources.
  * map:		Mapped MC command portal and control registers resources.
  *
- * dpio_rman:	Data Path I/O objects resource manager.
- * dpbp_rman:	Data Path Buffer Pools resource manager.
- * dpcon_rman:	Data Path Concentrators resource manager.
+ * dpio_rman:	I/O objects resource manager.
+ * dpbp_rman:	Buffer Pools resource manager.
+ * dpcon_rman:	Concentrators resource manager.
+ * dpmcp_rman:	MC portals resource manager.
  */
 struct dpaa2_mc_softc {
 	device_t		 dev;
@@ -89,6 +90,7 @@ struct dpaa2_mc_softc {
 	struct rman		 dpio_rman;
 	struct rman		 dpbp_rman;
 	struct rman		 dpcon_rman;
+	struct rman		 dpmcp_rman;
 
 	/* For managed DPAA2 objects. */
 	struct mtx		 mdev_lock;
