@@ -3573,7 +3573,7 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 			if (error) {
 				dpaa2_mcp_free_command(cmd);
 				device_printf(rcdev, "%s: failed to open DPRC: "
-				    "error=%d\n", __func__, rc);
+				    "error=%d\n", __func__, error);
 				return (ENODEV);
 			}
 
