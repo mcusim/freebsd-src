@@ -456,6 +456,7 @@ dpaa2_rc_print_child(device_t rcdev, device_t child)
 	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_IO);
 	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_BP);
 	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_CON);
+	retval += dpaa2_rc_print_type(rl, DPAA2_DEV_MCP);
 
 	retval += printf(" at %s (id=%u)", dpaa2_ttos(dinfo->dtype), dinfo->id);
 
