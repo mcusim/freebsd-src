@@ -2929,15 +2929,14 @@ dpaa2_rc_mcp_destroy(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 
 static int
 dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
-    uint32_t dpmcp_id)
+    uint32_t dpmcp_id, uint16_t *token)
 {
-	struct __packed mcp_open_args {
-		uint32_t	dpmcp_id;
-	} *args;
 	struct dpaa2_rc_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
 	struct dpaa2_mcp *portal;
+	struct dpaa2_cmd_header *hdr;
+	int error;
 
 	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
@@ -2946,10 +2945,14 @@ dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	if (!portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
-	args = (struct mcp_open_args *) &cmd->params[0];
-	args->dpmcp_id = dpmcp_id;
+	cmd->params[0] = dpmcp_id;
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_OPEN);
+	if (!error) {
+		hdr = (struct dpaa2_cmd_header *) &cmd->header;
+		*token = hdr->token;
+	}
 
-	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_OPEN));
+	return (error);
 }
 
 static int
