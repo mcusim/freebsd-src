@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 
 #include "dpaa2_mcp.h"
 #include "dpaa2_mc.h"
+#include "dpaa2_cmd_if.h"
 
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp", "DPAA2 Management Complex Portal");
 
@@ -143,7 +144,7 @@ err_close_rc:
 err_free_cmd:
 	dpaa2_mcp_free_command(cmd);
 err_exit:
-	dpaa2_bp_detach(dev);
+	dpaa2_mcp_detach(dev);
 	return (ENXIO);
 }
 
