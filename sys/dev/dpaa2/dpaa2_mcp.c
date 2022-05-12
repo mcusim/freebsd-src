@@ -56,6 +56,97 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp", "DPAA2 Management Complex Portal");
 
+static int
+dpaa2_mcp_detach(device_t dev)
+{
+	return (0);
+}
+
+static int
+dpaa2_mcp_probe(device_t dev)
+{
+	/* DPMCP device will be added by the parent resource container. */
+	device_set_desc(dev, "DPAA2 MC portal");
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+dpaa2_mcp_attach(device_t dev)
+{
+	device_t pdev, child;
+	struct dpaa2_mcp_softc *sc;
+	struct dpaa2_devinfo *rcinfo;
+	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_cmd *cmd;
+	uint16_t rc_token, mcp_token;
+	int error;
+
+	sc = device_get_softc(dev);
+	sc->dev = dev;
+	pdev = device_get_parent(dev);
+	child = dev;
+	rcinfo = device_get_ivars(pdev);
+	dinfo = device_get_ivars(dev);
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate dpaa2_cmd: "
+		    "error=%d\n", __func__, error);
+		goto err_exit;
+	}
+
+	/* Open resource container and DPMCP object. */
+	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
+		    __func__, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_MCP_OPEN(dev, child, cmd, dinfo->id, &mcp_token);
+	if (error) {
+		device_printf(dev, "%s: failed to open DPMCP: id=%d, error=%d\n",
+		    __func__, dinfo->id, error);
+		goto err_close_rc;
+	}
+
+	/* Prepare DPMCP object. */
+	error = DPAA2_CMD_MCP_RESET(dev, child, cmd);
+	if (error) {
+		device_printf(dev, "%s: failed to reset DPMCP: id=%d, "
+		    "error=%d\n", __func__, dinfo->id, error);
+		goto err_close_mcp;
+	}
+
+	/* Close the DPMCP object and the resource container. */
+	error = DPAA2_CMD_MCP_CLOSE(dev, child, cmd);
+	if (error) {
+		device_printf(dev, "%s: failed to close DPMCP: id=%d, "
+		    "error=%d\n", __func__, dinfo->id, error);
+		goto err_close_rc;
+	}
+	error = DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
+	if (error) {
+		device_printf(dev, "%s: failed to close DPRC: error=%d\n",
+		    __func__, error);
+		goto err_free_cmd;
+	}
+
+	dpaa2_mcp_free_command(cmd);
+
+	return (0);
+
+err_close_mcp:
+	DPAA2_CMD_MCP_CLOSE(dev, child, dpaa2_mcp_tk(cmd, mcp_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+err_exit:
+	dpaa2_bp_detach(dev);
+	return (ENXIO);
+}
+
 int
 dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
     struct resource_map *map, uint16_t flags, bool atomic)
@@ -233,3 +324,22 @@ dpaa2_mcp_unlock(struct dpaa2_mcp *mcp)
 		}
 	}
 }
+
+static device_method_t dpaa2_mcp_methods[] = {
+	/* Device interface */
+	DEVMETHOD(device_probe,		dpaa2_mcp_probe),
+	DEVMETHOD(device_attach,	dpaa2_mcp_attach),
+	DEVMETHOD(device_detach,	dpaa2_mcp_detach),
+
+	DEVMETHOD_END
+};
+
+static driver_t dpaa2_mcp_driver = {
+	"dpaa2_mcp",
+	dpaa2_mcp_methods,
+	sizeof(struct dpaa2_mcp_softc),
+};
+
+static devclass_t dpaa2_mcp_devclass;
+
+DRIVER_MODULE(dpaa2_mcp, dpaa2_rc, dpaa2_mcp_driver, dpaa2_mcp_devclass, 0, 0);

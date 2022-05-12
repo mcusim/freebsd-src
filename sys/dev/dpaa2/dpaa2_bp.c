@@ -108,6 +108,13 @@ dpaa2_bp_attach(device_t dev)
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
 
+	error = bus_alloc_resources(sc->dev, dpaa2_bp_spec, sc->res);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate resources: "
+		    "error=%d\n", __func__, error);
+		return (ENXIO);
+	}
+
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
 	if (error) {
