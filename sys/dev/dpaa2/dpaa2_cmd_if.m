@@ -874,12 +874,13 @@ CODE {
 	}
 	static int
 	bypass_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
-		uint32_t dpmcp_id)
+		uint32_t dpmcp_id, uint16_t *token)
 	{
 		panic_on_mc(dev);
 		if (device_get_parent(dev) != NULL)
 			return (DPAA2_CMD_MCP_OPEN(
-				device_get_parent(dev), child, cmd, dpmcp_id));
+				device_get_parent(dev), child, cmd, dpmcp_id,
+				token));
 		return (ENXIO);
 	}
 	static int
@@ -1549,6 +1550,7 @@ METHOD int mcp_open {
 	device_t	 child;
 	struct dpaa2_cmd *cmd;
 	uint32_t	 dpmcp_id;
+	uint16_t	*token;
 } DEFAULT bypass_mcp_open;
 
 METHOD int mcp_close {
