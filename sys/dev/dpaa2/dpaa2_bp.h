@@ -51,7 +51,6 @@ struct dpaa2_bp_attr {
 struct dpaa2_bp_softc {
 	device_t		dev;
 	struct resource 	*res[DPAA2_BP_MAX_RESOURCES];
-
 	struct dpaa2_bp_attr	attr;
 };
 

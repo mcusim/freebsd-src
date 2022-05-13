@@ -76,11 +76,28 @@ __FBSDID("$FreeBSD$");
  *
  * Note that MSI should be allocated separately using pseudo-PCI interface.
  */
-static struct resource_spec dpaa2_io_spec[] = {
-	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 1, RF_ACTIVE | RF_UNMAPPED },
-	{ SYS_RES_MEMORY, 2, RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
-
+struct resource_spec dpaa2_io_spec[] = {
+	/*
+	 * System Memory resources.
+	 */
+#define MEM_RES_NUM	(3u)
+#define MEM_RID_OFF	(0u)
+#define MEM_RID(rid)	((rid) + MCP_RID_OFF)
+	{ SYS_RES_MEMORY, MEM_RID(0),   RF_ACTIVE | RF_UNMAPPED },
+	{ SYS_RES_MEMORY, MEM_RID(1),   RF_ACTIVE | RF_UNMAPPED },
+	{ SYS_RES_MEMORY, MEM_RID(2),   RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
+	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPIO.
+	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(MEM_RID_OFF + MEM_RES_NUM)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
+	{ DPAA2_DEV_MCP,  MCP_RID(0),   RF_ACTIVE | RF_OPTIONAL },
+	/* --- */
 	RESOURCE_SPEC_END
 };
 

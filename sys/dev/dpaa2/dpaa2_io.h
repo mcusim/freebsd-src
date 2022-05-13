@@ -35,6 +35,8 @@
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 
+/* Maximum resources per DPIO: 3 SYS_MEM + 1 DPMCP. */
+#define DPAA2_IO_MAX_RESOURCES	4
 /* Maximum number of MSIs supported by the DPIO objects. */
 #define DPAA2_IO_MSI_COUNT	1
 
@@ -96,12 +98,14 @@ struct dpaa2_io_softc {
 	uint16_t		 rc_token;
 	uint16_t		 io_token;
 
-	struct resource 	*res[3];
-	struct resource_map	 map[3];
+	struct resource 	*res[DPAA2_IO_MAX_RESOURCES];
+	struct resource_map	 map[DPAA2_IO_MAX_RESOURCES];
 
 	int			 irq_rid[DPAA2_IO_MSI_COUNT];
 	struct resource		*irq_resource;
 	void			*intr; /* interrupt handle */
 };
+
+extern struct resource_spec dpaa2_io_spec[];
 
 #endif /* _DPAA2_IO_H */

@@ -204,6 +204,17 @@ MALLOC_DEFINE(M_DPAA2_NI, "dpaa2_ni", "DPAA2 Network Interface");
 /* DPAA2 Network Interface resource specification. */
 struct resource_spec dpaa2_ni_spec[] = {
 	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPNI.
+	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(0u)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
+	{ DPAA2_DEV_MCP, MCP_RID(0),   RF_ACTIVE | RF_OPTIONAL },
+	/*
 	 * DPIO resources (software portals).
 	 *
 	 * NOTE: One per running core. While DPIOs are the source of data
@@ -211,7 +222,7 @@ struct resource_spec dpaa2_ni_spec[] = {
 	 *	 network interface that has produced ingress data to that core.
 	 */
 #define IO_RES_NUM	(16u)
-#define IO_RID_OFF	(0u)
+#define IO_RID_OFF	(MCP_RID_OFF + MCP_RES_NUM)
 #define IO_RID(rid)	((rid) + IO_RID_OFF)
 	/* --- */
 	{ DPAA2_DEV_IO,  IO_RID(0),    RF_ACTIVE | RF_SHAREABLE },
@@ -269,17 +280,6 @@ struct resource_spec dpaa2_ni_spec[] = {
  	{ DPAA2_DEV_CON, CON_RID(13),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(14),  RF_ACTIVE | RF_OPTIONAL },
  	{ DPAA2_DEV_CON, CON_RID(15),  RF_ACTIVE | RF_OPTIONAL },
-	/*
-	 * DPMCP resources.
-	 *
-	 * NOTE: MC command portals (MCPs) are used to send commands to, and
-	 *	 receive responses from, the MC firmware. One portal per DPNI.
-	 */
-#define MCP_RES_NUM	(1u)
-#define MCP_RID_OFF	(CON_RID_OFF + CON_RES_NUM)
-#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
-	/* --- */
-	/* { DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE }, */
 	/* --- */
 	RESOURCE_SPEC_END
 };

@@ -35,6 +35,9 @@
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 
+/* Maximum resources per DPCON: 1 DPMCP. */
+#define DPAA2_CON_MAX_RESOURCES	1
+
 /**
  * @brief Attributes of the DPCON object.
  *
@@ -53,6 +56,7 @@ struct dpaa2_con_attr {
  */
 struct dpaa2_con_softc {
 	device_t		 dev;
+	struct resource 	*res[DPAA2_CON_MAX_RESOURCES];
 	struct dpaa2_con_attr	 attr;
 
 	/* Help to send commands to MC. */
@@ -60,5 +64,7 @@ struct dpaa2_con_softc {
 	uint16_t		 rc_token;
 	uint16_t		 con_token;
 };
+
+extern struct resource_spec dpaa2_con_spec[];
 
 #endif /* _DPAA2_CON_H */

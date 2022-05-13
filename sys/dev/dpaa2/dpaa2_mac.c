@@ -72,6 +72,23 @@ __FBSDID("$FreeBSD$");
 #define DPMAC_IRQ_LINK_DOWN_REQ	0x00000008 /* link down request */
 #define DPMAC_IRQ_EP_CHANGED	0x00000010 /* DPAA2 endpoint dis/connected */
 
+/* DPAA2 MAC resource specification. */
+struct resource_spec dpaa2_mac_spec[] = {
+	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPMAC.
+	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(0u)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
+	{ DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE | RF_OPTIONAL },
+	/* --- */
+	RESOURCE_SPEC_END
+};
+
 /* Interrupt configuration routines. */
 static int dpaa2_mac_setup_irq(device_t);
 static int dpaa2_mac_setup_msi(struct dpaa2_mac_softc *);
@@ -108,6 +125,13 @@ dpaa2_mac_attach(device_t dev)
 	dinfo = device_get_ivars(dev);
 
 	memset(sc->addr, 0, ETHER_ADDR_LEN);
+
+	error = bus_alloc_resources(sc->dev, dpaa2_mac_spec, sc->res);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate resources: "
+		    "error=%d\n", __func__, error);
+		return (ENXIO);
+	}
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);

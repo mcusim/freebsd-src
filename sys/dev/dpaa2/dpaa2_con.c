@@ -67,7 +67,22 @@ __FBSDID("$FreeBSD$");
 #include "dpaa2_mc.h"
 #include "dpaa2_cmd_if.h"
 
-/* Forward declarations. */
+/* DPAA2 Concentrator resource specification. */
+struct resource_spec dpaa2_con_spec[] = {
+	/*
+	 * DPMCP resources.
+	 *
+	 * NOTE: MC command portals (MCPs) are used to send commands to, and
+	 *	 receive responses from, the MC firmware. One portal per DPCON.
+	 */
+#define MCP_RES_NUM	(1u)
+#define MCP_RID_OFF	(0u)
+#define MCP_RID(rid)	((rid) + MCP_RID_OFF)
+	/* --- */
+	{ DPAA2_DEV_MCP, MCP_RID(0), RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
+	/* --- */
+	RESOURCE_SPEC_END
+};
 
 static int dpaa2_con_detach(device_t dev);
 
@@ -115,6 +130,13 @@ dpaa2_con_attach(device_t dev)
 	child = dev;
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
+
+	error = bus_alloc_resources(sc->dev, dpaa2_con_spec, sc->res);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate resources: "
+		    "error=%d\n", __func__, error);
+		return (ENXIO);
+	}
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);

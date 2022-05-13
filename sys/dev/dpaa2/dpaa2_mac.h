@@ -37,6 +37,7 @@
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 
+#define DPAA2_MAC_MAX_RESOURCES	1  /* Maximum resources per DPMAC: 1 DPMCP. */
 #define DPAA2_MAC_MSI_COUNT	1  /* MSIs per DPMAC */
 
 /* DPMAC link configuration options. */
@@ -104,6 +105,7 @@ struct dpaa2_mac_link_state {
 struct dpaa2_mac_softc {
 	device_t		 dev;
 	uint8_t			 addr[ETHER_ADDR_LEN];
+	struct resource 	*res[DPAA2_MAC_MAX_RESOURCES];
 	struct dpaa2_mac_attr	 attr;
 
 	/* Help to send commands to MC. */
@@ -116,5 +118,7 @@ struct dpaa2_mac_softc {
 	struct resource		*irq_res;
 	void			*intr; /* interrupt handle */
 };
+
+extern struct resource_spec dpaa2_mac_spec[];
 
 #endif /* _DPAA2_MAC_H */

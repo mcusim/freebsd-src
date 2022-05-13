@@ -3217,6 +3217,8 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 
 	/* Add DPAA2-specific resources to the resource list. */
 	for (; res_spec && res_spec->type != -1; res_spec++) {
+		if (res_spec->type < DPAA2_DEV_MC)
+			continue; /* Skip non-DPAA2 resource. */
 		rid = res_spec->rid;
 
 		/* Limit DPIOs and DPCONs by number of CPUs. */
@@ -3262,7 +3264,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	device_t rcdev, dev, child;
 	struct dpaa2_devinfo *rcinfo, *dinfo;
 	struct dpaa2_rc_obj_region reg;
-	struct resource_spec *res_spec = NULL;
+	struct resource_spec *res_spec;
 	const char *devclass;
 	uint64_t start, end, count;
 	uint32_t flags = 0;
@@ -3275,6 +3277,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	switch (obj->type) {
 	case DPAA2_DEV_IO:
 		devclass = "dpaa2_io";
+		res_spec = dpaa2_io_spec;
 		flags = DPAA2_MC_DEV_ALLOCATABLE | DPAA2_MC_DEV_SHAREABLE;
 		break;
 	case DPAA2_DEV_BP:
@@ -3284,15 +3287,18 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		break;
 	case DPAA2_DEV_CON:
 		devclass = "dpaa2_con";
+		res_spec = dpaa2_con_spec;
 		flags = DPAA2_MC_DEV_ALLOCATABLE;
 		break;
 	case DPAA2_DEV_MAC:
 		devclass = "dpaa2_mac";
+		res_spec = dpaa2_mac_spec;
 		flags = DPAA2_MC_DEV_ASSOCIATED;
 		break;
 	case DPAA2_DEV_MCP:
 		devclass = "dpaa2_mcp";
-		flags = DPAA2_MC_DEV_ALLOCATABLE;
+		res_spec = NULL;
+		flags = DPAA2_MC_DEV_ALLOCATABLE | DPAA2_MC_DEV_SHAREABLE;
 		break;
 	default:
 		/* Only managed devices above are supported. */
@@ -3354,6 +3360,8 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 
 	/* Add DPAA2-specific resources to the resource list. */
 	for (; res_spec && res_spec->type != -1; res_spec++) {
+		if (res_spec->type < DPAA2_DEV_MC)
+			continue; /* Skip non-DPAA2 resource. */
 		rid = res_spec->rid;
 
 		error = dpaa2_rc_add_res(rcdev, dev, res_spec->type, &rid,
@@ -3570,70 +3578,10 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
 	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
-	struct dpaa2_cmd *cmd;
-	struct dpaa2_obj obj;
 	struct resource *res;
 	uint32_t dpmcp_id;
-	uint16_t rc_token;
 	bool shared = false;
 	int error;
-
-	if (devtype == DPAA2_DEV_MCP) {
-		/*
-		 * Create a new DPMCP if there's no free MC portal available in
-		 * the resource container.
-		 */
-		error = DPAA2_MC_GET_FREE_DEV(rcdev, &dpaa2_dev, devtype);
-		if (error) {
-			/* Allocate a command to send to MC hardware. */
-			error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-			if (error) {
-				device_printf(rcdev, "%s: failed to allocate "
-				    "dpaa2_cmd: error=%d\n", __func__, error);
-				return (ENODEV);
-			}
-			/* Open resource container. */
-			error = DPAA2_CMD_RC_OPEN(rcdev, child, cmd, rcinfo->id,
-			    &rc_token);
-			if (error) {
-				dpaa2_mcp_free_command(cmd);
-				device_printf(rcdev, "%s: failed to open DPRC: "
-				    "error=%d\n", __func__, error);
-				return (ENODEV);
-			}
-
-			error = DPAA2_CMD_MCP_CREATE(rcdev, child, cmd, 0, 0,
-			    &dpmcp_id);
-			if (error) {
-				dpaa2_mcp_free_command(cmd);
-				device_printf(rcdev, "%s: failed to create MC "
-				    "portal: error=%d\n", __func__, error);
-				return (ENODEV);
-			}
-
-			error = DPAA2_CMD_RC_GET_OBJ_DESCRIPTOR(rcdev, child,
-			    cmd, dpmcp_id, DPAA2_DEV_MCP, &obj);
-			if (error) {
-				dpaa2_mcp_free_command(cmd);
-				device_printf(rcdev, "%s: failed to get "
-				    "information about DPMCP: id=%u, error=%d\n",
-				    __func__, dpmcp_id, error);
-				return (ENODEV);
-			}
-			dpaa2_rc_add_managed_child(sc, cmd, &obj);
-
-			/* Close resource container. */
-			error = DPAA2_CMD_RC_CLOSE(rcdev, child, cmd);
-			if (error) {
-				dpaa2_mcp_free_command(cmd);
-				device_printf(rcdev, "%s: failed to close DPRC: "
-				    "error=%d\n", __func__, error);
-				return (ENODEV);
-			}
-
-			dpaa2_mcp_free_command(cmd);
-		}
-	}
 
 	/* Request a free DPAA2 device of the given type from MC. */
 	error = DPAA2_MC_GET_FREE_DEV(rcdev, &dpaa2_dev, devtype);
