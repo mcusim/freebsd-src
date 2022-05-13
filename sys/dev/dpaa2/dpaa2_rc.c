@@ -3575,11 +3575,8 @@ dpaa2_rc_add_res(device_t rcdev, device_t child, enum dpaa2_dev_type devtype,
     int *rid, int flags)
 {
 	device_t dpaa2_dev;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(child);
 	struct resource *res;
-	uint32_t dpmcp_id;
 	bool shared = false;
 	int error;
 
