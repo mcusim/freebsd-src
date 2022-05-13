@@ -98,15 +98,14 @@ dpaa2_mcp_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "%s: failed to allocate resources\n",
 		    __func__);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
 	if (rman_get_size(sc->res[0]) < DPAA2_MCP_MEM_WIDTH) {
 		device_printf(dev, "%s: MC portal memory region too small: "
 		    "%jd\n", __func__, rman_get_size(sc->res[0]));
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* Map MC portal memory resource. */
@@ -117,8 +116,7 @@ dpaa2_mcp_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "%s: failed to map MC portal memory\n",
 		    __func__);
-		dpaa2_mc_detach(dev);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* Prepare helper portal object to send commands to MC. */
@@ -127,8 +125,7 @@ dpaa2_mcp_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
 		    "error=%d\n", __func__, error);
-		dpaa2_rc_detach(dev);
-		return (ENXIO);
+		goto err_exit;
 	}
 
 	/* Allocate a command to send to MC hardware. */
