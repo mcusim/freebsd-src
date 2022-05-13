@@ -96,7 +96,7 @@ struct resource_spec dpaa2_io_spec[] = {
 #define MCP_RID_OFF	(MEM_RID_OFF + MEM_RES_NUM)
 #define MCP_RID(rid)	((rid) + MCP_RID_OFF)
 	/* --- */
-	{ DPAA2_DEV_MCP,  MCP_RID(0),   RF_ACTIVE | RF_OPTIONAL },
+	{ DPAA2_DEV_MCP,  MCP_RID(0),   RF_ACTIVE | RF_SHAREABLE | RF_OPTIONAL },
 	/* --- */
 	RESOURCE_SPEC_END
 };
