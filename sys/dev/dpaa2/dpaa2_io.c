@@ -82,7 +82,7 @@ struct resource_spec dpaa2_io_spec[] = {
 	 */
 #define MEM_RES_NUM	(3u)
 #define MEM_RID_OFF	(0u)
-#define MEM_RID(rid)	((rid) + MCP_RID_OFF)
+#define MEM_RID(rid)	((rid) + MEM_RID_OFF)
 	{ SYS_RES_MEMORY, MEM_RID(0),   RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, MEM_RID(1),   RF_ACTIVE | RF_UNMAPPED },
 	{ SYS_RES_MEMORY, MEM_RID(2),   RF_ACTIVE | RF_UNMAPPED | RF_OPTIONAL },
