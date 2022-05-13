@@ -707,22 +707,26 @@ dpaa2_rc_mng_get_container_id(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t cont_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd || !token)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = cont_id;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_OPEN);
 	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -732,17 +736,21 @@ dpaa2_rc_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_rc_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+	struct dpaa2_mcp *portal;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	/* TODO: use devinfo's portal instead of sc->portal */
+	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
+	if (!portal || !cmd)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_CLOSE));
 }
 
 static int
@@ -2883,7 +2891,7 @@ dpaa2_rc_mcp_create(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	struct dpaa2_mcp *portal;
 	int error;
 
-	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
 	/* TODO: use devinfo's portal instead of sc->portal */
 	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
@@ -2915,7 +2923,7 @@ dpaa2_rc_mcp_destroy(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
 	struct dpaa2_mcp *portal;
 
-	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
 	/* TODO: use devinfo's portal instead of sc->portal */
 	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
@@ -2939,7 +2947,7 @@ dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
 	/* TODO: use devinfo's portal instead of sc->portal */
 	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
@@ -2964,7 +2972,7 @@ dpaa2_rc_mcp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
 	struct dpaa2_mcp *portal;
 
-	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
 	/* TODO: use devinfo's portal instead of sc->portal */
 	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
@@ -2982,7 +2990,7 @@ dpaa2_rc_mcp_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
 	struct dpaa2_mcp *portal;
 
-	if (!child || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
+	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
 		return (DPAA2_CMD_STAT_ERR);
 	/* TODO: use devinfo's portal instead of sc->portal */
 	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
