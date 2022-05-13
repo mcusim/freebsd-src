@@ -40,6 +40,7 @@
 
 #define DPAA2_PORTAL_TIMEOUT		100000	/* us */
 #define DPAA2_MCP_MEM_WIDTH		0x40 /* Minimal size of the MC portal. */
+#define DPAA2_MCP_MAX_RESOURCES		1 /* resources per DPMCP: 1 SYS_MEM */
 
 /*
  * Portal flags.
@@ -417,8 +418,11 @@ struct dpaa2_mcp_attr {
  * @brief Software context for the DPAA2 MC portal.
  */
 struct dpaa2_mcp_softc {
-	device_t		dev;
-	struct dpaa2_mcp_attr	attr;
+	device_t		 dev;
+	struct dpaa2_mcp_attr	 attr;
+
+	struct resource 	*res[DPAA2_MCP_MAX_RESOURCES];
+	struct resource_map	 map[DPAA2_MCP_MAX_RESOURCES];
 };
 
 int	dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,

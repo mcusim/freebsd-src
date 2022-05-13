@@ -57,6 +57,11 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_DPAA2_MCP, "dpaa2_mcp", "DPAA2 Management Complex Portal");
 
+static struct resource_spec dpaa2_mcp_spec[] = {
+	{ SYS_RES_MEMORY, 0, RF_ACTIVE | RF_UNMAPPED },
+	RESOURCE_SPEC_END
+};
+
 static int
 dpaa2_mcp_detach(device_t dev)
 {
@@ -74,20 +79,57 @@ dpaa2_mcp_probe(device_t dev)
 static int
 dpaa2_mcp_attach(device_t dev)
 {
-	device_t pdev, child;
+	device_t pdev = device_get_parent(dev);
+	device_t child = dev;
 	struct dpaa2_mcp_softc *sc;
 	struct dpaa2_devinfo *rcinfo;
 	struct dpaa2_devinfo *dinfo;
 	struct dpaa2_cmd *cmd;
+	struct resource_map_request req;
 	uint16_t rc_token, mcp_token;
 	int error;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	pdev = device_get_parent(dev);
-	child = dev;
 	rcinfo = device_get_ivars(pdev);
 	dinfo = device_get_ivars(dev);
+
+	error = bus_alloc_resources(sc->dev, dpaa2_mcp_spec, sc->res);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate resources\n",
+		    __func__);
+		return (ENXIO);
+	}
+
+	/* At least 64 bytes of the command portal should be available. */
+	if (rman_get_size(sc->res[0]) < DPAA2_MCP_MEM_WIDTH) {
+		device_printf(dev, "%s: MC portal memory region too small: "
+		    "%jd\n", __func__, rman_get_size(sc->res[0]));
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Map MC portal memory resource. */
+	resource_init_map_request(&req);
+	req.memattr = VM_MEMATTR_DEVICE;
+	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0], &req,
+	    &sc->map[0]);
+	if (error) {
+		device_printf(dev, "%s: failed to map MC portal memory\n",
+		    __func__);
+		dpaa2_mc_detach(dev);
+		return (ENXIO);
+	}
+
+	/* Prepare helper portal object to send commands to MC. */
+	error = dpaa2_mcp_init_portal(&dinfo->portal, sc->res[0], &sc->map[0],
+	    DPAA2_PORTAL_DEF, true);
+	if (error) {
+		device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
+		    "error=%d\n", __func__, error);
+		dpaa2_rc_detach(dev);
+		return (ENXIO);
+	}
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
