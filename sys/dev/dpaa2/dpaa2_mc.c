@@ -95,8 +95,6 @@ static struct resource_spec dpaa2_mc_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-/* Forward declarations. */
-
 static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
 static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
 static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
@@ -124,7 +122,8 @@ dpaa2_mc_attach(device_t dev)
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mc_spec, sc->res);
 	if (error) {
-		device_printf(dev, "Failed to allocate resources\n");
+		device_printf(dev, "%s: failed to allocate resources\n",
+		    __func__);
 		return (ENXIO);
 	}
 
@@ -150,8 +149,8 @@ dpaa2_mc_attach(device_t dev)
 
 	/* At least 64 bytes of the command portal should be available. */
 	if (rman_get_size(sc->res[0]) < DPAA2_MCP_MEM_WIDTH) {
-		device_printf(dev, "MC portal memory region too small: %jd\n",
-		    rman_get_size(sc->res[0]));
+		device_printf(dev, "%s: MC portal memory region too small: "
+		    "%jd\n", __func__, rman_get_size(sc->res[0]));
 		dpaa2_mc_detach(dev);
 		return (ENXIO);
 	}
