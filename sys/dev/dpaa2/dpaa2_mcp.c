@@ -81,18 +81,15 @@ dpaa2_mcp_attach(device_t dev)
 {
 	device_t pdev = device_get_parent(dev);
 	device_t child = dev;
-	struct dpaa2_mcp_softc *sc;
-	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_mcp_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_cmd *cmd;
 	struct resource_map_request req;
 	uint16_t rc_token, mcp_token;
 	int error;
 
-	sc = device_get_softc(dev);
 	sc->dev = dev;
-	rcinfo = device_get_ivars(pdev);
-	dinfo = device_get_ivars(dev);
 
 	error = bus_alloc_resources(sc->dev, dpaa2_mcp_spec, sc->res);
 	if (error) {
