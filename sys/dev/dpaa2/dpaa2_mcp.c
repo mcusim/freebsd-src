@@ -85,6 +85,7 @@ dpaa2_mcp_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_cmd *cmd;
+	struct dpaa2_mcp *portal;
 	struct resource_map_request req;
 	uint16_t rc_token, mcp_token;
 	int error;
@@ -116,8 +117,8 @@ dpaa2_mcp_attach(device_t dev)
 		goto err_exit;
 	}
 
-	/* Prepare helper portal object to send commands to MC. */
-	error = dpaa2_mcp_init_portal(&dinfo->portal, sc->res[0], &sc->map[0],
+	/* Initialize portal to send commands to MC. */
+	error = dpaa2_mcp_init_portal(&portal, sc->res[0], &sc->map[0],
 	    DPAA2_PORTAL_DEF, true);
 	if (error) {
 		device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
@@ -170,6 +171,7 @@ dpaa2_mcp_attach(device_t dev)
 	}
 
 	dpaa2_mcp_free_command(cmd);
+	dinfo->portal = portal;
 
 	return (0);
 
