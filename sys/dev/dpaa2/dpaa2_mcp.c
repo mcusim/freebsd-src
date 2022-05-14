@@ -62,130 +62,6 @@ static struct resource_spec dpaa2_mcp_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-static int
-dpaa2_mcp_detach(device_t dev)
-{
-	return (0);
-}
-
-static int
-dpaa2_mcp_probe(device_t dev)
-{
-	/* DPMCP device will be added by the parent resource container. */
-	device_set_desc(dev, "DPAA2 MC portal");
-	return (BUS_PROBE_DEFAULT);
-}
-
-static int
-dpaa2_mcp_attach(device_t dev)
-{
-	device_t pdev = device_get_parent(dev);
-	device_t child = dev;
-	struct dpaa2_mcp_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_cmd *cmd;
-	struct dpaa2_mcp *portal;
-	struct resource_map_request req;
-	uint16_t rc_token, mcp_token;
-	int error;
-
-	sc->dev = dev;
-
-	error = bus_alloc_resources(sc->dev, dpaa2_mcp_spec, sc->res);
-	if (error) {
-		device_printf(dev, "%s: failed to allocate resources\n",
-		    __func__);
-		goto err_exit;
-	}
-
-	/* At least 64 bytes of the command portal should be available. */
-	if (rman_get_size(sc->res[0]) < DPAA2_MCP_MEM_WIDTH) {
-		device_printf(dev, "%s: MC portal memory region too small: "
-		    "%jd\n", __func__, rman_get_size(sc->res[0]));
-		goto err_exit;
-	}
-
-	/* Map MC portal memory resource. */
-	resource_init_map_request(&req);
-	req.memattr = VM_MEMATTR_DEVICE;
-	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0], &req,
-	    &sc->map[0]);
-	if (error) {
-		device_printf(dev, "%s: failed to map MC portal memory\n",
-		    __func__);
-		goto err_exit;
-	}
-
-	/* Initialize portal to send commands to MC. */
-	error = dpaa2_mcp_init_portal(&portal, sc->res[0], &sc->map[0],
-	    DPAA2_PORTAL_DEF, true);
-	if (error) {
-		device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
-		    "error=%d\n", __func__, error);
-		goto err_exit;
-	}
-
-	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
-	if (error) {
-		device_printf(dev, "%s: failed to allocate dpaa2_cmd: "
-		    "error=%d\n", __func__, error);
-		goto err_exit;
-	}
-
-	/* Open resource container and DPMCP object. */
-	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &rc_token);
-	if (error) {
-		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
-		    __func__, error);
-		goto err_free_cmd;
-	}
-	error = DPAA2_CMD_MCP_OPEN(dev, child, cmd, dinfo->id, &mcp_token);
-	if (error) {
-		device_printf(dev, "%s: failed to open DPMCP: id=%d, error=%d\n",
-		    __func__, dinfo->id, error);
-		goto err_close_rc;
-	}
-
-	/* Prepare DPMCP object. */
-	error = DPAA2_CMD_MCP_RESET(dev, child, cmd);
-	if (error) {
-		device_printf(dev, "%s: failed to reset DPMCP: id=%d, "
-		    "error=%d\n", __func__, dinfo->id, error);
-		goto err_close_mcp;
-	}
-
-	/* Close the DPMCP object and the resource container. */
-	error = DPAA2_CMD_MCP_CLOSE(dev, child, cmd);
-	if (error) {
-		device_printf(dev, "%s: failed to close DPMCP: id=%d, "
-		    "error=%d\n", __func__, dinfo->id, error);
-		goto err_close_rc;
-	}
-	error = DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
-	if (error) {
-		device_printf(dev, "%s: failed to close DPRC: error=%d\n",
-		    __func__, error);
-		goto err_free_cmd;
-	}
-
-	dpaa2_mcp_free_command(cmd);
-	dinfo->portal = portal;
-
-	return (0);
-
-err_close_mcp:
-	DPAA2_CMD_MCP_CLOSE(dev, child, dpaa2_mcp_tk(cmd, mcp_token));
-err_close_rc:
-	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
-err_free_cmd:
-	dpaa2_mcp_free_command(cmd);
-err_exit:
-	dpaa2_mcp_detach(dev);
-	return (ENXIO);
-}
-
 int
 dpaa2_mcp_init_portal(struct dpaa2_mcp **mcp, struct resource *res,
     struct resource_map *map, uint16_t flags, bool atomic)
@@ -362,6 +238,130 @@ dpaa2_mcp_unlock(struct dpaa2_mcp *mcp)
 			mtx_unlock(&mcp->lock);
 		}
 	}
+}
+
+static int
+dpaa2_mcp_probe(device_t dev)
+{
+	/* DPMCP device will be added by the parent resource container. */
+	device_set_desc(dev, "DPAA2 MC portal");
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+dpaa2_mcp_detach(device_t dev)
+{
+	return (0);
+}
+
+static int
+dpaa2_mcp_attach(device_t dev)
+{
+	device_t pdev = device_get_parent(dev);
+	device_t child = dev;
+	struct dpaa2_mcp_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_cmd *cmd;
+	struct dpaa2_mcp *portal;
+	struct resource_map_request req;
+	uint16_t rc_token, mcp_token;
+	int error;
+
+	sc->dev = dev;
+
+	error = bus_alloc_resources(sc->dev, dpaa2_mcp_spec, sc->res);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate resources\n",
+		    __func__);
+		goto err_exit;
+	}
+
+	/* At least 64 bytes of the command portal should be available. */
+	if (rman_get_size(sc->res[0]) < DPAA2_MCP_MEM_WIDTH) {
+		device_printf(dev, "%s: MC portal memory region too small: "
+		    "%jd\n", __func__, rman_get_size(sc->res[0]));
+		goto err_exit;
+	}
+
+	/* Map MC portal memory resource. */
+	resource_init_map_request(&req);
+	req.memattr = VM_MEMATTR_DEVICE;
+	error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[0], &req,
+	    &sc->map[0]);
+	if (error) {
+		device_printf(dev, "%s: failed to map MC portal memory\n",
+		    __func__);
+		goto err_exit;
+	}
+
+	/* Initialize portal to send commands to MC. */
+	error = dpaa2_mcp_init_portal(&portal, sc->res[0], &sc->map[0],
+	    DPAA2_PORTAL_DEF, true);
+	if (error) {
+		device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
+		    "error=%d\n", __func__, error);
+		goto err_exit;
+	}
+
+	/* Allocate a command to send to MC hardware. */
+	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	if (error) {
+		device_printf(dev, "%s: failed to allocate dpaa2_cmd: "
+		    "error=%d\n", __func__, error);
+		goto err_exit;
+	}
+
+	/* Open resource container and DPMCP object. */
+	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &rc_token);
+	if (error) {
+		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
+		    __func__, error);
+		goto err_free_cmd;
+	}
+	error = DPAA2_CMD_MCP_OPEN(dev, child, cmd, dinfo->id, &mcp_token);
+	if (error) {
+		device_printf(dev, "%s: failed to open DPMCP: id=%d, error=%d\n",
+		    __func__, dinfo->id, error);
+		goto err_close_rc;
+	}
+
+	/* Prepare DPMCP object. */
+	error = DPAA2_CMD_MCP_RESET(dev, child, cmd);
+	if (error) {
+		device_printf(dev, "%s: failed to reset DPMCP: id=%d, "
+		    "error=%d\n", __func__, dinfo->id, error);
+		goto err_close_mcp;
+	}
+
+	/* Close the DPMCP object and the resource container. */
+	error = DPAA2_CMD_MCP_CLOSE(dev, child, cmd);
+	if (error) {
+		device_printf(dev, "%s: failed to close DPMCP: id=%d, "
+		    "error=%d\n", __func__, dinfo->id, error);
+		goto err_close_rc;
+	}
+	error = DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
+	if (error) {
+		device_printf(dev, "%s: failed to close DPRC: error=%d\n",
+		    __func__, error);
+		goto err_free_cmd;
+	}
+
+	dpaa2_mcp_free_command(cmd);
+	dinfo->portal = portal;
+
+	return (0);
+
+err_close_mcp:
+	DPAA2_CMD_MCP_CLOSE(dev, child, dpaa2_mcp_tk(cmd, mcp_token));
+err_close_rc:
+	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
+err_free_cmd:
+	dpaa2_mcp_free_command(cmd);
+err_exit:
+	dpaa2_mcp_detach(dev);
+	return (ENXIO);
 }
 
 static device_method_t dpaa2_mcp_methods[] = {
