@@ -486,9 +486,11 @@ dpaa2_ni_attach(device_t dev)
 {
 	device_t pdev = device_get_parent(dev);
 	device_t child = dev;
+	device_t mcp_dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *mcp_dinfo;
 	struct ifnet *ifp;
 	int error;
 
@@ -531,6 +533,11 @@ dpaa2_ni_attach(device_t dev)
 		    "error=%d\n", __func__, error);
 		return (ENXIO);
 	}
+
+	/* Obtain MC portal. */
+	mcp_dev = (device_t) rman_get_start(sc->res[MCP_RID(0)]);
+	mcp_dinfo = device_get_ivars(mcp_dev);
+	dinfo->portal = mcp_dinfo->portal;
 
 	mtx_init(&sc->lock, device_get_nameunit(dev), "dpaa2_ni", MTX_DEF);
 

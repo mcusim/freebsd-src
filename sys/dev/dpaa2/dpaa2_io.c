@@ -140,19 +140,17 @@ dpaa2_io_detach(device_t dev)
 static int
 dpaa2_io_attach(device_t dev)
 {
-	device_t pdev, child;
-	struct dpaa2_io_softc *sc;
-	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
+	device_t pdev = device_get_parent(dev);
+	device_t child = dev;
+	device_t mcp_dev;
+	struct dpaa2_io_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *mcp_dinfo;
 	struct resource_map_request req;
 	int error;
 
-	sc = device_get_softc(dev);
 	sc->dev = dev;
-	pdev = device_get_parent(dev);
-	child = dev;
-	rcinfo = device_get_ivars(pdev);
-	dinfo = device_get_ivars(dev);
 
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
 	if (error) {
@@ -160,6 +158,11 @@ dpaa2_io_attach(device_t dev)
 		    error);
 		goto err_exit;
 	}
+
+	/* Obtain MC portal. */
+	mcp_dev = (device_t) rman_get_start(sc->res[MCP_RID(0)]);
+	mcp_dinfo = device_get_ivars(mcp_dev);
+	dinfo->portal = mcp_dinfo->portal;
 
 	/* Map cache-enabled part of the software portal memory. */
 	resource_init_map_request(&req);
