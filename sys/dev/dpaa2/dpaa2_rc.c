@@ -85,6 +85,7 @@ static int dpaa2_rc_enable_irq(struct dpaa2_mcp *, struct dpaa2_cmd *, uint8_t,
 static int dpaa2_rc_configure_irq(device_t, device_t, int, uint64_t, uint32_t);
 static int dpaa2_rc_add_res(device_t, device_t, enum dpaa2_dev_type, int *, int);
 static int dpaa2_rc_print_type(struct resource_list *, enum dpaa2_dev_type);
+static struct dpaa2_mcp *dpaa2_rc_select_portal(device_t, device_t);
 
 /* Routines to send commands to MC. */
 static int dpaa2_rc_exec_cmd(struct dpaa2_mcp *, struct dpaa2_cmd *, uint16_t);
@@ -103,7 +104,6 @@ dpaa2_rc_probe(device_t dev)
 static int
 dpaa2_rc_detach(device_t dev)
 {
-	struct dpaa2_rc_softc *sc;
 	struct dpaa2_devinfo *dinfo;
 	int error;
 
@@ -111,11 +111,10 @@ dpaa2_rc_detach(device_t dev)
 	if (error)
 		return (error);
 
-	sc = device_get_softc(dev);
 	dinfo = device_get_ivars(dev);
 
-	if (sc->portal)
-		dpaa2_mcp_free_portal(sc->portal);
+	if (dinfo->portal)
+		dpaa2_mcp_free_portal(dinfo->portal);
 	if (dinfo)
 		free(dinfo, M_DPAA2_RC);
 
@@ -133,7 +132,6 @@ dpaa2_rc_attach(device_t dev)
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
-	sc->portal = NULL;
 	sc->unit = device_get_unit(dev);
 
 	if (sc->unit == 0) {
@@ -161,9 +159,10 @@ dpaa2_rc_attach(device_t dev)
 		dinfo->pdev = pdev;
 		dinfo->dev = dev;
 		dinfo->dtype = DPAA2_DEV_RC;
+		dinfo->portal = NULL;
 
 		/* Prepare helper portal object to send commands to MC. */
-		error = dpaa2_mcp_init_portal(&sc->portal, mcsc->res[0],
+		error = dpaa2_mcp_init_portal(&dinfo->portal, mcsc->res[0],
 		    &mcsc->map[0], DPAA2_PORTAL_DEF, true);
 		if (error) {
 			device_printf(dev, "%s: failed to initialize dpaa2_mcp: "
@@ -642,19 +641,17 @@ dpaa2_rc_get_id(device_t rcdev, device_t child, enum pci_id_type type,
  */
 
 static int
-dpaa2_rc_mng_get_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mng_get_version(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t *major, uint32_t *minor, uint32_t *rev)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !major || !minor || !rev)
+	if (portal == NULL || cmd == NULL || major == NULL || minor == NULL ||
+	    rev == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MNG_GET_VER);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MNG_GET_VER);
 	if (!error) {
 		*major = cmd->params[0] >> 32;
 		*minor = cmd->params[1] & 0xFFFFFFFF;
@@ -665,19 +662,16 @@ dpaa2_rc_mng_get_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mng_get_soc_version(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, uint32_t *pvr, uint32_t *svr)
+dpaa2_rc_mng_get_soc_version(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint32_t *pvr, uint32_t *svr)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !pvr || !svr)
+	if (portal == NULL || cmd == NULL || pvr == NULL || svr == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MNG_GET_SOC_VER);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MNG_GET_SOC_VER);
 	if (!error) {
 		*pvr = cmd->params[0] >> 32;
 		*svr = cmd->params[0] & 0xFFFFFFFF;
@@ -687,19 +681,16 @@ dpaa2_rc_mng_get_soc_version(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_mng_get_container_id(device_t rcdev, device_t child,
+dpaa2_rc_mng_get_container_id(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint32_t *cont_id)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cont_id)
+	if (portal == NULL || cmd == NULL || cont_id == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MNG_GET_CONT_ID);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MNG_GET_CONT_ID);
 	if (!error)
 		*cont_id = cmd->params[0] & 0xFFFFFFFF;
 
@@ -710,18 +701,11 @@ static int
 dpaa2_rc_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t cont_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = cont_id;
@@ -738,35 +722,25 @@ dpaa2_rc_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 static int
 dpaa2_rc_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_CLOSE));
 }
 
 static int
-dpaa2_rc_get_obj_count(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_obj_count(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t *obj_count)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !obj_count)
+	if (portal == NULL || cmd == NULL || obj_count == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_OBJ_COUNT);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_OBJ_COUNT);
 	if (!error)
 		*obj_count = (uint32_t)(cmd->params[0] >> 32);
 
@@ -774,11 +748,9 @@ dpaa2_rc_get_obj_count(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_obj(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_obj(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t obj_idx, struct dpaa2_obj *obj)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct __packed dpaa2_obj_resp {
 		uint32_t	_reserved1;
 		uint32_t	id;
@@ -793,16 +765,15 @@ dpaa2_rc_get_obj(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint8_t		type[16];
 		uint8_t		label[16];
 	} *pobj;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !obj)
+	if (portal == NULL || cmd == NULL || obj == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = obj_idx;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_OBJ);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_OBJ);
 	if (!error) {
 		pobj = (struct dpaa2_obj_resp *) &cmd->params[0];
 		obj->id = pobj->id;
@@ -825,7 +796,7 @@ dpaa2_rc_get_obj(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_obj_descriptor(device_t rcdev, device_t child,
+dpaa2_rc_get_obj_descriptor(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint32_t obj_id, enum dpaa2_dev_type dtype,
     struct dpaa2_obj *obj)
 {
@@ -848,21 +819,18 @@ dpaa2_rc_get_obj_descriptor(device_t rcdev, device_t child,
 		uint8_t		type[16];
 		uint8_t		label[16];
 	} *pobj;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	const char *type = dpaa2_ttos(dtype);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !obj)
+	if (portal == NULL || cmd == NULL || obj == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct get_obj_desc_args *) &cmd->params[0];
 	args->obj_id = obj_id;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_OBJ_DESC);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_OBJ_DESC);
 	if (!error) {
 		pobj = (struct dpaa2_obj_resp *) &cmd->params[0];
 		obj->id = pobj->id;
@@ -885,11 +853,9 @@ dpaa2_rc_get_obj_descriptor(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_rc_attr *attr)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct __packed dpaa2_rc_attr {
 		uint32_t	cont_id;
 		uint16_t	icid;
@@ -897,14 +863,13 @@ dpaa2_rc_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	options;
 		uint32_t	portal_id;
 	} *pattr;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_ATTR);
 	if (!error) {
 		pattr = (struct dpaa2_rc_attr *) &cmd->params[0];
 		attr->cont_id = pattr->cont_id;
@@ -917,7 +882,7 @@ dpaa2_rc_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_obj_region(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_obj_region(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t obj_id, uint8_t reg_idx, enum dpaa2_dev_type dtype,
     struct dpaa2_rc_obj_region *reg)
 {
@@ -939,33 +904,31 @@ dpaa2_rc_get_obj_region(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	_reserved2;
 		uint64_t	base_paddr;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	uint16_t cmdid, api_major, api_minor;
 	const char *type = dpaa2_ttos(dtype);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !reg)
+	if (portal == NULL || cmd == NULL || reg == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	/*
 	 * If the DPRC object version was not yet cached, cache it now.
 	 * Otherwise use the already cached value.
 	 */
-	if (!sc->portal->rc_api_major && !sc->portal->rc_api_minor) {
-		error = DPAA2_CMD_RC_GET_API_VERSION(rcdev, child, cmd,
+	if (!portal->rc_api_major && !portal->rc_api_minor) {
+		error = DPAA2_CMD_RC_GET_API_VERSION(dev, child, cmd,
 		    &api_major, &api_minor);
 		if (error)
 			return (error);
-		sc->portal->rc_api_major = api_major;
-		sc->portal->rc_api_minor = api_minor;
+		portal->rc_api_major = api_major;
+		portal->rc_api_minor = api_minor;
 	} else {
-		api_major = sc->portal->rc_api_major;
-		api_minor = sc->portal->rc_api_minor;
+		api_major = portal->rc_api_major;
+		api_minor = portal->rc_api_minor;
 	}
 
+	/* TODO: Remove magic numbers. */
 	if (api_major > 6u || (api_major == 6u && api_minor >= 6u))
 		/*
 		 * MC API version 6.6 changed the size of the MC portals and
@@ -986,7 +949,7 @@ dpaa2_rc_get_obj_region(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->reg_idx = reg_idx;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, cmdid);
+	error = dpaa2_rc_exec_cmd(portal, cmd, cmdid);
 	if (!error) {
 		resp = (struct obj_region *) &cmd->params[0];
 		reg->base_paddr = resp->base_paddr;
@@ -1000,23 +963,20 @@ dpaa2_rc_get_obj_region(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_get_api_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_api_version(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint16_t *major, uint16_t *minor)
 {
 	struct __packed rc_api_version {
 		uint16_t	major;
 		uint16_t	minor;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !major || !minor)
+	if (portal == NULL || cmd == NULL || major == NULL || minor == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_API_VERSION);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_API_VERSION);
 	if (!error) {
 		resp = (struct rc_api_version *) &cmd->params[0];
 		*major = resp->major;
@@ -1027,21 +987,20 @@ dpaa2_rc_get_api_version(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_set_irq_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint8_t enable)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_enable_irq(sc->portal, cmd, irq_idx, enable,
+	return (dpaa2_rc_enable_irq(portal, cmd, irq_idx, enable,
 	    CMDID_RC_SET_IRQ_ENABLE));
 }
 
 static int
-dpaa2_rc_set_obj_irq(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_set_obj_irq(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint64_t addr, uint32_t data, uint32_t irq_usr,
     uint32_t obj_id, enum dpaa2_dev_type dtype)
 {
@@ -1054,13 +1013,10 @@ dpaa2_rc_set_obj_irq(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	obj_id;
 		uint8_t		type[16];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	const char *type = dpaa2_ttos(dtype);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct set_obj_irq_args *) &cmd->params[0];
@@ -1071,11 +1027,11 @@ dpaa2_rc_set_obj_irq(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->obj_id = obj_id;
 	memcpy(args->type, type, min(strlen(type) + 1, TYPE_LEN_MAX));
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_SET_OBJ_IRQ));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_SET_OBJ_IRQ));
 }
 
 static int
-dpaa2_rc_get_conn(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_get_conn(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ep_desc *ep1_desc, struct dpaa2_ep_desc *ep2_desc,
     uint32_t *link_stat)
 {
@@ -1093,27 +1049,26 @@ dpaa2_rc_get_conn(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t link_stat;
 		uint32_t _reserved2;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !ep1_desc || !ep2_desc)
+	if (portal == NULL || cmd == NULL || ep1_desc == NULL ||
+	    ep2_desc == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct get_conn_args *) &cmd->params[0];
 	args->ep1_id = ep1_desc->obj_id;
-	args->ep1_ifid = ep1_desc->if_id;;
+	args->ep1_ifid = ep1_desc->if_id;
+	/* TODO: Remove magic number. */
 	strncpy(args->ep1_type, dpaa2_ttos(ep1_desc->type), 16);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_RC_GET_CONN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_RC_GET_CONN);
 	if (!error) {
 		resp = (struct get_conn_resp *) &cmd->params[0];
 		ep2_desc->obj_id = resp->ep2_id;
 		ep2_desc->if_id = resp->ep2_ifid;
 		ep2_desc->type = dpaa2_stot((const char *) resp->ep2_type);
-		if (link_stat)
+		if (link_stat != NULL)
 			*link_stat = resp->link_stat;
 	}
 
@@ -1121,21 +1076,18 @@ dpaa2_rc_get_conn(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpni_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpni_id;
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_OPEN);
  	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -1145,61 +1097,49 @@ dpaa2_rc_ni_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_CLOSE));
 }
 
 static int
-dpaa2_rc_ni_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_ENABLE));
 }
 
 static int
-dpaa2_rc_ni_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_disable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_DISABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_DISABLE));
 }
 
 static int
-dpaa2_rc_ni_get_api_version(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, uint16_t *major, uint16_t *minor)
+dpaa2_rc_ni_get_api_version(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint16_t *major, uint16_t *minor)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !major || !minor)
+	if (portal == NULL || cmd == NULL || major == NULL || minor == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_API_VER);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_API_VER);
 	if (!error) {
 		*major = cmd->params[0] & 0xFFFFU;
 		*minor = (cmd->params[0] >> 16) & 0xFFFFU;
@@ -1209,21 +1149,18 @@ dpaa2_rc_ni_get_api_version(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_ni_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_RESET));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_RESET));
 }
 
 static int
-dpaa2_rc_ni_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_attr *attr)
 {
 	struct __packed ni_attr {
@@ -1246,16 +1183,13 @@ dpaa2_rc_ni_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint16_t	_reserved4;
 		uint64_t	_reserved5[4];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_ATTR);
 	if (!error) {
 		resp = (struct ni_attr *) &cmd->params[0];
 
@@ -1281,7 +1215,7 @@ dpaa2_rc_ni_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_ni_set_buf_layout(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_buf_layout(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_buf_layout *bl)
 {
 	struct __packed set_buf_layout_args {
@@ -1297,12 +1231,9 @@ dpaa2_rc_ni_set_buf_layout(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint16_t	tail_room;
 		uint64_t	_reserved4[5];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !bl)
+	if (portal == NULL || cmd == NULL || bl == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct set_buf_layout_args *) &cmd->params[0];
@@ -1319,23 +1250,20 @@ dpaa2_rc_ni_set_buf_layout(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->params |= bl->pass_frame_status	? 4U : 0U;
 	args->params |= bl->pass_sw_opaque	? 8U : 0U;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_BUF_LAYOUT));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_BUF_LAYOUT));
 }
 
 static int
-dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, device_t child,
+dpaa2_rc_ni_get_tx_data_offset(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint16_t *offset)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !offset)
+	if (portal == NULL || cmd == NULL || offset == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_TX_DATA_OFF);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_TX_DATA_OFF);
 	if (!error)
 		*offset = cmd->params[0] & 0xFFFFU;
 
@@ -1343,19 +1271,16 @@ dpaa2_rc_ni_get_tx_data_offset(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, device_t child,
+dpaa2_rc_ni_get_port_mac_addr(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint8_t *mac)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !mac)
+	if (portal == NULL || cmd == NULL || mac == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_PORT_MAC_ADDR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_PORT_MAC_ADDR);
 	if (!error) {
 		mac[0] = (cmd->params[0] >> 56) & 0xFFU;
 		mac[1] = (cmd->params[0] >> 48) & 0xFFU;
@@ -1369,46 +1294,40 @@ dpaa2_rc_ni_get_port_mac_addr(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_ni_set_prim_mac_addr(device_t rcdev, device_t child,
+dpaa2_rc_ni_set_prim_mac_addr(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint8_t *mac)
 {
 	struct __packed set_prim_mac_args {
 		uint8_t		_reserved[2];
 		uint8_t		mac[ETHER_ADDR_LEN];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !mac)
+	if (portal == NULL || cmd == NULL || mac == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	args = (struct set_prim_mac_args *) &cmd->params[0];
 	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
 		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_PRIM_MAC_ADDR));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_PRIM_MAC_ADDR));
 }
 
 static int
-dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, device_t child,
+dpaa2_rc_ni_get_prim_mac_addr(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint8_t *mac)
 {
 	struct __packed get_prim_mac_resp {
 		uint8_t		_reserved[2];
 		uint8_t		mac[ETHER_ADDR_LEN];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !mac)
+	if (portal == NULL || cmd == NULL || mac == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_PRIM_MAC_ADDR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_PRIM_MAC_ADDR);
 	if (!error) {
 		resp = (struct get_prim_mac_resp *) &cmd->params[0];
 		for (int i = 1; i <= ETHER_ADDR_LEN; i++)
@@ -1419,7 +1338,7 @@ dpaa2_rc_ni_get_prim_mac_addr(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_ni_set_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_link_cfg(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_cfg *cfg)
 {
 	struct __packed link_cfg_args {
@@ -1430,12 +1349,9 @@ dpaa2_rc_ni_set_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint64_t	adv_speeds;
 		uint64_t	_reserved3[3];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cfg)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	args = (struct link_cfg_args *) &cmd->params[0];
@@ -1443,11 +1359,11 @@ dpaa2_rc_ni_set_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->options = cfg->options;
 	args->adv_speeds = cfg->adv_speeds;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_LINK_CFG));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_LINK_CFG));
 }
 
 static int
-dpaa2_rc_ni_get_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_link_cfg(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_cfg *cfg)
 {
 	struct __packed link_cfg_resp {
@@ -1458,16 +1374,13 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint64_t	adv_speeds;
 		uint64_t	_reserved3[3];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cfg)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_LINK_CFG);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_LINK_CFG);
 	if (!error) {
 		resp = (struct link_cfg_resp *) &cmd->params[0];
 		cfg->rate = resp->rate;
@@ -1479,7 +1392,7 @@ dpaa2_rc_ni_get_link_cfg(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_get_link_state(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_link_state(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_link_state *state)
 {
 	struct __packed link_state_resp {
@@ -1491,18 +1404,15 @@ dpaa2_rc_ni_get_link_state(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint64_t	supported;
 		uint64_t	advert;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !state)
+	if (portal == NULL || cmd == NULL || state == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_LINK_STATE);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_LINK_STATE);
 	if (!error) {
 		resp = (struct link_state_resp *) &cmd->params[0];
 		state->options = resp->options;
@@ -1518,7 +1428,7 @@ dpaa2_rc_ni_get_link_state(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_ni_set_qos_table(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_qos_table(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_qos_table *tbl)
 {
 	struct __packed qos_table_args {
@@ -1529,12 +1439,9 @@ dpaa2_rc_ni_set_qos_table(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint64_t	_reserved[5];
 		uint64_t	kcfg_busaddr;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !tbl)
+	if (portal == NULL || cmd == NULL || tbl == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1546,26 +1453,22 @@ dpaa2_rc_ni_set_qos_table(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->options |= tbl->discard_on_miss	? 1U : 0U;
 	args->options |= tbl->keep_entries	? 2U : 0U;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_QOS_TABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_QOS_TABLE));
 }
 
 static int
-dpaa2_rc_ni_clear_qos_table(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd)
+dpaa2_rc_ni_clear_qos_table(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_CLEAR_QOS_TABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_CLEAR_QOS_TABLE));
 }
 
 static int
-dpaa2_rc_ni_set_pools(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_pools(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_pools_cfg *cfg)
 {
 	struct __packed set_pools_args {
@@ -1577,12 +1480,9 @@ dpaa2_rc_ni_set_pools(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint16_t	buf_sz[DPAA2_NI_MAX_POOLS];
 		uint32_t	_reserved2;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1596,23 +1496,20 @@ dpaa2_rc_ni_set_pools(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		args->backup_pool_mask |= (cfg->pools[i].backup_flag & 1) << i;
 	}
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_POOLS));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_POOLS));
 }
 
 static int
-dpaa2_rc_ni_set_err_behavior(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, struct dpaa2_ni_err_cfg *cfg)
+dpaa2_rc_ni_set_err_behavior(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    struct dpaa2_ni_err_cfg *cfg)
 {
 	struct __packed err_behavior_args {
 		uint32_t	err_mask;
 		uint8_t		flags;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cfg)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1623,11 +1520,11 @@ dpaa2_rc_ni_set_err_behavior(device_t rcdev, device_t child,
 	args->flags |= cfg->set_err_fas ? 0x10u : 0u;
 	args->flags |= ((uint8_t) cfg->action) & 0x0Fu;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_ERR_BEHAVIOR));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_ERR_BEHAVIOR));
 }
 
 static int
-dpaa2_rc_ni_get_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_queue(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_queue_cfg *cfg)
 {
 	struct __packed get_queue_args {
@@ -1650,13 +1547,10 @@ dpaa2_rc_ni_get_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint8_t		cgid;
 		uint8_t		_reserved[15];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cfg)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1667,7 +1561,7 @@ dpaa2_rc_ni_get_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->idx = cfg->idx;
 	args->chan_id = cfg->chan_id;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_QUEUE);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_QUEUE);
 	if (!error) {
 		resp = (struct get_queue_resp *) &cmd->params[0];
 
@@ -1689,7 +1583,7 @@ dpaa2_rc_ni_get_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_set_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_queue(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_ni_queue_cfg *cfg)
 {
 	struct __packed set_queue_args {
@@ -1708,12 +1602,9 @@ dpaa2_rc_ni_set_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint8_t		chan_id;
 		uint8_t		_reserved[23];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cfg)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1734,11 +1625,11 @@ dpaa2_rc_ni_set_queue(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->flags |= cfg->stash_control ? 0x40u : 0u;
 	args->flags |= cfg->hold_active ? 0x80u : 0u;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_QUEUE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_QUEUE));
 }
 
 static int
-dpaa2_rc_ni_get_qdid(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_qdid(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     enum dpaa2_ni_queue_type type, uint16_t *qdid)
 {
 	struct __packed get_qdid_args {
@@ -1747,13 +1638,10 @@ dpaa2_rc_ni_get_qdid(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	struct __packed get_qdid_resp {
 		uint16_t	qdid;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL || qdid == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1761,7 +1649,7 @@ dpaa2_rc_ni_get_qdid(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args = (struct get_qdid_args *) &cmd->params[0];
 	args->queue_type = (uint8_t) type;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_QDID);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_QDID);
 	if (!error) {
 		resp = (struct get_qdid_resp *) &cmd->params[0];
 		*qdid = resp->qdid;
@@ -1771,7 +1659,7 @@ dpaa2_rc_ni_get_qdid(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_ni_add_mac_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_add_mac_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t *mac)
 {
 	struct __packed add_mac_args {
@@ -1781,12 +1669,9 @@ dpaa2_rc_ni_add_mac_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint8_t		tc_id;
 		uint8_t		fq_id;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !mac)
+	if (portal == NULL || cmd == NULL || mac == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1795,22 +1680,19 @@ dpaa2_rc_ni_add_mac_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
 		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_ADD_MAC_ADDR));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_ADD_MAC_ADDR));
 }
 
 static int
-dpaa2_rc_ni_clear_mac_filters(device_t rcdev, device_t child,
+dpaa2_rc_ni_clear_mac_filters(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, bool rm_uni, bool rm_multi)
 {
 	struct __packed clear_mac_filters_args {
 		uint8_t		flags;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1819,22 +1701,19 @@ dpaa2_rc_ni_clear_mac_filters(device_t rcdev, device_t child,
 	args->flags |= rm_uni ? 0x1 : 0x0;
 	args->flags |= rm_multi ? 0x2 : 0x0;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_CLEAR_MAC_FILTERS));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_CLEAR_MAC_FILTERS));
 }
 
 static int
-dpaa2_rc_ni_set_mfl(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_mfl(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint16_t length)
 {
 	struct __packed set_mfl_args {
 		uint16_t length;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1842,11 +1721,11 @@ dpaa2_rc_ni_set_mfl(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args = (struct set_mfl_args *) &cmd->params[0];
 	args->length = length;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_MFL));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_MFL));
 }
 
 static int
-dpaa2_rc_ni_set_offload(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_offload(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     enum dpaa2_ni_ofl_type ofl_type, bool en)
 {
 	struct __packed set_ofl_args {
@@ -1854,12 +1733,9 @@ dpaa2_rc_ni_set_offload(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint8_t		ofl_type;
 		uint32_t	config;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1868,23 +1744,20 @@ dpaa2_rc_ni_set_offload(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->ofl_type = (uint8_t) ofl_type;
 	args->config = en ? 1u : 0u;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_OFFLOAD));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_OFFLOAD));
 }
 
 static int
-dpaa2_rc_ni_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_irq_mask(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t mask)
 {
 	struct __packed set_irq_mask_args {
 		uint32_t	mask;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1893,23 +1766,20 @@ dpaa2_rc_ni_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->mask = mask;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_IRQ_MASK));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_IRQ_MASK));
 }
 
 static int
-dpaa2_rc_ni_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_irq_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, bool en)
 {
 	struct __packed set_irq_enable_args {
 		uint32_t	en;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1918,11 +1788,11 @@ dpaa2_rc_ni_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->en = en ? 1u : 0u;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_IRQ_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_IRQ_ENABLE));
 }
 
 static int
-dpaa2_rc_ni_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_irq_status(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t *status)
 {
 	struct __packed get_irq_stat_args {
@@ -1932,13 +1802,10 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	struct __packed get_irq_stat_resp {
 		uint32_t	status;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !status)
+	if (portal == NULL || cmd == NULL || status == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1947,7 +1814,7 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->status = *status;
 	args->irq_idx = irq_idx;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_IRQ_STATUS);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_IRQ_STATUS);
 	if (!error) {
 		resp = (struct get_irq_stat_resp *) &cmd->params[0];
 		*status = resp->status;
@@ -1957,18 +1824,15 @@ dpaa2_rc_ni_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_ni_set_uni_promisc(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, bool en)
+dpaa2_rc_ni_set_uni_promisc(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    bool en)
 {
 	struct __packed set_uni_promisc_args {
 		uint8_t	en;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -1976,23 +1840,20 @@ dpaa2_rc_ni_set_uni_promisc(device_t rcdev, device_t child,
 	args = (struct set_uni_promisc_args *) &cmd->params[0];
 	args->en = en ? 1u : 0u;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_UNI_PROMISC));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_UNI_PROMISC));
 }
 
 static int
-dpaa2_rc_ni_set_multi_promisc(device_t rcdev, device_t child,
+dpaa2_rc_ni_set_multi_promisc(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, bool en)
 {
 	/* TODO: Implementation is the same as for ni_set_uni_promisc(). */
 	struct __packed set_multi_promisc_args {
 		uint8_t	en;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2000,11 +1861,11 @@ dpaa2_rc_ni_set_multi_promisc(device_t rcdev, device_t child,
 	args = (struct set_multi_promisc_args *) &cmd->params[0];
 	args->en = en ? 1u : 0u;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_MULTI_PROMISC));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_MULTI_PROMISC));
 }
 
 static int
-dpaa2_rc_ni_get_statistics(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_get_statistics(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t page, uint16_t param, uint64_t *cnt)
 {
 	struct __packed get_statistics_args {
@@ -2014,13 +1875,10 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	struct __packed get_statistics_resp {
 		uint64_t	cnt[7];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !cnt)
+	if (portal == NULL || cmd == NULL || cnt == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2029,7 +1887,7 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->page = page;
 	args->param = param;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_GET_STATISTICS);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_GET_STATISTICS);
 	if (!error) {
 		resp = (struct get_statistics_resp *) &cmd->params[0];
 		for (int i = 0; i < DPAA2_NI_STAT_COUNTERS; i++)
@@ -2040,7 +1898,7 @@ dpaa2_rc_ni_get_statistics(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_ni_set_rx_tc_dist(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint16_t dist_size, uint8_t tc, enum dpaa2_ni_dist_mode dist_mode,
     bus_addr_t key_cfg_buf)
 {
@@ -2052,12 +1910,9 @@ dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint64_t	_reserved2[5];
 		uint64_t	key_cfg_iova;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2068,25 +1923,22 @@ dpaa2_rc_ni_set_rx_tc_dist(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->ma_dm = ((uint8_t) dist_mode) & 0x0Fu;
 	args->key_cfg_iova = key_cfg_buf;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_NI_SET_RX_TC_DIST));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_SET_RX_TC_DIST));
 }
 
 static int
-dpaa2_rc_io_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpio_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpio_id;
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_OPEN);
 	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -2096,67 +1948,53 @@ dpaa2_rc_io_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_io_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_CLOSE));
 }
 
 static int
-dpaa2_rc_io_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_ENABLE));
 }
 
 static int
-dpaa2_rc_io_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_disable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_DISABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_DISABLE));
 }
 
 static int
-dpaa2_rc_io_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_io_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_RESET));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_RESET));
 }
 
 static int
-dpaa2_rc_io_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_io_attr *attr)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct __packed dpaa2_io_attr {
 		uint32_t	id;
 		uint16_t	swp_id;
@@ -2169,14 +2007,13 @@ dpaa2_rc_io_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint32_t	swp_clk;
 		uint32_t	_reserved2[5];
 	} *pattr;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_GET_ATTR);
 	if (!error) {
 		pattr = (struct dpaa2_io_attr *) &cmd->params[0];
 
@@ -2195,7 +2032,7 @@ dpaa2_rc_io_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_io_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_set_irq_mask(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t mask)
 {
 	/* TODO: Extract similar *_set_irq_mask() into one function. */
@@ -2203,12 +2040,9 @@ dpaa2_rc_io_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	mask;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2217,11 +2051,11 @@ dpaa2_rc_io_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->mask = mask;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_SET_IRQ_MASK));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_SET_IRQ_MASK));
 }
 
 static int
-dpaa2_rc_io_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_get_irq_status(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t *status)
 {
 	/* TODO: Extract similar *_get_irq_status() into one function. */
@@ -2232,13 +2066,10 @@ dpaa2_rc_io_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	struct __packed get_irq_stat_resp {
 		uint32_t	status;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !status)
+	if (portal == NULL || cmd == NULL || status == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2247,7 +2078,7 @@ dpaa2_rc_io_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->status = *status;
 	args->irq_idx = irq_idx;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_GET_IRQ_STATUS);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_GET_IRQ_STATUS);
 	if (!error) {
 		resp = (struct get_irq_stat_resp *) &cmd->params[0];
 		*status = resp->status;
@@ -2257,7 +2088,7 @@ dpaa2_rc_io_get_irq_status(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_io_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_io_set_irq_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, bool en)
 {
 	/* TODO: Extract similar *_set_irq_enable() into one function. */
@@ -2265,12 +2096,9 @@ dpaa2_rc_io_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 		uint32_t	en;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2279,11 +2107,11 @@ dpaa2_rc_io_set_irq_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 	args->en = en ? 1u : 0u;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_SET_IRQ_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_SET_IRQ_ENABLE));
 }
 
 static int
-dpaa2_rc_io_add_static_dq_chan(device_t rcdev, device_t child,
+dpaa2_rc_io_add_static_dq_chan(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, uint32_t dpcon_id, uint8_t *chan_idx)
 {
 	struct __packed add_static_dq_chan_args {
@@ -2292,13 +2120,10 @@ dpaa2_rc_io_add_static_dq_chan(device_t rcdev, device_t child,
 	struct __packed add_static_dq_chan_resp {
 		uint8_t		chan_idx;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !chan_idx)
+	if (portal == NULL || cmd == NULL || chan_idx == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2306,7 +2131,7 @@ dpaa2_rc_io_add_static_dq_chan(device_t rcdev, device_t child,
 	args = (struct add_static_dq_chan_args *) &cmd->params[0];
 	args->dpcon_id = dpcon_id;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_IO_ADD_STATIC_DQ_CHAN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_IO_ADD_STATIC_DQ_CHAN);
 	if (!error) {
 		resp = (struct add_static_dq_chan_resp *) &cmd->params[0];
 		*chan_idx = resp->chan_idx;
@@ -2316,21 +2141,18 @@ dpaa2_rc_io_add_static_dq_chan(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_bp_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_bp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpbp_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpbp_id;
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_OPEN);
 	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -2340,81 +2162,65 @@ dpaa2_rc_bp_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_bp_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_CLOSE));
 }
 
 static int
-dpaa2_rc_bp_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_ENABLE));
 }
 
 static int
-dpaa2_rc_bp_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_disable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_DISABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_DISABLE));
 }
 
 static int
-dpaa2_rc_bp_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_bp_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_RESET));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_RESET));
 }
 
 static int
-dpaa2_rc_bp_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_bp_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_bp_attr *attr)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
 	struct __packed dpaa2_bp_attr {
 		uint16_t	_reserved1;
 		uint16_t	bpid;
 		uint32_t	id;
 	} *pattr;
-
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_BP_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_BP_GET_ATTR);
 	if (!error) {
 		pattr = (struct dpaa2_bp_attr *) &cmd->params[0];
 		attr->id = pattr->id;
@@ -2425,21 +2231,18 @@ dpaa2_rc_bp_get_attributes(device_t rcdev, device_t child, struct dpaa2_cmd *cmd
 }
 
 static int
-dpaa2_rc_mac_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mac_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpmac_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpmac_id;
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_OPEN);
 	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -2449,35 +2252,29 @@ dpaa2_rc_mac_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_mac_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_CLOSE));
 }
 
 static int
-dpaa2_rc_mac_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_mac_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_RESET));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_RESET));
 }
 
 static int
-dpaa2_rc_mac_mdio_read(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mac_mdio_read(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t phy, uint16_t reg, uint16_t *val)
 {
 	struct __packed mdio_read_args {
@@ -2487,13 +2284,10 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	_reserved1;
 		uint64_t	_reserved2[6];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !val)
+	if (portal == NULL || cmd == NULL || val == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct mdio_read_args *) &cmd->params[0];
@@ -2501,7 +2295,7 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->reg = reg;
 	args->clause = 0;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_MDIO_READ);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_MDIO_READ);
 	if (!error)
 		*val = cmd->params[0] & 0xFFFF;
 
@@ -2509,7 +2303,7 @@ dpaa2_rc_mac_mdio_read(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_mdio_write(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mac_mdio_write(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t phy, uint16_t reg, uint16_t val)
 {
 	struct __packed mdio_write_args {
@@ -2520,12 +2314,9 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint16_t	_reserved1;
 		uint64_t	_reserved2[6];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct mdio_write_args *) &cmd->params[0];
@@ -2534,23 +2325,20 @@ dpaa2_rc_mac_mdio_write(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->val = val;
 	args->clause = 0;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_MDIO_WRITE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_MDIO_WRITE));
 }
 
 static int
-dpaa2_rc_mac_get_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mac_get_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t *mac)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !mac)
+	if (portal == NULL || cmd == NULL || mac == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_GET_ADDR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_GET_ADDR);
 	if (!error) {
 		mac[0] = (cmd->params[0] >> 56) & 0xFFU;
 		mac[1] = (cmd->params[0] >> 48) & 0xFFU;
@@ -2564,8 +2352,8 @@ dpaa2_rc_mac_get_addr(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
-dpaa2_rc_mac_get_attributes(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, struct dpaa2_mac_attr *attr)
+dpaa2_rc_mac_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    struct dpaa2_mac_attr *attr)
 {
 	struct __packed mac_attr_resp {
 		uint8_t		eth_if;
@@ -2589,16 +2377,13 @@ dpaa2_rc_mac_get_attributes(device_t rcdev, device_t child,
 
 		uint64_t	_reserved[4];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_GET_ATTR);
 	if (!error) {
 		resp = (struct mac_attr_resp *) &cmd->params[0];
 		attr->id = resp->id;
@@ -2611,8 +2396,8 @@ dpaa2_rc_mac_get_attributes(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_mac_set_link_state(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, struct dpaa2_mac_link_state *state)
+dpaa2_rc_mac_set_link_state(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    struct dpaa2_mac_link_state *state)
 {
 	struct __packed mac_set_link_args {
 		uint64_t	options;
@@ -2623,12 +2408,9 @@ dpaa2_rc_mac_set_link_state(device_t rcdev, device_t child,
 		uint64_t	supported;
 		uint64_t	advert;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !state)
+	if (portal == NULL || cmd == NULL || state == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2642,11 +2424,11 @@ dpaa2_rc_mac_set_link_state(device_t rcdev, device_t child,
 	args->flags |= state->up ? 0x1u : 0u;
 	args->flags |= state->state_valid ? 0x2u : 0u;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_SET_LINK_STATE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_SET_LINK_STATE));
 }
 
 static int
-dpaa2_rc_mac_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_mac_set_irq_mask(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint8_t irq_idx, uint32_t mask)
 {
 	/* TODO: Implementation is the same as for ni_set_irq_mask(). */
@@ -2654,12 +2436,9 @@ dpaa2_rc_mac_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint32_t	mask;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2668,24 +2447,21 @@ dpaa2_rc_mac_set_irq_mask(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->mask = mask;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_SET_IRQ_MASK));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_SET_IRQ_MASK));
 }
 
 static int
-dpaa2_rc_mac_set_irq_enable(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, uint8_t irq_idx, bool en)
+dpaa2_rc_mac_set_irq_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, bool en)
 {
 	/* TODO: Implementation is the same as for ni_set_irq_enable(). */
 	struct __packed set_irq_enable_args {
 		uint32_t	en;
 		uint8_t		irq_idx;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2694,12 +2470,12 @@ dpaa2_rc_mac_set_irq_enable(device_t rcdev, device_t child,
 	args->en = en ? 1u : 0u;
 	args->irq_idx = irq_idx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_SET_IRQ_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_SET_IRQ_ENABLE));
 }
 
 static int
-dpaa2_rc_mac_get_irq_status(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, uint8_t irq_idx, uint32_t *status)
+dpaa2_rc_mac_get_irq_status(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t irq_idx, uint32_t *status)
 {
 	/* TODO: Implementation is the same as ni_get_irq_status(). */
 	struct __packed get_irq_stat_args {
@@ -2709,13 +2485,10 @@ dpaa2_rc_mac_get_irq_status(device_t rcdev, device_t child,
 	struct __packed get_irq_stat_resp {
 		uint32_t	status;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !status)
+	if (portal == NULL || cmd == NULL || status == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
 	dpaa2_rc_reset_cmd_params(cmd);
@@ -2724,7 +2497,7 @@ dpaa2_rc_mac_get_irq_status(device_t rcdev, device_t child,
 	args->status = *status;
 	args->irq_idx = irq_idx;
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_MAC_GET_IRQ_STATUS);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_MAC_GET_IRQ_STATUS);
 	if (!error) {
 		resp = (struct get_irq_stat_resp *) &cmd->params[0];
 		*status = resp->status;
@@ -2734,21 +2507,18 @@ dpaa2_rc_mac_get_irq_status(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_con_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_con_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpcon_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !token)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpcon_id;
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_OPEN);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_OPEN);
 	if (!error) {
 		hdr = (struct dpaa2_cmd_header *) &cmd->header;
 		*token = hdr->token;
@@ -2759,64 +2529,52 @@ dpaa2_rc_con_open(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 
 
 static int
-dpaa2_rc_con_close(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_CLOSE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_CLOSE));
 }
 
 static int
-dpaa2_rc_con_reset(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_RESET));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_RESET));
 }
 
 static int
-dpaa2_rc_con_enable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_enable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_ENABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_ENABLE));
 }
 
 static int
-dpaa2_rc_con_disable(device_t rcdev, device_t child, struct dpaa2_cmd *cmd)
+dpaa2_rc_con_disable(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_DISABLE));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_DISABLE));
 }
 
 static int
-dpaa2_rc_con_get_attributes(device_t rcdev, device_t child,
-    struct dpaa2_cmd *cmd, struct dpaa2_con_attr *attr)
+dpaa2_rc_con_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    struct dpaa2_con_attr *attr)
 {
 	struct __packed con_attr_resp {
 		uint32_t	id;
@@ -2825,16 +2583,13 @@ dpaa2_rc_con_get_attributes(device_t rcdev, device_t child,
 		uint8_t		_reserved1;
 		uint64_t	_reserved2[6];
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd || !attr)
+	if (portal == NULL || cmd == NULL || attr == NULL)
 		return (DPAA2_CMD_STAT_EINVAL);
 
-	error = dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_GET_ATTR);
+	error = dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_GET_ATTR);
 	if (!error) {
 		resp = (struct con_attr_resp *) &cmd->params[0];
 		attr->id = resp->id;
@@ -2846,7 +2601,7 @@ dpaa2_rc_con_get_attributes(device_t rcdev, device_t child,
 }
 
 static int
-dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
+dpaa2_rc_con_set_notif(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     struct dpaa2_con_notif_cfg *cfg)
 {
 	struct __packed set_notif_args {
@@ -2857,12 +2612,9 @@ dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 		uint64_t	ctx;
 		uint64_t	_reserved3[5];
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(rcdev);
-	struct dpaa2_devinfo *rcinfo = device_get_ivars(rcdev);
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!rcinfo || rcinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	if (!sc->portal || !cmd)
+	if (portal == NULL || cmd == NULL || cfg == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct set_notif_args *) &cmd->params[0];
@@ -2870,7 +2622,7 @@ dpaa2_rc_con_set_notif(device_t rcdev, device_t child, struct dpaa2_cmd *cmd,
 	args->prior = cfg->prior;
 	args->ctx = cfg->qman_ctx;
 
-	return (dpaa2_rc_exec_cmd(sc->portal, cmd, CMDID_CON_SET_NOTIF));
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_CON_SET_NOTIF));
 }
 
 static int
@@ -2885,17 +2637,10 @@ dpaa2_rc_mcp_create(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	struct __packed mcp_create_resp {
 		uint32_t	dpmcp_id;
 	} *resp;
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	int error;
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd || !dpmcp_id)
+	if (portal == NULL || cmd == NULL || dpmcp_id == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct mcp_create_args *) &cmd->params[0];
@@ -2918,16 +2663,9 @@ dpaa2_rc_mcp_destroy(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 	struct __packed mcp_destroy_args {
 		uint32_t	dpmcp_id;
 	} *args;
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	args = (struct mcp_destroy_args *) &cmd->params[0];
@@ -2940,18 +2678,11 @@ static int
 dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
     uint32_t dpmcp_id, uint16_t *token)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 	struct dpaa2_cmd_header *hdr;
 	int error;
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd)
+	if (portal == NULL || cmd == NULL || token == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	cmd->params[0] = dpmcp_id;
@@ -2967,16 +2698,9 @@ dpaa2_rc_mcp_open(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 static int
 dpaa2_rc_mcp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_CLOSE));
@@ -2985,16 +2709,9 @@ dpaa2_rc_mcp_close(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 static int
 dpaa2_rc_mcp_reset(device_t dev, device_t child, struct dpaa2_cmd *cmd)
 {
-	struct dpaa2_rc_softc *sc = device_get_softc(dev);
-	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
-	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
-	struct dpaa2_mcp *portal;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
 
-	if (!cinfo || !dinfo || dinfo->dtype != DPAA2_DEV_RC)
-		return (DPAA2_CMD_STAT_ERR);
-	/* TODO: use devinfo's portal instead of sc->portal */
-	portal = cinfo->portal != NULL ? cinfo->portal : sc->portal;
-	if (!portal || !cmd)
+	if (portal == NULL || cmd == NULL)
 		return (DPAA2_CMD_STAT_ERR);
 
 	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_MCP_RESET));
@@ -3212,6 +2929,7 @@ dpaa2_rc_add_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	dinfo->dev = dev;
 	dinfo->id = obj->id;
 	dinfo->dtype = obj->type;
+	dinfo->portal = NULL;
 	/* Children share their parent container's ICID and portal ID. */
 	dinfo->icid = rcinfo->icid;
 	dinfo->portal_id = rcinfo->portal_id;
@@ -3337,6 +3055,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	dinfo->dev = dev;
 	dinfo->id = obj->id;
 	dinfo->dtype = obj->type;
+	dinfo->portal = NULL;
 	/* Children share their parent container's ICID and portal ID. */
 	dinfo->icid = rcinfo->icid;
 	dinfo->portal_id = rcinfo->portal_id;
@@ -3694,6 +3413,17 @@ dpaa2_rc_reset_cmd_params(struct dpaa2_cmd *cmd)
 		    DPAA2_CMD_PARAMS_N);
 	}
 	return (0);
+}
+
+static struct dpaa2_mcp *
+dpaa2_rc_select_portal(device_t dev, device_t child)
+{
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *cinfo = device_get_ivars(child);
+
+	if (cinfo == NULL || dinfo == NULL || dinfo->dtype != DPAA2_DEV_RC)
+		return (NULL);
+	return (cinfo->portal != NULL ? cinfo->portal : dinfo->portal);
 }
 
 static device_method_t dpaa2_rc_methods[] = {

@@ -118,7 +118,6 @@ struct dpaa2_mc_softc {
  */
 struct dpaa2_rc_softc {
 	device_t		 dev;
-	struct dpaa2_mcp	*portal; /* TODO: use devinfo's portal instead */
 	int			 unit;
 	uint32_t		 cont_id;
 };
