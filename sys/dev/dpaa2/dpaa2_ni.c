@@ -94,7 +94,7 @@ __FBSDID("$FreeBSD$");
 #define ARRAY_SIZE(a)		(sizeof(a) / sizeof((a)[0]))
 
 /* Frame Dequeue Response status bits. */
-#define IS_NULL_RESPONSE(stat)	((((stat) >> 4) & 1) == 1)
+#define IS_NULL_RESPONSE(stat)	((((stat) >> 4) & 1) == 0)
 
 #define	ALIGN_UP(x, y)		roundup2((x), (y))
 #define	ALIGN_DOWN(x, y)	rounddown2((x), (y))
