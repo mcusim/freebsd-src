@@ -111,18 +111,16 @@ dpaa2_mac_probe(device_t dev)
 static int
 dpaa2_mac_attach(device_t dev)
 {
-	device_t pdev, child;
-	struct dpaa2_mac_softc *sc;
-	struct dpaa2_devinfo *rcinfo;
-	struct dpaa2_devinfo *dinfo;
+	device_t pdev = device_get_parent(dev);
+	device_t child = dev;
+	device_t mcp_dev;
+	struct dpaa2_mac_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+	struct dpaa2_devinfo *mcp_dinfo;
 	int error;
 
-	sc = device_get_softc(dev);
 	sc->dev = dev;
-	pdev = device_get_parent(dev);
-	child = dev;
-	rcinfo = device_get_ivars(pdev);
-	dinfo = device_get_ivars(dev);
 
 	memset(sc->addr, 0, ETHER_ADDR_LEN);
 
@@ -132,6 +130,11 @@ dpaa2_mac_attach(device_t dev)
 		    "error=%d\n", __func__, error);
 		return (ENXIO);
 	}
+
+	/* Obtain MC portal. */
+	mcp_dev = (device_t) rman_get_start(sc->res[MCP_RID(0)]);
+	mcp_dinfo = device_get_ivars(mcp_dev);
+	dinfo->portal = mcp_dinfo->portal;
 
 	/* Allocate a command to send to MC hardware. */
 	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
