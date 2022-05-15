@@ -93,6 +93,9 @@ __FBSDID("$FreeBSD$");
 #define WRIOP_VERSION(x, y, z)	((x) << 10 | (y) << 5 | (z) << 0)
 #define ARRAY_SIZE(a)		(sizeof(a) / sizeof((a)[0]))
 
+/* Frame Dequeue Response status bits. */
+#define IS_NULL_RESPONSE(stat)	((((stat) >> 4) & 1) == 1)
+
 #define	ALIGN_UP(x, y)		roundup2((x), (y))
 #define	ALIGN_DOWN(x, y)	rounddown2((x), (y))
 #define CACHE_LINE_ALIGN(x)	ALIGN_UP((x), CACHE_LINE_SIZE)
@@ -2559,14 +2562,14 @@ dpaa2_ni_consume_frames(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq **src,
 			retries++;
 			continue;
 		} else if (rc == EINPROGRESS) {
-			if (dq != NULL) {
+			if (dq != NULL && !IS_NULL_RESPONSE(dq->fdr.desc.stat)) {
 				fd = &dq->fdr.fd;
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
 				frames++;
 			}
 		} else if (rc == EALREADY || rc == ENOENT) {
-			if (dq != NULL) {
+			if (dq != NULL && !IS_NULL_RESPONSE(dq->fdr.desc.stat)) {
 				fd = &dq->fdr.fd;
 				fq = (struct dpaa2_ni_fq *) dq->fdr.desc.fqd_ctx;
 				fq->consume(chan, fq, fd);
