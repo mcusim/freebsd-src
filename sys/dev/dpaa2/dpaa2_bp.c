@@ -77,17 +77,35 @@ struct resource_spec dpaa2_bp_spec[] = {
 };
 
 static int
-dpaa2_bp_detach(device_t dev)
+dpaa2_bp_probe(device_t dev)
 {
-	return (0);
+	/* DPBP device will be added by the parent resource container. */
+	device_set_desc(dev, "DPAA2 Buffer Pool");
+	return (BUS_PROBE_DEFAULT);
 }
 
 static int
-dpaa2_bp_probe(device_t dev)
+dpaa2_bp_detach(device_t dev)
 {
-	/* DPIO device will be added by a parent resource container itself. */
-	device_set_desc(dev, "DPAA2 Buffer Pool");
-	return (BUS_PROBE_DEFAULT);
+	device_t child = dev;
+	struct dpaa2_bp_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
+
+	if (sc->cmd != NULL) {
+		(void)DPAA2_CMD_BP_DISABLE(dev, child, sc->cmd);
+		(void)DPAA2_CMD_BP_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd,
+		    sc->bp_token));
+		(void)DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(sc->cmd,
+		    sc->rc_token));
+
+		dpaa2_mcp_free_command(sc->cmd);
+		sc->cmd = NULL;
+	}
+
+	dinfo->portal = NULL;
+	bus_release_resources(sc->dev, dpaa2_bp_spec, sc->res);
+
+	return (0);
 }
 
 static int
@@ -100,11 +118,10 @@ dpaa2_bp_attach(device_t dev)
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(pdev);
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *mcp_dinfo;
-	struct dpaa2_cmd *cmd;
-	uint16_t rc_token, bp_token;
 	int error;
 
 	sc->dev = dev;
+	sc->cmd = NULL;
 
 	error = bus_alloc_resources(sc->dev, dpaa2_bp_spec, sc->res);
 	if (error) {
@@ -113,31 +130,34 @@ dpaa2_bp_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	/* Obtain MC portal. */
+	/* Send commands to MC via allocated portal. */
 	mcp_dev = (device_t) rman_get_start(sc->res[MCP_RID(0)]);
 	mcp_dinfo = device_get_ivars(mcp_dev);
 	dinfo->portal = mcp_dinfo->portal;
 
 	/* Allocate a command to send to MC hardware. */
-	error = dpaa2_mcp_init_command(&cmd, DPAA2_CMD_DEF);
+	error = dpaa2_mcp_init_command(&sc->cmd, DPAA2_CMD_DEF);
 	if (error) {
 		device_printf(dev, "%s: failed to allocate dpaa2_cmd: "
 		    "error=%d\n", __func__, error);
-		goto err_exit;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
 
 	/* Open resource container and DPBP object. */
-	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &sc->rc_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
 		    __func__, error);
-		goto err_free_cmd;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
-	error = DPAA2_CMD_BP_OPEN(dev, child, cmd, dinfo->id, &bp_token);
+	error = DPAA2_CMD_BP_OPEN(dev, child, cmd, dinfo->id, &sc->bp_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
-		goto err_close_rc;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
 
 	/* Prepare DPBP object. */
@@ -145,48 +165,25 @@ dpaa2_bp_attach(device_t dev)
 	if (error) {
 		device_printf(dev, "%s: failed to reset DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
-		goto err_close_bp;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
 	error = DPAA2_CMD_BP_ENABLE(dev, child, cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to enable DPBP: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
-		goto err_close_bp;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
 	error = DPAA2_CMD_BP_GET_ATTRIBUTES(dev, child, cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "%s: failed to get DPBP attributes: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
-		goto err_disable_bp;
-	}
-
-	/* Close the DPBP object and the resource container. */
-	error = DPAA2_CMD_BP_CLOSE(dev, child, cmd);
-	if (error) {
-		device_printf(dev, "%s: failed to close DPBP: id=%d, error=%d\n",
-		    __func__, dinfo->id, error);
-		goto err_close_rc;
-	}
-	error = DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
-	if (error) {
-		device_printf(dev, "%s: failed to close DPRC: error=%d\n",
-		    __func__, error);
-		goto err_free_cmd;
+		dpaa2_bp_detach(dev);
+		return (ENXIO);
 	}
 
 	return (0);
-
-err_disable_bp:
-	DPAA2_CMD_BP_DISABLE(dev, child, cmd);
-err_close_bp:
-	DPAA2_CMD_BP_CLOSE(dev, child, dpaa2_mcp_tk(cmd, bp_token));
-err_close_rc:
-	DPAA2_CMD_RC_CLOSE(dev, child, dpaa2_mcp_tk(cmd, rc_token));
-err_free_cmd:
-	dpaa2_mcp_free_command(cmd);
-err_exit:
-	dpaa2_bp_detach(dev);
-	return (ENXIO);
 }
 
 static device_method_t dpaa2_bp_methods[] = {
