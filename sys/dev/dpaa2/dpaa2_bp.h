@@ -41,17 +41,23 @@
  *		 acquire/release operations on buffers.
  */
 struct dpaa2_bp_attr {
-	uint32_t		id;
-	uint16_t		bpid;
+	uint32_t		 id;
+	uint16_t		 bpid;
 };
 
 /**
  * @brief Software context for the DPAA2 Buffer Pool driver.
  */
 struct dpaa2_bp_softc {
-	device_t		dev;
+	device_t		 dev;
+	struct dpaa2_bp_attr	 attr;
+
+	/* Help to send commands to MC. */
+	struct dpaa2_cmd	*cmd;
+	uint16_t		 rc_token;
+	uint16_t		 bp_token;
+
 	struct resource 	*res[DPAA2_BP_MAX_RESOURCES];
-	struct dpaa2_bp_attr	attr;
 };
 
 extern struct resource_spec dpaa2_bp_spec[];
