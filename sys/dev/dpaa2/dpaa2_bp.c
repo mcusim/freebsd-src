@@ -145,14 +145,15 @@ dpaa2_bp_attach(device_t dev)
 	}
 
 	/* Open resource container and DPBP object. */
-	error = DPAA2_CMD_RC_OPEN(dev, child, cmd, rcinfo->id, &sc->rc_token);
+	error = DPAA2_CMD_RC_OPEN(dev, child, sc->cmd, rcinfo->id,
+	    &sc->rc_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPRC: error=%d\n",
 		    __func__, error);
 		dpaa2_bp_detach(dev);
 		return (ENXIO);
 	}
-	error = DPAA2_CMD_BP_OPEN(dev, child, cmd, dinfo->id, &sc->bp_token);
+	error = DPAA2_CMD_BP_OPEN(dev, child, sc->cmd, dinfo->id, &sc->bp_token);
 	if (error) {
 		device_printf(dev, "%s: failed to open DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
@@ -161,21 +162,21 @@ dpaa2_bp_attach(device_t dev)
 	}
 
 	/* Prepare DPBP object. */
-	error = DPAA2_CMD_BP_RESET(dev, child, cmd);
+	error = DPAA2_CMD_BP_RESET(dev, child, sc->cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to reset DPBP: id=%d, error=%d\n",
 		    __func__, dinfo->id, error);
 		dpaa2_bp_detach(dev);
 		return (ENXIO);
 	}
-	error = DPAA2_CMD_BP_ENABLE(dev, child, cmd);
+	error = DPAA2_CMD_BP_ENABLE(dev, child, sc->cmd);
 	if (error) {
 		device_printf(dev, "%s: failed to enable DPBP: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
 		dpaa2_bp_detach(dev);
 		return (ENXIO);
 	}
-	error = DPAA2_CMD_BP_GET_ATTRIBUTES(dev, child, cmd, &sc->attr);
+	error = DPAA2_CMD_BP_GET_ATTRIBUTES(dev, child, sc->cmd, &sc->attr);
 	if (error) {
 		device_printf(dev, "%s: failed to get DPBP attributes: id=%d, "
 		    "error=%d\n", __func__, dinfo->id, error);
