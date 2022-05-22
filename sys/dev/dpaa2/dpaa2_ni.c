@@ -826,10 +826,16 @@ dpaa2_ni_setup(device_t dev)
 			error = DPAA2_CMD_MAC_OPEN(sc->dev, child,
 			    dpaa2_mcp_tk(sc->cmd, sc->rc_token),
 			    sc->mac.dpmac_id, &mac_token);
+			/* Under VFIO, the DPMAC might be sitting in another
+			 * container (DPRC) we don't have access to.
+			 * Assume DPAA2_MAC_LINK_TYPE_FIXED if this is
+			 * the case.
+			 */
 			if (error) {
 				device_printf(dev, "%s: failed to open "
-				    "connected DPMAC: %d\n", __func__,
+				    "connected DPMAC: %d (assuming in other DPRC)\n", __func__,
 				    sc->mac.dpmac_id);
+					link_type = DPAA2_MAC_LINK_TYPE_FIXED;
 			} else {
 				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, child,
 				    sc->cmd, &attr);
