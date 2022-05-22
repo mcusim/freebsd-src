@@ -355,7 +355,7 @@ struct dpaa2_rc_attr {
 	uint32_t	cont_id;
 	uint32_t	portal_id;
 	uint32_t	options;
-	uint16_t	icid;
+	uint32_t	icid;
 };
 
 /**
