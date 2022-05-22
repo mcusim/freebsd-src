@@ -156,7 +156,7 @@ struct dpaa2_devinfo {
 
 	uint32_t		 id;
 	uint32_t		 portal_id;
-	uint16_t		 icid;
+	uint32_t		 icid;
 
 	enum dpaa2_dev_type	 dtype;
 	struct resource_list	 resources;

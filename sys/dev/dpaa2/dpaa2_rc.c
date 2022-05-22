@@ -858,8 +858,7 @@ dpaa2_rc_get_attributes(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 {
 	struct __packed dpaa2_rc_attr {
 		uint32_t	cont_id;
-		uint16_t	icid;
-		uint16_t	_reserved1;
+		uint32_t	icid;
 		uint32_t	options;
 		uint32_t	portal_id;
 	} *pattr;
