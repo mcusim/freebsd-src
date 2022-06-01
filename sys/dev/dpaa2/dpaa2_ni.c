@@ -877,10 +877,10 @@ dpaa2_ni_setup(device_t dev)
 				device_printf(dev, "%s: DPMAC link type is not "
 				    "supported\n", __func__);
 			}
-		} else if (ep2_desc.type == DPAA2_DEV_NI) {
+		} else if (ep2_desc.type == DPAA2_DEV_NI ||
+			   ep2_desc.type == DPAA2_DEV_MUX ||
+			   ep2_desc.type == DPAA2_DEV_SW) {
 			dpaa2_ni_setup_fixed_link(sc);
-		} else {
-			/* TODO: Also DPSW, DPDMUX */
 		}
 	}
 
