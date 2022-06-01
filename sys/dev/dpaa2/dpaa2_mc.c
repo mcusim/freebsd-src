@@ -649,6 +649,10 @@ dpaa2_ttos(enum dpaa2_dev_type type)
 		return ("dpcon");
 	case DPAA2_DEV_MAC:
 		return ("dpmac");
+	case DPAA2_DEV_MUX:
+		return ("dpdmux");
+	case DPAA2_DEV_SW:
+		return ("dpsw");
 	default:
 		break;
 	}
@@ -675,6 +679,10 @@ dpaa2_stot(const char *str)
 		return (DPAA2_DEV_CON);
 	} else if (COMPARE_TYPE(str, "dpmac")) {
 		return (DPAA2_DEV_MAC);
+	} else if (COMPARE_TYPE(str, "dpdmux")) {
+		return (DPAA2_DEV_MUX);
+	} else if (COMPARE_TYPE(str, "dpsw")) {
+		return (DPAA2_DEV_SW);
 	}
 
 	return (DPAA2_DEV_NOTYPE);
