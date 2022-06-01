@@ -803,18 +803,17 @@ dpaa2_ni_setup(device_t dev)
 		device_printf(dev, "connected to %s (id=%d)\n",
 		    dpaa2_ttos(ep2_desc.type), ep2_desc.obj_id);
 
+		error = dpaa2_ni_set_mac_addr(dev, cmd, rc_token, ni_token);
+		if (error)
+			device_printf(dev, "%s: failed to set MAC "
+				      "address: error=%d\n", __func__, error);
+
 		if (ep2_desc.type == DPAA2_DEV_MAC) {
 			/*
 			 * This is the simplest case when DPNI is connected to
 			 * DPMAC directly.
 			 */
 			sc->mac.dpmac_id = ep2_desc.obj_id;
-
-			error = dpaa2_ni_set_mac_addr(dev, cmd, rc_token,
-			    ni_token);
-			if (error)
-				device_printf(dev, "%s: failed to set MAC "
-				    "address: error=%d\n", __func__, error);
 
 			link_type = DPAA2_MAC_LINK_TYPE_NONE;
 
