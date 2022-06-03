@@ -3558,9 +3558,7 @@ static driver_t dpaa2_rc_driver = {
 	sizeof(struct dpaa2_rc_softc),
 };
 
-static devclass_t dpaa2_rc_devclass;
-
 /* For root container */
-DRIVER_MODULE(dpaa2_rc, dpaa2_mc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_rc, dpaa2_mc, dpaa2_rc_driver, 0, 0);
 /* For child containers */
-DRIVER_MODULE(dpaa2_rc, dpaa2_rc, dpaa2_rc_driver, dpaa2_rc_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_rc, dpaa2_rc, dpaa2_rc_driver, 0, 0);

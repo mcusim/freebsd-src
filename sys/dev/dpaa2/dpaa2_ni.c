@@ -3327,9 +3327,7 @@ static driver_t dpaa2_ni_driver = {
 	sizeof(struct dpaa2_ni_softc),
 };
 
-static devclass_t dpaa2_ni_devclass;
-
-DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, dpaa2_ni_devclass, 0, 0);
+DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, 0, 0);
+DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, 0, 0);
 
 MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1);

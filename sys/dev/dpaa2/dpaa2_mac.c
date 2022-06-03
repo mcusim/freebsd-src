@@ -373,6 +373,4 @@ static driver_t dpaa2_mac_driver = {
 	sizeof(struct dpaa2_mac_softc),
 };
 
-static devclass_t dpaa2_mac_devclass;
-
-DRIVER_MODULE(dpaa2_mac, dpaa2_rc, dpaa2_mac_driver, dpaa2_mac_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_mac, dpaa2_rc, dpaa2_mac_driver, 0, 0);

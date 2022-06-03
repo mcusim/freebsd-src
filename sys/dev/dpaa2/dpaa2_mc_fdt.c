@@ -121,7 +121,4 @@ static device_method_t dpaa2_mc_fdt_methods[] = {
 DEFINE_CLASS_1(dpaa2_mc, dpaa2_mc_fdt_driver, dpaa2_mc_fdt_methods,
     sizeof(struct dpaa2_mc_softc), dpaa2_mc_driver);
 
-static devclass_t dpaa2_mc_fdt_devclass;
-
-DRIVER_MODULE(dpaa2_mc, simplebus, dpaa2_mc_fdt_driver, dpaa2_mc_fdt_devclass,
-    0, 0);
+DRIVER_MODULE(dpaa2_mc, simplebus, dpaa2_mc_fdt_driver, 0, 0);

@@ -198,10 +198,7 @@ static device_method_t dpaa2_mac_dev_methods[] = {
 DEFINE_CLASS_0(dpaa2_mac_dev, dpaa2_mac_dev_driver, dpaa2_mac_dev_methods,
     sizeof(struct dpaa2_mac_dev_softc));
 
-static devclass_t dpaa2_mac_dev_devclass;
-
-DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver,
-    dpaa2_mac_dev_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver, 0, 0);
 
 MODULE_DEPEND(dpaa2_mac_dev, memac_mdio, 1, 1, 1);
 MODULE_DEPEND(dpaa2_mac_dev, miibus, 1, 1, 1);
@@ -305,8 +302,9 @@ dpaa2_mc_acpi_attach(device_t dev)
 static device_t
 dpaa2_mc_acpi_find_dpaa2_mac_dev(device_t dev, uint32_t id)
 {
-	int devcount, error, i;
+	int devcount, error, i, len;
 	device_t *devlist, mdev;
+	const char *mdevname;
 
 	error = device_get_children(dev, &devlist, &devcount);
 	if (error != 0)
@@ -314,10 +312,17 @@ dpaa2_mc_acpi_find_dpaa2_mac_dev(device_t dev, uint32_t id)
 
 	for (i = 0; i < devcount; i++) {
 		mdev = devlist[i];
-		if (device_get_devclass(mdev) != dpaa2_mac_dev_devclass)
+		mdevname = device_get_name(mdev);
+		if (mdevname != NULL) {
+			len = strlen(mdevname);
+			if (strncmp("dpaa2_mac_dev", mdevname, len) != 0)
+				continue;
+		} else {
 			continue;
+		}
 		if (!device_is_attached(mdev))
 			continue;
+
 		if (dpaa2_mac_dev_match_id(mdev, id))
 			return (mdev);
 	}
@@ -403,10 +408,8 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 DEFINE_CLASS_1(dpaa2_mc, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_methods,
     sizeof(struct dpaa2_mc_softc), dpaa2_mc_driver);
 
-static devclass_t dpaa2_mc_acpi_devclass;
-
 /* Make sure miibus gets procesed first. */
-DRIVER_MODULE_ORDERED(dpaa2_mc, acpi, dpaa2_mc_acpi_driver,
-    dpaa2_mc_acpi_devclass, NULL, NULL, SI_ORDER_ANY);
+DRIVER_MODULE_ORDERED(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, NULL, NULL,
+    SI_ORDER_ANY);
 
 MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);

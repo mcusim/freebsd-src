@@ -493,6 +493,4 @@ static driver_t dpaa2_io_driver = {
 	sizeof(struct dpaa2_io_softc),
 };
 
-static devclass_t dpaa2_io_devclass;
-
-DRIVER_MODULE(dpaa2_io, dpaa2_rc, dpaa2_io_driver, dpaa2_io_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_io, dpaa2_rc, dpaa2_io_driver, 0, 0);

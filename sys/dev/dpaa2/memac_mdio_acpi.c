@@ -139,11 +139,8 @@ static device_method_t memacphy_acpi_methods[] = {
 DEFINE_CLASS_0(memacphy, memacphy_acpi_driver, memacphy_acpi_methods,
     sizeof(struct memacphy_softc));
 
-static devclass_t memacphy_devclass;
-
-DRIVER_MODULE(miibus, memacphy, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(memacphy, memac_mdio, memacphy_acpi_driver, memacphy_devclass,
-    0, 0);
+DRIVER_MODULE(miibus, memacphy, miibus_driver, 0, 0);
+DRIVER_MODULE(memacphy, memac_mdio, memacphy_acpi_driver, 0, 0);
 
 MODULE_DEPEND(memacphy, miibus, 1, 1, 1);
 
@@ -450,11 +447,8 @@ static device_method_t memac_mdio_acpi_methods[] = {
 DEFINE_CLASS_0(memac_mdio, memac_mdio_acpi_driver, memac_mdio_acpi_methods,
     sizeof(struct memac_mdio_softc));
 
-static devclass_t memac_mdio_acpi_devclass;
-
-DRIVER_MODULE(miibus, memac_mdio, miibus_driver, miibus_devclass, 0, 0);
-DRIVER_MODULE(memac_mdio, acpi, memac_mdio_acpi_driver, memac_mdio_acpi_devclass,
-    0, 0);
+DRIVER_MODULE(miibus, memac_mdio, miibus_driver, 0, 0);
+DRIVER_MODULE(memac_mdio, acpi, memac_mdio_acpi_driver, 0, 0);
 
 MODULE_DEPEND(memac_mdio, miibus, 1, 1, 1);
 

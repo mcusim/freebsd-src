@@ -379,6 +379,4 @@ static driver_t dpaa2_mcp_driver = {
 	sizeof(struct dpaa2_mcp_softc),
 };
 
-static devclass_t dpaa2_mcp_devclass;
-
-DRIVER_MODULE(dpaa2_mcp, dpaa2_rc, dpaa2_mcp_driver, dpaa2_mcp_devclass, 0, 0);
+DRIVER_MODULE(dpaa2_mcp, dpaa2_rc, dpaa2_mcp_driver, 0, 0);
