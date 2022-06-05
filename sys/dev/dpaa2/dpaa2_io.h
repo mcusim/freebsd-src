@@ -48,8 +48,8 @@ enum dpaa2_io_chan_mode {
 /**
  * @brief Attributes of the DPIO object.
  *
- * swp_ce_paddr: Physical address of the software portal cache-enabled area.
- * swp_ci_paddr: Physical address of the software portal cache-inhibited area.
+ * swp_ce_paddr: Physical address of the cache-enabled area.
+ * swp_ci_paddr: Physical address of the cache-inhibited area.
  * swp_version:	 Hardware IP version of the software portal.
  * swp_clk:	 QBMAN clock frequency value in Hz.
  * id:		 DPIO object ID.
