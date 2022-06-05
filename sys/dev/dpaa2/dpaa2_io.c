@@ -123,6 +123,7 @@ dpaa2_io_detach(device_t dev)
 {
 	device_t child = dev;
 	struct dpaa2_io_softc *sc = device_get_softc(dev);
+	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	int error;
 
 	/* Tear down interrupt handler and release IRQ resources. */
@@ -156,7 +157,8 @@ dpaa2_io_detach(device_t dev)
 		    sc->res[MEM_RID(i)], &sc->map[MEM_RID(i)]);
 		if (error && bootverbose)
 			device_printf(dev, "%s: failed to unmap memory "
-			    "resource: rid=%d, error=%d\n", MEM_RID(i), error);
+			    "resource: rid=%d, error=%d\n", __func__, MEM_RID(i),
+			    error);
 	}
 
 	/* Release allocated resources. */
@@ -410,6 +412,8 @@ dpaa2_io_setup_irqs(device_t dev)
 static int
 dpaa2_io_release_irqs(device_t dev)
 {
+	struct dpaa2_io_softc *sc = device_get_softc(dev);
+
 	/* Disable receiving CDANs from channel 0. */
 	if (sc->swp_desc.has_notif)
 		dpaa2_swp_set_push_dequeue(sc->swp, 0, false);
