@@ -2388,9 +2388,9 @@ dpaa2_ni_intr(void *arg)
  * @brief Callback to obtain a physical address of the only DMA segment mapped.
  */
 static void
-dpaa2_ni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
+dpaa2_ni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
-	if (!err) {
+	if (error == 0) {
 		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
 		*(bus_addr_t *) arg = segs[0].ds_addr;
 	}
@@ -2401,9 +2401,9 @@ dpaa2_ni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
  */
 static void
 dpaa2_ni_dmamap_cb2(void *arg, bus_dma_segment_t *segs, int nseg,
-    bus_size_t mapsz __unused, int err)
+    bus_size_t mapsz __unused, int error)
 {
-	if (!err) {
+	if (error == 0) {
 		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
 		*(bus_addr_t *) arg = segs[0].ds_addr;
 	}
@@ -2488,12 +2488,18 @@ dpaa2_ni_tx_task(void *arg, int count)
 				error = bus_dmamap_load_mbuf(sc->tx_dmat,
 				    txb->dmap, txb->m, dpaa2_ni_dmamap_cb2,
 				    &txb->paddr, BUS_DMA_NOWAIT);
-				if (error) {
+				if (error != 0) {
 					device_printf(sc->dev, "%s: can't load "
-					    "TX buffer: error=%d\n", __func__,
-					    error);
+					    "TX buffer (1): error=%d\n",
+					    __func__, error);
 				}
+			} else {
+				device_printf(sc->dev, "%s: mbuf "
+				    "de-fragmentation failed\n", __func__);
 			}
+		} else if (error != 0) {
+			device_printf(sc->dev, "%s: can't load TX buffer (2): "
+			    "error=%d\n", __func__, error);
 		}
 
 		if (__predict_false(error != 0)) {
