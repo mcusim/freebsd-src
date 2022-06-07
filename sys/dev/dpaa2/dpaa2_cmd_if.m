@@ -421,6 +421,16 @@ CODE {
 		return (ENXIO);
 	}
 	static int
+	bypass_ni_remove_mac_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+		uint8_t *mac)
+	{
+		panic_on_mc(dev);
+		if (device_get_parent(dev) != NULL)
+			return (DPAA2_CMD_NI_REMOVE_MAC_ADDR(
+				device_get_parent(dev), child, cmd, mac));
+		return (ENXIO);
+	}
+	static int
 	bypass_ni_clear_mac_filters(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 		bool rm_uni, bool rm_multi)
 	{
@@ -1189,6 +1199,13 @@ METHOD int ni_add_mac_addr {
 	struct dpaa2_cmd *cmd;
 	uint8_t		*mac;
 } DEFAULT bypass_ni_add_mac_addr;
+
+METHOD int ni_remove_mac_addr {
+	device_t	 dev;
+	device_t	 child;
+	struct dpaa2_cmd *cmd;
+	uint8_t		*mac;
+} DEFAULT bypass_ni_remove_mac_addr;
 
 METHOD int ni_clear_mac_filters {
 	device_t	 dev;

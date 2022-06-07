@@ -1683,6 +1683,29 @@ dpaa2_rc_ni_add_mac_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 }
 
 static int
+dpaa2_rc_ni_remove_mac_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
+    uint8_t *mac)
+{
+	struct __packed rem_mac_args {
+		uint16_t	_reserved;
+		uint8_t		mac[ETHER_ADDR_LEN];
+		uint64_t	_reserved1[6];
+	} *args;
+	struct dpaa2_mcp *portal = dpaa2_rc_select_portal(dev, child);
+
+	if (portal == NULL || cmd == NULL || mac == NULL)
+		return (DPAA2_CMD_STAT_EINVAL);
+
+	dpaa2_rc_reset_cmd_params(cmd);
+
+	args = (struct add_mac_args *) &cmd->params[0];
+	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
+		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
+
+	return (dpaa2_rc_exec_cmd(portal, cmd, CMDID_NI_REMOVE_MAC_ADDR));
+}
+
+static int
 dpaa2_rc_ni_clear_mac_filters(device_t dev, device_t child,
     struct dpaa2_cmd *cmd, bool rm_uni, bool rm_multi)
 {
@@ -3494,6 +3517,7 @@ static device_method_t dpaa2_rc_methods[] = {
 	DEVMETHOD(dpaa2_cmd_ni_set_queue,	dpaa2_rc_ni_set_queue),
 	DEVMETHOD(dpaa2_cmd_ni_get_qdid,	dpaa2_rc_ni_get_qdid),
 	DEVMETHOD(dpaa2_cmd_ni_add_mac_addr,	dpaa2_rc_ni_add_mac_addr),
+	DEVMETHOD(dpaa2_cmd_ni_remove_mac_addr,	dpaa2_rc_ni_remove_mac_addr),
 	DEVMETHOD(dpaa2_cmd_ni_clear_mac_filters, dpaa2_rc_ni_clear_mac_filters),
 	DEVMETHOD(dpaa2_cmd_ni_set_mfl,		dpaa2_rc_ni_set_mfl),
 	DEVMETHOD(dpaa2_cmd_ni_set_offload,	dpaa2_rc_ni_set_offload),
