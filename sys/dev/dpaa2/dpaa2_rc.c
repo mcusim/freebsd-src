@@ -1698,7 +1698,7 @@ dpaa2_rc_ni_remove_mac_addr(device_t dev, device_t child, struct dpaa2_cmd *cmd,
 
 	dpaa2_rc_reset_cmd_params(cmd);
 
-	args = (struct add_mac_args *) &cmd->params[0];
+	args = (struct rem_mac_args *) &cmd->params[0];
 	for (int i = 1; i <= ETHER_ADDR_LEN; i++)
 		args->mac[i - 1] = mac[ETHER_ADDR_LEN - i];
 
