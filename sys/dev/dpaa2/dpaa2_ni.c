@@ -2301,14 +2301,14 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifreq *ifr = (struct ifreq *) data;
 	device_t dev, child;
 	uint32_t changed = 0;
-	int mtu, rc = 0;
+	int mtu, error, rc = 0;
 
 	dev = child = sc->dev;
 
 	switch (cmd) {
 	case SIOCSIFMTU:
 		DPNI_LOCK(sc);
-		mtu = ifr->ifr_mtu
+		mtu = ifr->ifr_mtu;
 		if (mtu < ETHERMIN || mtu > ETHERMTU_JUMBO) {
 			DPNI_UNLOCK(sc);
 			return (EINVAL);
