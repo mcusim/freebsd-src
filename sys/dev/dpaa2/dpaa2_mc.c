@@ -72,10 +72,23 @@ __FBSDID("$FreeBSD$");
 #define IORT_DEVICE_NAME		"MCE"
 
 /* MC Registers */
-#define MC_REG_GCR1			0x00u
-#define GCR1_P1_STOP			0x80000000
-#define MC_REG_GSR			0x08u
-#define MC_REG_FAPR			0x28u
+#define MC_REG_GCR1			0x0000u
+#define MC_REG_GSR			0x0004u
+#define MC_REG_FAPR			0x0028u
+
+/* General Control Register 1 (GCR1) */
+#define GCR1_P1_STOP			0x80000000u
+#define GCR1_P2_STOP			0x40000000u
+
+/* General Status Register (GSR) */
+#define GSR_HW_ERR(v)			(((v) & 0x80000000u) >> 31)
+#define GSR_CAT_ERR(v)			(((v) & 0x40000000u) >> 30)
+#define GSR_DPL_OFFSET(v)		(((v) & 0x3FFFFF00u) >> 8)
+#define GSR_MCS(v)			(((v) & 0xFFu) >> 0)
+
+/* Timeouts to wait for the MC status. */
+#define MC_STAT_TIMEOUT			100u	/* us */
+#define MC_STAT_ATTEMPTS		100u
 
 /**
  * @brief Structure to describe a DPAA2 device as a managed resource.
@@ -142,9 +155,21 @@ dpaa2_mc_attach(device_t dev)
 		val = mcreg_read_4(sc, MC_REG_FAPR);
 		device_printf(dev, "FAPR=0x%x\n", val);
 
-		/* Reset P1_STOP bit to resume MC processor. */
-		val = mcreg_read_4(sc, MC_REG_GCR1) & (~GCR1_P1_STOP);
+		/* Reset P1_STOP and P2_STOP bits to resume MC processor. */
+		val = mcreg_read_4(sc, MC_REG_GCR1) &
+		    ~(GCR1_P1_STOP | GCR1_P2_STOP);
 		mcreg_write_4(sc, MC_REG_GCR1, val);
+
+		/* Poll MC status. */
+		for (int i = 0; i < MC_STAT_ATTEMPTS; i++) {
+			val = mcreg_read_4(sc, MC_REG_GSR);
+			if (GSR_MCS(val) != 0u)
+				break;
+			DELAY(MC_STAT_TIMEOUT);
+		}
+		device_printf(dev, "herr=%d, cerr=%d, dpl_offset=0x%x, "
+		    "mcs=0x%x\n", GSR_HW_ERR(val), GSR_CAT_ERR(val),
+		    GSR_DPL_OFFSET(val), GSR_MCS(val));
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
