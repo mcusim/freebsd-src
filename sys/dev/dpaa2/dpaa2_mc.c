@@ -87,7 +87,7 @@ __FBSDID("$FreeBSD$");
 #define GSR_MCS(v)			(((v) & 0xFFu) >> 0)
 
 /* Timeouts to wait for the MC status. */
-#define MC_STAT_TIMEOUT			100u	/* us */
+#define MC_STAT_TIMEOUT			1000u	/* us */
 #define MC_STAT_ATTEMPTS		100u
 
 /**
@@ -153,7 +153,7 @@ dpaa2_mc_attach(device_t dev)
 
 		/* Print Firmware Attributes and Partitioning Register. */
 		val = mcreg_read_4(sc, MC_REG_FAPR);
-		device_printf(dev, "FAPR=0x%x\n", val);
+		device_printf(dev, "fapr=0x%x\n", val);
 
 		/* Reset P1_STOP and P2_STOP bits to resume MC processor. */
 		val = mcreg_read_4(sc, MC_REG_GCR1) &
@@ -167,9 +167,9 @@ dpaa2_mc_attach(device_t dev)
 				break;
 			DELAY(MC_STAT_TIMEOUT);
 		}
-		device_printf(dev, "herr=%d, cerr=%d, dpl_offset=0x%x, "
-		    "mcs=0x%x\n", GSR_HW_ERR(val), GSR_CAT_ERR(val),
-		    GSR_DPL_OFFSET(val), GSR_MCS(val));
+		device_printf(dev, "gsr=0x%x, herr=%d, cerr=%d, "
+		    "dpl_offset=0x%x, mcs=0x%x\n", val, GSR_HW_ERR(val),
+		    GSR_CAT_ERR(val), GSR_DPL_OFFSET(val), GSR_MCS(val));
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
