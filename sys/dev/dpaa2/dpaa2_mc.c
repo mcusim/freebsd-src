@@ -73,7 +73,8 @@ __FBSDID("$FreeBSD$");
 
 /* MC Registers */
 #define MC_REG_GCR1			0x0000u
-#define MC_REG_GSR			0x0004u
+#define MC_REG_GCR2			0x0004u /* TODO: Does it exist? */
+#define MC_REG_GSR			0x0008u
 #define MC_REG_FAPR			0x0028u
 
 /* General Control Register 1 (GCR1) */
@@ -108,13 +109,14 @@ static struct resource_spec dpaa2_mc_spec[] = {
 	RESOURCE_SPEC_END
 };
 
-static u_int dpaa2_mc_get_xref(device_t mcdev, device_t child);
-static u_int dpaa2_mc_map_id(device_t mcdev, device_t child, uintptr_t *id);
-static struct rman *dpaa2_mc_rman(device_t mcdev, int type);
+static u_int dpaa2_mc_get_xref(device_t, device_t);
+static u_int dpaa2_mc_map_id(device_t, device_t, uintptr_t *);
+static struct rman *dpaa2_mc_rman(device_t, int);
 
-static int alloc_msi(device_t, device_t, int count, int maxcount, int *irqs);
-static int release_msi(device_t, device_t, int count, int *irqs);
-static int map_msi(device_t, device_t, int irq, uint64_t *addr, uint32_t *data);
+static int dpaa2_mc_alloc_msi_impl(device_t, device_t, int, int, int *);
+static int dpaa2_mc_release_msi_impl(device_t, device_t, int, int *);
+static int dpaa2_mc_map_msi_impl(device_t, device_t, int, uint64_t *,
+    uint32_t *);
 
 /*
  * For device interface.
@@ -146,14 +148,22 @@ dpaa2_mc_attach(device_t dev)
 		error = bus_map_resource(sc->dev, SYS_RES_MEMORY, sc->res[1],
 		    &req, &sc->map[1]);
 		if (error) {
-			device_printf(dev, "Failed to map control registers\n");
+			device_printf(dev, "%s: failed to map control "
+			    "registers\n", __func__);
 			dpaa2_mc_detach(dev);
 			return (ENXIO);
 		}
 
-		/* Print Firmware Attributes and Partitioning Register. */
-		val = mcreg_read_4(sc, MC_REG_FAPR);
-		device_printf(dev, "fapr=0x%x\n", val);
+		if (bootverbose) {
+			device_printf(dev, "GCR1=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GCR1));
+			device_printf(dev, "GCR2=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GCR2));
+			device_printf(dev, "GSR=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GSR));
+			device_printf(dev, "FAPR=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_FAPR));
+		}
 
 		/* Reset P1_STOP and P2_STOP bits to resume MC processor. */
 		val = mcreg_read_4(sc, MC_REG_GCR1) &
@@ -167,9 +177,16 @@ dpaa2_mc_attach(device_t dev)
 				break;
 			DELAY(MC_STAT_TIMEOUT);
 		}
-		device_printf(dev, "gsr=0x%x, herr=%d, cerr=%d, "
-		    "dpl_offset=0x%x, mcs=0x%x\n", val, GSR_HW_ERR(val),
-		    GSR_CAT_ERR(val), GSR_DPL_OFFSET(val), GSR_MCS(val));
+		if (bootverbose) {
+			device_printf(dev, "GCR1=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GCR1));
+			device_printf(dev, "GCR2=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GCR2));
+			device_printf(dev, "GSR=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_GSR));
+			device_printf(dev, "FAPR=0x%x\n", mcreg_read_4(sc,
+			    MC_REG_FAPR));
+		}
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
@@ -401,7 +418,7 @@ dpaa2_mc_alloc_msi(device_t mcdev, device_t child, int count, int maxcount,
     int *irqs)
 {
 #if defined(INTRNG)
-	return (alloc_msi(mcdev, child, count, maxcount, irqs));
+	return (dpaa2_mc_alloc_msi_impl(mcdev, child, count, maxcount, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -411,7 +428,7 @@ int
 dpaa2_mc_release_msi(device_t mcdev, device_t child, int count, int *irqs)
 {
 #if defined(INTRNG)
-	return (release_msi(mcdev, child, count, irqs));
+	return (dpaa2_mc_release_msi_impl(mcdev, child, count, irqs));
 #else
 	return (ENXIO);
 #endif
@@ -422,7 +439,7 @@ dpaa2_mc_map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr,
     uint32_t *data)
 {
 #if defined(INTRNG)
-	return (map_msi(mcdev, child, irq, addr, data));
+	return (dpaa2_mc_map_msi_impl(mcdev, child, irq, addr, data));
 #else
 	return (ENXIO);
 #endif
@@ -813,7 +830,8 @@ dpaa2_mc_rman(device_t mcdev, int type)
  *	 Total number of IRQs is limited to 32.
  */
 static int
-alloc_msi(device_t mcdev, device_t child, int count, int maxcount, int *irqs)
+dpaa2_mc_alloc_msi_impl(device_t mcdev, device_t child, int count, int maxcount,
+    int *irqs)
 {
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	int msi_irqs[DPAA2_MC_MSI_COUNT];
@@ -876,7 +894,7 @@ alloc_msi(device_t mcdev, device_t child, int count, int maxcount, int *irqs)
  * NOTE: MSIs are kept allocated in the kernel as a part of the pool.
  */
 static int
-release_msi(device_t mcdev, device_t child, int count, int *irqs)
+dpaa2_mc_release_msi_impl(device_t mcdev, device_t child, int count, int *irqs)
 {
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 
@@ -906,7 +924,8 @@ release_msi(device_t mcdev, device_t child, int count, int *irqs)
  *	 Total number of IRQs is limited to 32.
  */
 static int
-map_msi(device_t mcdev, device_t child, int irq, uint64_t *addr, uint32_t *data)
+dpaa2_mc_map_msi_impl(device_t mcdev, device_t child, int irq, uint64_t *addr,
+    uint32_t *data)
 {
 	struct dpaa2_mc_softc *sc = device_get_softc(mcdev);
 	int error = EINVAL;
