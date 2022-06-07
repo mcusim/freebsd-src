@@ -113,10 +113,8 @@ __FBSDID("$FreeBSD$");
 #define DPNI_IRQ_LINK_CHANGED	1 /* Link state changed */
 #define DPNI_IRQ_EP_CHANGED	2 /* DPAA2 endpoint dis/connected */
 
-/* Maximum frame length and MTU. */
-#define DPAA2_ETH_MFL		(MJUM9BYTES)
-#define DPAA2_ETH_HDR_AND_VLAN	(ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN)
-#define DPAA2_ETH_MTU		(DPAA2_ETH_MFL - DPAA2_ETH_HDR_AND_VLAN)
+/* Default maximum frame length. */
+#define DPAA2_ETH_MFL		(ETHER_MAX_LEN - ETHER_CRC_LEN)
 
 /* Minimally supported version of the DPNI API. */
 #define DPNI_VER_MAJOR		7
@@ -2301,16 +2299,31 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *) data;
+	device_t dev, child;
 	uint32_t changed = 0;
-	int rc = 0;
+	int mtu, rc = 0;
+
+	dev = child = sc->dev;
 
 	switch (cmd) {
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > DPAA2_ETH_MTU)
+		DPNI_LOCK(sc);
+		mtu = ifr->ifr_mtu
+		if (mtu < ETHERMIN || mtu > ETHERMTU_JUMBO) {
+			DPNI_UNLOCK(sc);
 			return (EINVAL);
+		}
+		ifp->if_mtu = mtu;
+		DPNI_UNLOCK(sc);
 
-		/* TODO: Update max. frame length according to the new MTU. */
-		ifp->if_mtu = ifr->ifr_mtu;
+		/* Update maximum frame length. */
+		error = DPAA2_CMD_NI_SET_MFL(dev, child, dpaa2_mcp_tk(sc->cmd,
+		    sc->ni_token), mtu + ETHER_HDR_LEN);
+		if (error) {
+			device_printf(dev, "%s: failed to update maximum frame "
+			    "length: error=%d\n", __func__, error);
+			return (error);
+		}
 		break;
 	case SIOCSIFCAP:
 		changed = ifp->if_capenable ^ ifr->ifr_reqcap;
