@@ -154,16 +154,13 @@ dpaa2_mc_attach(device_t dev)
 			return (ENXIO);
 		}
 
-		if (bootverbose) {
-			device_printf(dev, "GCR1=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GCR1));
-			device_printf(dev, "GCR2=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GCR2));
-			device_printf(dev, "GSR=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GSR));
-			device_printf(dev, "FAPR=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_FAPR));
-		}
+		if (bootverbose)
+			device_printf(dev,
+			    "GCR1=0x%x, GCR2=0x%x, GSR=0x%x, FAPR=0x%x\n",
+			    mcreg_read_4(sc, MC_REG_GCR1),
+			    mcreg_read_4(sc, MC_REG_GCR2),
+			    mcreg_read_4(sc, MC_REG_GSR),
+			    mcreg_read_4(sc, MC_REG_FAPR));
 
 		/* Reset P1_STOP and P2_STOP bits to resume MC processor. */
 		val = mcreg_read_4(sc, MC_REG_GCR1) &
@@ -171,22 +168,22 @@ dpaa2_mc_attach(device_t dev)
 		mcreg_write_4(sc, MC_REG_GCR1, val);
 
 		/* Poll MC status. */
+		if (bootverbose)
+			device_printf(dev, "polling MC status...\n");
 		for (int i = 0; i < MC_STAT_ATTEMPTS; i++) {
 			val = mcreg_read_4(sc, MC_REG_GSR);
 			if (GSR_MCS(val) != 0u)
 				break;
 			DELAY(MC_STAT_TIMEOUT);
 		}
-		if (bootverbose) {
-			device_printf(dev, "GCR1=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GCR1));
-			device_printf(dev, "GCR2=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GCR2));
-			device_printf(dev, "GSR=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_GSR));
-			device_printf(dev, "FAPR=0x%x\n", mcreg_read_4(sc,
-			    MC_REG_FAPR));
-		}
+
+		if (bootverbose)
+			device_printf(dev,
+			    "GCR1=0x%x, GCR2=0x%x, GSR=0x%x, FAPR=0x%x\n",
+			    mcreg_read_4(sc, MC_REG_GCR1),
+			    mcreg_read_4(sc, MC_REG_GCR2),
+			    mcreg_read_4(sc, MC_REG_GSR),
+			    mcreg_read_4(sc, MC_REG_FAPR));
 	}
 
 	/* At least 64 bytes of the command portal should be available. */
