@@ -501,6 +501,11 @@ struct dpaa2_ni_qos_table {
 	bool		keep_entries;
 };
 
+struct dpaa2_ni_mcaddr_ctx {
+	struct ifnet *ifp;
+	int error;
+};
+
 struct dpaa2_eth_dist_fields {
 	uint64_t	rxnfc_field;
 	enum net_prot	cls_prot;

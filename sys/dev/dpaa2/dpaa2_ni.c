@@ -442,6 +442,8 @@ static void dpaa2_ni_init(void *);
 static int  dpaa2_ni_transmit(struct ifnet *, struct mbuf *);
 static void dpaa2_ni_qflush(struct ifnet *);
 static int  dpaa2_ni_ioctl(struct ifnet *, u_long, caddr_t);
+static int  dpaa2_ni_update_mac_filters(struct ifnet *);
+static u_int dpaa2_ni_add_maddr(void *, struct sockaddr_dl *, u_int);
 
 /* Interrupt handlers */
 static void dpaa2_ni_intr(void *);
@@ -2362,15 +2364,22 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		DPNI_UNLOCK(sc);
 		break;
 	case SIOCADDMULTI:
-		/* TBD */
-		break;
 	case SIOCDELMULTI:
-		/* TBD */
+		DPNI_LOCK(sc);
+		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
+			DPNI_UNLOCK(sc);
+			rc = dpaa2_ni_update_mac_filters(ifp);
+			if (rc)
+				device_printf(dev, "%s: failed to update MAC "
+				    "filters: error=%d\n", __func__, rc);
+			DPNI_LOCK(sc);
+		}
+		DPNI_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:
 		if (sc->mii)
-			rc= ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, cmd);
+			rc = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, cmd);
 		else if(sc->fixed_link) {
 			rc = ifmedia_ioctl(ifp, ifr, &sc->fixed_ifmedia, cmd);
 		}
@@ -2380,6 +2389,58 @@ dpaa2_ni_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	}
 
 	return (rc);
+}
+
+static int
+dpaa2_ni_update_mac_filters(struct ifnet *ifp)
+{
+	struct dpaa2_ni_softc *sc = ifp->if_softc;
+	struct dpaa2_ni_mcaddr_ctx ctx;
+	device_t dev, child;
+	int error;
+
+	dev = child = sc->dev;
+
+	/* Remove all multicast MAC filters. */
+	error = DPAA2_CMD_NI_CLEAR_MAC_FILTERS(dev, child, dpaa2_mcp_tk(sc->cmd,
+	    sc->ni_token), false, true);
+	if (error) {
+		device_printf(dev, "%s: failed to remove multicast MAC filters: "
+		    "error=%d\n", __func__, error);
+		return (error);
+	}
+
+	ctx.ifp = ifp;
+	ctx.error = 0;
+
+	if_foreach_llmaddr(ifp, dpaa2_ni_add_maddr, &ctx);
+
+	return (ctx.error);
+}
+
+static u_int
+dpaa2_ni_add_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	struct dpaa2_ni_mcaddr_ctx *ctx = arg;
+	struct dpaa2_ni_softc *sc = ctx->ifp->if_softc;
+	device_t dev, child;
+
+	dev = child = sc->dev;
+
+	if (ctx->error != 0)
+		return (0);
+
+	if (ETHER_IS_MULTICAST(LLADDR(sdl))) {
+		ctx->error = DPAA2_CMD_NI_ADD_MAC_ADDR(dev, child,
+		    dpaa2_mcp_tk(sc->cmd, sc->ni_token), LLADDR(sdl));
+		if (ctx->error) {
+			device_printf(dev, "%s: failed to add multicast MAC "
+			    "address filter: error=%d\n", __func__, ctx->error);
+			return (0);
+		}
+	}
+
+	return (1);
 }
 
 static void
