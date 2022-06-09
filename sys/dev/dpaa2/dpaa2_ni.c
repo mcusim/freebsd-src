@@ -2405,13 +2405,14 @@ dpaa2_ni_update_mac_filters(struct ifnet *ifp)
 	error = DPAA2_CMD_NI_CLEAR_MAC_FILTERS(dev, child, dpaa2_mcp_tk(sc->cmd,
 	    sc->ni_token), false, true);
 	if (error) {
-		device_printf(dev, "%s: failed to remove multicast MAC filters: "
+		device_printf(dev, "%s: failed to clear multicast MAC filters: "
 		    "error=%d\n", __func__, error);
 		return (error);
 	}
 
 	ctx.ifp = ifp;
 	ctx.error = 0;
+	ctx.nent = 0;
 
 	if_foreach_llmaddr(ifp, dpaa2_ni_add_maddr, &ctx);
 
@@ -2431,13 +2432,23 @@ dpaa2_ni_add_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 		return (0);
 
 	if (ETHER_IS_MULTICAST(LLADDR(sdl))) {
-		ctx->error = DPAA2_CMD_NI_ADD_MAC_ADDR(dev, child,
-		    dpaa2_mcp_tk(sc->cmd, sc->ni_token), LLADDR(sdl));
-		if (ctx->error) {
-			device_printf(dev, "%s: failed to add multicast MAC "
-			    "address filter: error=%d\n", __func__, ctx->error);
+		ctx->error = DPAA2_CMD_NI_ADD_MAC_ADDR(dev, child, dpaa2_mcp_tk(
+		    sc->cmd, sc->ni_token), LLADDR(sdl));
+		if (ctx->error != 0) {
+			device_printf(dev, "%s: can't add more then %d MAC "
+			    "addresses, switching to the multicast promiscuous "
+			    "mode\n", __func__, ctx->nent);
+
+			/* Enable multicast promiscuous mode. */
+			DPNI_LOCK(sc);
+			ctx->ifp->if_flags |= IFF_ALLMULTI;
+			sc->if_flags |= IFF_ALLMULTI;
+			ctx->error = dpaa2_ni_setup_if_flags(sc);
+			DPNI_UNLOCK(sc);
+
 			return (0);
 		}
+		ctx->nent++;
 	}
 
 	return (1);

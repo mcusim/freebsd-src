@@ -501,9 +501,17 @@ struct dpaa2_ni_qos_table {
 	bool		keep_entries;
 };
 
+/**
+ * @brief Context to add multicast physical addresses to the filter table.
+ *
+ * ifp:		Network interface associated with the context.
+ * error:	Result of the last MC command.
+ * nent:	Number of entries added.
+ */
 struct dpaa2_ni_mcaddr_ctx {
-	struct ifnet *ifp;
-	int error;
+	struct ifnet	*ifp;
+	int		 error;
+	int		 nent;
 };
 
 struct dpaa2_eth_dist_fields {
