@@ -205,10 +205,16 @@ struct dpaa2_ni_attr {
  * @brief DMA-mapped buffer (for buffer pool, etc.).
  */
 struct dpaa2_ni_buf {
-	struct mbuf		*m; /* pointer to related mbuf */
+	uint64_t		 idx;	/* buffer index */
 	bus_dmamap_t		 dmap;
+	/* for associated mbuf */
+	struct mbuf		*m;
 	bus_addr_t		 paddr;
 	void			*vaddr;
+	/* for scatter/gather table */
+	bus_dmamap_t		 sgt_dmap;
+	bus_addr_t		 sgt_paddr;
+	void			*sgt_vaddr;
 };
 
 /**
@@ -596,6 +602,7 @@ struct dpaa2_ni_softc {
 	bus_dma_tag_t		 st_dmat;  /* for channel storage */
 	bus_dma_tag_t		 rxd_dmat; /* for Rx distribution key */
 	bus_dma_tag_t		 qos_dmat; /* for QoS table key */
+	bus_dma_tag_t		 sgt_dmat; /* for scatter/gather tables */
 
 	struct dpaa2_ni_buf	 qos_kcfg; /* QoS table key config. */
 	struct dpaa2_ni_buf	 rxd_kcfg; /* Rx distribution key config. */

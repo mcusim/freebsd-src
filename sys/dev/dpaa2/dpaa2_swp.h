@@ -294,6 +294,18 @@ struct dpaa2_fd {
 } __packed;
 
 /**
+ * @brief DPAA2 scatter/gather entry.
+ *
+ * NOTE: 16 bytes.
+ */
+struct dpaa2_sg_entry {
+	uint64_t	addr;
+	uint32_t	len;
+	uint16_t	bpid;
+	uint16_t	offset_fmt;
+} __packed;
+
+/**
  * @brief Frame Dequeue Response (FDR).
  *
  * NOTE: 64 bytes.

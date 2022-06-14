@@ -130,7 +130,11 @@ __FBSDID("$FreeBSD$");
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
-#define DPAA2_TX_BUFRING_SZ	(4096)
+#define DPAA2_TX_BUFRING_SZ	(4096u)
+#define DPAA2_TX_SEGLIMIT	(16u)
+#define DPAA2_TX_SEG_SZ		(4096u)
+#define DPAA2_TX_SEGS_MAXSZ	(DPAA2_TX_SEGLIMIT * DPAA2_TX_SEG_SZ)
+#define DPAA2_TX_SGT_SZ		(512u) /* bytes */
 
 /* Size of a buffer to keep a QoS table key configuration. */
 #define ETH_QOS_KCFG_BUF_SIZE	256
@@ -417,10 +421,8 @@ static int dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *,
     struct dpaa2_ni_channel *);
 
 /* Frame descriptor routines */
-static int dpaa2_ni_build_single_fd(struct dpaa2_ni_softc *, struct mbuf *,
-    struct dpaa2_fd *);
-static int dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *, struct mbuf *,
-    struct dpaa2_fd *);
+static int dpaa2_ni_build_fd(struct dpaa2_ni_softc *, struct dpaa2_ni_tx_ring *,
+    struct dpaa2_ni_buf *, bus_dma_segment_t *, int, struct dpaa2_fd *);
 static int dpaa2_ni_fd_err(struct dpaa2_fd *);
 static uint32_t dpaa2_ni_fd_data_len(struct dpaa2_fd *);
 static int dpaa2_ni_fd_chan_idx(struct dpaa2_fd *);
@@ -1377,7 +1379,7 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 			return (ENOMEM);
 		}
 
-		/* Create DMA map for Tx buffers. */
+		/* Configure Tx buffers. */
 		for (uint64_t j = 0; j < DPAA2_NI_BUFS_PER_TX; j++) {
 			error = bus_dmamap_create(sc->tx_dmat, 0,
 			    &tx->buf[j].dmap);
@@ -1386,6 +1388,17 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 				    "Tx DMA map: error=%d\n", __func__, error);
 				return (error);
 			}
+
+			/* Allocate a buffer to hold scatter/gather table. */
+			error = bus_dmamem_alloc(sc->sgt_dmat,
+			    &tx->buf[j].sgt_vaddr, BUS_DMA_ZERO |
+			    BUS_DMA_COHERENT, &tx->buf[j].sgt_dmap);
+			if (error != 0) {
+				device_printf(sc->dev, "%s: failed to allocate "
+				    "S/G table: error=%d\n", __func__, error);
+				return (error);
+			}
+			tx->buf[j].sgt_paddr = 0;
 
 			/* Add index of the Tx buffer to the ring. */
 			buf_ring_enqueue(tx->idx_br, (void *) j);
@@ -1727,19 +1740,16 @@ dpaa2_ni_setup_dma(struct dpaa2_ni_softc *sc)
 		return (error);
 	}
 
-	/*
-	 * DMA tag to map Tx mbufs.
-	 *
-	 * TODO: Use more then 1 segment when SG DPAA2 frames will be supported.
-	 */
+	/* DMA tag to map Tx mbufs. */
 	error = bus_dma_tag_create(
 	    bus_get_dma_tag(dev),
 	    sc->buf_align, 0,		/* alignment, boundary */
 	    BUF_MAXADDR_49BIT,		/* low restricted addr */
 	    BUF_MAXADDR,		/* high restricted addr */
 	    NULL, NULL,			/* filter, filterarg */
-	    BUF_SIZE, 1,		/* maxsize, nsegments */
-	    BUF_SIZE, 0,		/* maxsegsize, flags */
+	    DPAA2_TX_SEGS_MAXSZ,	/* maxsize */
+	    DPAA2_TX_SEGLIMIT,		/* nsegments */
+	    DPAA2_TX_SEG_SZ, 0,		/* maxsegsize, flags */
 	    NULL, NULL,			/* lockfunc, lockarg */
 	    &sc->tx_dmat);
 	if (error) {
@@ -1795,6 +1805,22 @@ dpaa2_ni_setup_dma(struct dpaa2_ni_softc *sc)
 	if (error) {
 		device_printf(dev, "%s: failed to create DMA tag for QoS key\n",
 		    __func__);
+		return (error);
+	}
+
+	error = bus_dma_tag_create(
+	    bus_get_dma_tag(dev),
+	    PAGE_SIZE, 0,		/* alignment, boundary */
+	    BUS_SPACE_MAXADDR_32BIT,	/* low restricted addr */
+	    BUS_SPACE_MAXADDR,		/* high restricted addr */
+	    NULL, NULL,			/* filter, filterarg */
+	    DPAA2_TX_SGT_SZ, 1,		/* maxsize, nsegments */
+	    DPAA2_TX_SGT_SZ, 0,		/* maxsegsize, flags */
+	    NULL, NULL,			/* lockfunc, lockarg */
+	    &sc->sgt_dmat);
+	if (error) {
+		device_printf(dev, "%s: failed to create DMA tag for S/G "
+		    "tables\n", __func__);
 		return (error);
 	}
 
@@ -2547,10 +2573,11 @@ dpaa2_ni_tx_task(void *arg, int count)
 	struct dpaa2_ni_softc *sc = device_get_softc(chan->ni_dev);
 	struct dpaa2_ni_buf *txb;
 	struct dpaa2_fd fd;
-	struct mbuf *m;
+	struct mbuf *m, *m_d;
+	bus_dma_segment_t txsegs[DPAA2_TX_SEGLIMIT];
 	uint64_t idx;
 	void *pidx;
-	int error, rc, pkt_len;
+	int error, rc, txnsegs;
 
 	while ((m = drbr_peek(sc->ifp, tx->mbuf_br)) != NULL) {
 		/* Obtain an index of a Tx buffer. */
@@ -2562,78 +2589,75 @@ dpaa2_ni_tx_task(void *arg, int count)
 			idx = (uint64_t) pidx;
 			txb = &tx->buf[idx];
 			txb->m = m;
+			txb->idx = idx;
+			txb->sgt_paddr = 0;
 		}
 
-		/* DMA load */
-		error = bus_dmamap_load_mbuf(sc->tx_dmat, txb->dmap, txb->m,
-		    dpaa2_ni_dmamap_cb2, &txb->paddr, BUS_DMA_NOWAIT);
-		if (error == EFBIG) {
-			txb->m = m_defrag(txb->m, M_NOWAIT);
-			if (txb->m != NULL) {
-				error = bus_dmamap_load_mbuf(sc->tx_dmat,
-				    txb->dmap, txb->m, dpaa2_ni_dmamap_cb2,
-				    &txb->paddr, BUS_DMA_NOWAIT);
-				if (error != 0) {
-					device_printf(sc->dev, "%s: can't load "
-					    "TX buffer (1): error=%d\n",
-					    __func__, error);
-				}
-			} else {
-				device_printf(sc->dev, "%s: mbuf "
-				    "de-fragmentation failed\n", __func__);
-			}
-		} else if (error != 0) {
-			device_printf(sc->dev, "%s: can't load TX buffer (2): "
-			    "error=%d\n", __func__, error);
-		}
-
+		/* Load mbuf to transmit. */
+		error = bus_dmamap_load_mbuf_sg(sc->tx_dmat, txb->dmap, m,
+		    txsegs, &txnsegs, BUS_DMA_NOWAIT);
 		if (__predict_false(error != 0)) {
-			if (txb->m != NULL)
-				drbr_putback(sc->ifp, tx->mbuf_br, txb->m);
-			else
+			/* Too many fragments, trying to defragment... */
+			m_d = m_collapse(m, M_NOWAIT, DPAA2_TX_SEGLIMIT);
+			if (m_d == NULL) {
+				device_printf(sc->dev, "%s: mbuf "
+				    "defragmentation failed\n", __func__);
+				m_freem(m);
+				buf_ring_enqueue(tx->idx_br, (void *) idx);
 				drbr_advance(sc->ifp, tx->mbuf_br);
-			/* Return Tx buffer back. */
-			buf_ring_enqueue(tx->idx_br, pidx);
-			break;
-		} else {
-			pkt_len = txb->m->m_pkthdr.len;
-
-			/* Reset frame descriptor fields. */
-			memset(&fd, 0, sizeof(fd));
-
-			fd.addr =
-			    ((uint64_t)(chan->flowid & DPAA2_NI_BUF_CHAN_MASK) <<
-				DPAA2_NI_BUF_CHAN_SHIFT) |
-			    ((uint64_t)(tx->txid & DPAA2_NI_TX_IDX_MASK) <<
-				DPAA2_NI_TX_IDX_SHIFT) |
-			    ((uint64_t)(idx & DPAA2_NI_TXBUF_IDX_MASK) <<
-				DPAA2_NI_TXBUF_IDX_SHIFT) |
-			    (txb->paddr & DPAA2_NI_BUF_ADDR_MASK);
-
-			fd.data_length = (uint32_t)(pkt_len - sc->tx_data_off);
-			fd.bpid_ivp_bmt = 0; /* BMT bit? */
-			fd.offset_fmt_sl = sc->tx_data_off;
-			fd.ctrl = 0x00800000; /* PTA bit? */
-
-			for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
-				rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(fq->chan->io_dev,
-				    tx->fqid, &fd, 1);
-				if (rc == 1)
-					break; /* One frame has been enqueued. */
+				continue;
 			}
 
-			bus_dmamap_sync(sc->tx_dmat, txb->dmap,
-			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
-
-			if (rc != 1) {
-				bus_dmamap_unload(sc->tx_dmat, txb->dmap);
-				m_freem(txb->m);
-				/* Return Tx buffer back. */
-				buf_ring_enqueue(tx->idx_br, pidx);
-				fq->chan->tx_dropped++;
-			} else
-				fq->chan->tx_frames++;
+			txb->m = m = m_d;
+			error = bus_dmamap_load_mbuf_sg(sc->tx_dmat, txb->dmap,
+			    m, txsegs, &txnsegs, BUS_DMA_NOWAIT);
+			if (__predict_false(error != 0)) {
+				device_printf(sc->dev, "%s: failed to load "
+				    "mbuf: error=%d\n", __func__, error);
+				m_freem(m);
+				buf_ring_enqueue(tx->idx_br, (void *) idx);
+				drbr_advance(sc->ifp, tx->mbuf_br);
+				continue;
+			}
 		}
+
+		/* Build frame descriptor. */
+		error = dpaa2_ni_build_fd(sc, tx, txb, txsegs, txnsegs, &fd);
+		if (__predict_false(error != 0)) {
+			device_printf(sc->dev, "%s: failed to build frame "
+			    "descriptor: error=%d\n", __func__, error);
+			bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+			m_freem(m);
+			buf_ring_enqueue(tx->idx_br, (void *) idx);
+			drbr_advance(sc->ifp, tx->mbuf_br);
+			continue;
+		}
+
+		for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
+			/* TODO: Enqueue more frames in a single command. */
+			rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(fq->chan->io_dev,
+			    tx->fqid, &fd, 1);
+			if (rc == 1)
+				break; /* One frame has been enqueued. */
+		}
+
+		bus_dmamap_sync(sc->tx_dmat, txb->dmap, BUS_DMASYNC_PREWRITE);
+		if (__predict_true(txb->sgt_paddr != 0))
+			bus_dmamap_sync(sc->sgt_dmat, txb->sgt_dmap,
+			    BUS_DMASYNC_PREWRITE);
+
+		if (rc != 1) {
+			bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+			if (__predict_true(txb->sgt_paddr != 0))
+				bus_dmamap_unload(sc->sgt_dmat, txb->sgt_dmap);
+
+			m_freem(txb->m);
+			/* Return index of the Tx buffer back. */
+			buf_ring_enqueue(tx->idx_br, pidx);
+			fq->chan->tx_dropped++;
+		} else
+			fq->chan->tx_frames++;
+
 		drbr_advance(sc->ifp, tx->mbuf_br);
 	}
 }
@@ -2885,8 +2909,8 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	int chan_idx, tx_idx;
 
 	/*
-	 * Get channel, Tx ring and buffer indexes from the ADDR_TOK
-	 * (not used by QBMan) bits of the physical address.
+	 * Get channel, Tx ring and buffer indexes from the ADDR_TOK bits
+	 * (not used by QBMan) of the physical address.
 	 */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	tx_idx = dpaa2_ni_fd_tx_idx(fd);
@@ -2908,9 +2932,12 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 		return (0);
 	}
 
-	/* Unload, free mbuf and return buffer index back to the ring. */
 	bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+	if (txb->sgt_paddr != 0)
+		bus_dmamap_unload(sc->sgt_dmat, txb->sgt_dmap);
 	m_freem(txb->m);
+
+	/* Return Tx buffer index back to the ring. */
 	buf_ring_enqueue(tx->idx_br, (void *) buf_idx);
 
 	return (0);
@@ -3101,24 +3128,89 @@ dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *sc,
 }
 
 /*
- * @brief Build a single buffer frame descriptor.
+ * @brief Build a DPAA2 frame descriptor.
  */
 static int
-dpaa2_ni_build_single_fd(struct dpaa2_ni_softc *sc, struct mbuf *m,
+dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
+    struct dpaa2_ni_buf *txb, bus_dma_segment_t *txsegs, int txnsegs,
     struct dpaa2_fd *fd)
 {
-	/* TBD */
-	return (0);
-}
+	struct dpaa2_ni_channel	*chan = tx->fq->chan;
+	struct dpaa2_sg_entry *sgt;
+	uint64_t segs_len = 0u;
+	uint16_t offset_fmt_sl;
+	int i, j;
 
-/*
- * @brief Build a scatter/gather frame descriptor.
- */
-static int
-dpaa2_ni_build_sg_fd(struct dpaa2_ni_softc *sc, struct mbuf *m,
-    struct dpaa2_fd *fd)
-{
-	/* TBD */
+	KASSERT(txnsegs <= DPAA2_TX_SEGLIMIT, ("%s: too many segments, "
+	    "txnsegs (%d) > %d", __func__, txnsegs, DPAA2_TX_SEGLIMIT));
+	KASSERT(txb->sgt_vaddr != NULL, ("%s: S/G table not allocated?",
+	    __func__));
+
+	/* Reset frame descriptor fields. */
+	memset(fd, 0, sizeof(*fd));
+
+	if (txnsegs == 1) {
+		/* Build single buffer frame. */
+		txb->paddr = txsegs[0].ds_addr;
+		txb->vaddr = txb->m->m_data;
+		offset_fmt_sl = sc->tx_data_off;
+		txb->sgt_paddr = 0; /* to use later in tx_conf() */
+	} else if (txnsegs <= DPAA2_TX_SEGLIMIT) {
+		/* Build S/G frame. */
+
+		/* Populate SGT. */
+		sgt = (struct dpaa2_sg_entry *) txb->sgt_vaddr + sc->tx_data_off;
+		for (i = j = 0; i < txnsegs; i++) {
+			segs_len += txsegs[i].ds_len;
+			if (segs_len > sc->tx_data_off) {
+				sgt[j].addr = (uint64_t) txsegs[i].ds_addr;
+				sgt[j].len = (uint32_t) txsegs[i].ds_len;
+				sgt[j].bpid = 0; /* unused */
+				if (j == 0) {
+					/*
+					 * Offset to the frame data in the
+					 * first segment in SGT.
+					 */
+					sgt[j].offset_fmt = (txsegs[i].ds_len -
+					    (segs_len - sc->tx_data_off))
+					    & 0xFFFu;
+				} else
+					sgt[j].offset_fmt = 0;
+				j++;
+			}
+		}
+		sgt[j-1].offset_fmt |= 0x8000u; /* set final entry flag */
+
+		/* Load SGT. */
+		error = bus_dmamap_load(sc->sgt_dmat, txb->sgt_dmap,
+		    txb->sgt_vaddr, DPAA2_TX_SGT_SZ, dpaa2_ni_dmamap_cb,
+		    &txb->sgt_paddr, BUS_DMA_NOWAIT);
+		if (error != 0) {
+			device_printf(sc->dev, "%s: failed to map S/G table: "
+			    "error=%d\n", __func__, error);
+			return (error);
+		}
+		txb->paddr = txb->sgt_paddr;
+		txb->vaddr = txb->sgt_vaddr;
+		offset_fmt_sl = 0x2000u | sc->tx_data_off;
+	} else {
+		return (EINVAL);
+	}
+
+	fd->addr =
+	    ((uint64_t)(chan->flowid & DPAA2_NI_BUF_CHAN_MASK) <<
+		DPAA2_NI_BUF_CHAN_SHIFT) |
+	    ((uint64_t)(tx->txid & DPAA2_NI_TX_IDX_MASK) <<
+		DPAA2_NI_TX_IDX_SHIFT) |
+	    ((uint64_t)(txb->idx & DPAA2_NI_TXBUF_IDX_MASK) <<
+		DPAA2_NI_TXBUF_IDX_SHIFT) |
+	    (txb->paddr & DPAA2_NI_BUF_ADDR_MASK);
+
+	fd->data_length = (uint32_t)(txb->m->m_pkthdr.len - sc->tx_data_off);
+	fd->bpid_ivp_bmt = 0;
+	fd->offset_fmt_sl = offset_fmt_sl;
+	fd->ctrl = 0x00800000u;
+
 	return (0);
 }
 
