@@ -514,6 +514,8 @@ dpaa2_ni_attach(device_t dev)
 	sc->rx_sg_buf_frames = 0;
 	sc->rx_enq_rej_frames = 0;
 	sc->rx_ieoi_err_frames = 0;
+	sc->tx_single_buf_frames = 0;
+	sc->tx_sg_frames = 0;
 
 	sc->bp_dmat = NULL;
 	sc->st_dmat = NULL;
@@ -1684,6 +1686,12 @@ dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *sc)
 	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "rx_ieoi_err_frames",
 	    CTLFLAG_RD, &sc->rx_ieoi_err_frames,
 	    "QMan IEOI error");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "tx_single_buf_frames",
+	    CTLFLAG_RD, &sc->tx_single_buf_frames,
+	    "Tx single buffer frames");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "tx_sg_frames",
+	    CTLFLAG_RD, &sc->tx_sg_frames,
+	    "Tx S/G frames");
 
  	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
 
@@ -3155,6 +3163,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		txb->vaddr = txb->m->m_data;
 		offset_fmt_sl = sc->tx_data_off;
 		txb->sgt_paddr = 0; /* to use later in tx_conf() */
+		sc->tx_single_buf_frames++;
 	} else if (txnsegs <= DPAA2_TX_SEGLIMIT) {
 		/* Build S/G frame. */
 
@@ -3193,6 +3202,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		txb->paddr = txb->sgt_paddr;
 		txb->vaddr = txb->sgt_vaddr;
 		offset_fmt_sl = 0x2000u | sc->tx_data_off;
+		sc->tx_sg_frames++;
 	} else {
 		return (EINVAL);
 	}

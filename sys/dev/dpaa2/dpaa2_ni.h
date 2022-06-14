@@ -577,6 +577,8 @@ struct dpaa2_ni_softc {
 	uint64_t		 rx_sg_buf_frames;
 	uint64_t		 rx_enq_rej_frames;
 	uint64_t		 rx_ieoi_err_frames;
+	uint64_t		 tx_single_buf_frames;
+	uint64_t		 tx_sg_frames;
 
 	/* Attributes of the DPAA2 network interface. */
 	struct dpaa2_ni_attr	 attr;
