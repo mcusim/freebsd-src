@@ -2590,10 +2590,10 @@ dpaa2_ni_tx_task(void *arg, int count)
 	while ((m = drbr_peek(sc->ifp, tx->mbuf_br)) != NULL) {
 		/* Obtain an index of a Tx buffer. */
 		pidx = buf_ring_dequeue_mc(tx->idx_br);
-		if (__predict_false(pidx == NULL))
+		if (__predict_false(pidx == NULL)) {
 			/* TODO: Limit number of attempts. */
 			continue;
-		else {
+		} else {
 			idx = (uint64_t) pidx;
 			txb = &tx->buf[idx];
 			txb->m = m;
@@ -2610,10 +2610,8 @@ dpaa2_ni_tx_task(void *arg, int count)
 			if (m_d == NULL) {
 				device_printf(sc->dev, "%s: mbuf "
 				    "defragmentation failed\n", __func__);
-				m_freem(m);
-				buf_ring_enqueue(tx->idx_br, (void *) idx);
-				drbr_advance(sc->ifp, tx->mbuf_br);
-				continue;
+				fq->chan->tx_dropped++;
+				goto loop_err;
 			}
 
 			txb->m = m = m_d;
@@ -2622,10 +2620,8 @@ dpaa2_ni_tx_task(void *arg, int count)
 			if (__predict_false(error != 0)) {
 				device_printf(sc->dev, "%s: failed to load "
 				    "mbuf: error=%d\n", __func__, error);
-				m_freem(m);
-				buf_ring_enqueue(tx->idx_br, (void *) idx);
-				drbr_advance(sc->ifp, tx->mbuf_br);
-				continue;
+				fq->chan->tx_dropped++;
+				goto loop_err;
 			}
 		}
 
@@ -2634,38 +2630,39 @@ dpaa2_ni_tx_task(void *arg, int count)
 		if (__predict_false(error != 0)) {
 			device_printf(sc->dev, "%s: failed to build frame "
 			    "descriptor: error=%d\n", __func__, error);
-			bus_dmamap_unload(sc->tx_dmat, txb->dmap);
-			m_freem(m);
-			buf_ring_enqueue(tx->idx_br, (void *) idx);
-			drbr_advance(sc->ifp, tx->mbuf_br);
-			continue;
+			fq->chan->tx_dropped++;
+			goto loop_err_unload;
 		}
 
+		/* TODO: Enqueue more frames in a single command. */
 		for (int i = 0; i < DPAA2_NI_ENQUEUE_RETRIES; i++) {
-			/* TODO: Enqueue more frames in a single command. */
 			rc = DPAA2_SWP_ENQ_MULTIPLE_FQ(fq->chan->io_dev,
 			    tx->fqid, &fd, 1);
 			if (rc == 1)
-				break; /* One frame has been enqueued. */
+				break;
 		}
 
 		bus_dmamap_sync(sc->tx_dmat, txb->dmap, BUS_DMASYNC_PREWRITE);
-		if (__predict_true(txb->sgt_paddr != 0))
+		if (txb->sgt_paddr != 0)
 			bus_dmamap_sync(sc->sgt_dmat, txb->sgt_dmap,
 			    BUS_DMASYNC_PREWRITE);
 
 		if (rc != 1) {
-			bus_dmamap_unload(sc->tx_dmat, txb->dmap);
-			if (__predict_true(txb->sgt_paddr != 0))
-				bus_dmamap_unload(sc->sgt_dmat, txb->sgt_dmap);
-
-			m_freem(txb->m);
-			/* Return index of the Tx buffer back. */
-			buf_ring_enqueue(tx->idx_br, pidx);
 			fq->chan->tx_dropped++;
-		} else
+			goto loop_err_unload;
+		} else {
 			fq->chan->tx_frames++;
+		}
+		goto loop_next;
 
+loop_err_unload:
+		bus_dmamap_unload(sc->tx_dmat, txb->dmap);
+		if (txb->sgt_paddr != 0)
+			bus_dmamap_unload(sc->sgt_dmat, txb->sgt_dmap);
+loop_err:
+		m_freem(txb->m);
+		buf_ring_enqueue(tx->idx_br, pidx);
+loop_next:
 		drbr_advance(sc->ifp, tx->mbuf_br);
 	}
 }
