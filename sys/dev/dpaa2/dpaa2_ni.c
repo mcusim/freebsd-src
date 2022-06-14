@@ -3139,7 +3139,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 	struct dpaa2_sg_entry *sgt;
 	uint64_t segs_len = 0u;
 	uint16_t offset_fmt_sl;
-	int i, j;
+	int i, j, error;
 
 	KASSERT(txnsegs <= DPAA2_TX_SEGLIMIT, ("%s: too many segments, "
 	    "txnsegs (%d) > %d", __func__, txnsegs, DPAA2_TX_SEGLIMIT));
