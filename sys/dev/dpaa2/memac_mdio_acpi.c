@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2021 Bjoern A. Zeeb
+ * Copyright (c) 2021-2022 Bjoern A. Zeeb
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,15 +50,17 @@ __FBSDID("$FreeBSD$");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
+#include "memac_mdio_if.h"
 #include "acpi_bus_if.h"
 #include "miibus_if.h"
 
 /* -------------------------------------------------------------------------- */
 
 struct memacphy_softc {
-	int			 uid;
-	uint64_t		 phy_channel;
-	char			 compatible[64];
+	int			uid;
+	uint64_t		phy_channel;
+	char			compatible[64];
+	device_t		dpnidev;
 };
 
 static int
@@ -100,26 +102,40 @@ memacphy_acpi_attach(device_t dev)
 static int
 memacphy_miibus_readreg(device_t dev, int phy, int reg)
 {
-#if 0
-	device_printf(dev, "phy read %d:%d\n", phy, reg);
-#endif
+
 	return (MIIBUS_READREG(device_get_parent(dev), phy, reg));
 }
 
 static int
 memacphy_miibus_writereg(device_t dev, int phy, int reg, int data)
 {
-#if 0
-	device_printf(dev, "phy write %d:%d\n", phy, reg);
-#endif
+
 	return (MIIBUS_WRITEREG(device_get_parent(dev), phy, reg, data));
 }
 
 static void
 memacphy_miibus_statchg(device_t dev)
 {
-	device_printf(dev, "statchg\n");
-	MIIBUS_STATCHG(device_get_parent(dev));
+	struct memacphy_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (sc->dpnidev != NULL)
+		MIIBUS_STATCHG(sc->dpnidev);
+}
+
+static int
+memac_mdio_set_ni_dev(device_t dev, device_t nidev)
+{
+	struct memacphy_softc *sc;
+
+	sc = device_get_softc(dev);
+
+	if (sc->dpnidev != NULL)
+		return (EBUSY);
+
+	sc->dpnidev = nidev;
+	return (0);
 }
 
 static device_method_t memacphy_acpi_methods[] = {
@@ -132,6 +148,9 @@ static device_method_t memacphy_acpi_methods[] = {
 	DEVMETHOD(miibus_readreg,	memacphy_miibus_readreg),
 	DEVMETHOD(miibus_writereg,	memacphy_miibus_writereg),
 	DEVMETHOD(miibus_statchg,	memacphy_miibus_statchg),
+
+	/* memac */
+	DEVMETHOD(memac_mdio_set_ni_dev, memac_mdio_set_ni_dev),
 
 	DEVMETHOD_END
 };
@@ -403,12 +422,6 @@ memac_miibus_writereg(device_t dev, int phy, int reg, int data)
         return (0);
 }
 
-static void
-memac_miibus_statchg(device_t dev)
-{
-	device_printf(dev, "statchg\n");
-}
-
 static ssize_t
 memac_mdio_get_property(device_t dev, device_t child, const char *propname,
     void *propvalue, size_t size, device_property_type_t type)
@@ -424,7 +437,6 @@ memac_mdio_acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *re
 	return (acpi_read_ivar(dev, child, index, result));
 }
 
-
 static device_method_t memac_mdio_acpi_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		memac_mdio_acpi_probe),
@@ -434,7 +446,6 @@ static device_method_t memac_mdio_acpi_methods[] = {
 	/* MII interface */
 	DEVMETHOD(miibus_readreg,	memac_miibus_readreg),
 	DEVMETHOD(miibus_writereg,	memac_miibus_writereg),
-	DEVMETHOD(miibus_statchg,	memac_miibus_statchg),
 
 	/* .. */
 	DEVMETHOD(bus_add_child,	bus_generic_add_child),

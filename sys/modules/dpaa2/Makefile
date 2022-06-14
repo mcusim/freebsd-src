@@ -38,6 +38,7 @@ SRCS+=	dpaa2_mc_fdt.c \
 
 MFILES=	dev/dpaa2/dpaa2_cmd_if.m \
 	dev/dpaa2/dpaa2_swp_if.m \
-	dev/dpaa2/dpaa2_mc_if.m
+	dev/dpaa2/dpaa2_mc_if.m \
+	dev/dpaa2/memac_mdio_if.m
 
 .include <bsd.kmod.mk>
