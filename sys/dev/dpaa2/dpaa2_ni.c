@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #include "pci_if.h"
 #include "miibus_if.h"
 #include "mdio_if.h"
+#include "memac_mdio_if.h"
 
 #include "dpaa2_mc.h"
 #include "dpaa2_mc_if.h"
@@ -449,6 +450,7 @@ static u_int dpaa2_ni_add_maddr(void *, struct sockaddr_dl *, u_int);
 static void dpaa2_ni_intr(void *);
 
 /* MII handlers */
+static void dpaa2_ni_miibus_statchg(device_t);
 static int  dpaa2_ni_media_change(struct ifnet *);
 static void dpaa2_ni_media_status(struct ifnet *, struct ifmediareq *);
 static void dpaa2_ni_media_tick(void *);
@@ -859,20 +861,30 @@ dpaa2_ni_setup(device_t dev)
 				error = DPAA2_MC_GET_PHY_DEV(dev,
 				    &sc->mac.phy_dev, sc->mac.dpmac_id);
 				if (error == 0) {
+					error = MEMAC_MDIO_SET_NI_DEV(
+					    sc->mac.phy_dev, dev);
+					if (error != 0)
+						device_printf(dev, "%s: failed "
+						    "to set dpni dev on memac "
+						    "mdio dev %s: error=%d\n",
+						    __func__,
+						    device_get_nameunit(
+						    sc->mac.phy_dev), error);
+				}
+				if (error == 0) {
 					error = mii_attach(sc->mac.phy_dev,
 					    &sc->miibus, sc->ifp,
 					    dpaa2_ni_media_change,
 					    dpaa2_ni_media_status,
 					    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
+					if (error != 0)
+						device_printf(dev, "%s: failed "
+						    "to attach to miibus: "
+						    "error=%d\n",
+						    __func__, error);
 				}
-
-				if (error != 0) {
-					device_printf(dev, "%s: failed to "
-					    "attach miibus: error=%d\n",
-					    __func__, error);
-				} else {
+				if (error == 0)
 					sc->mii = device_get_softc(sc->miibus);
-				}
 			} else {
 				device_printf(dev, "%s: DPMAC link type is not "
 				    "supported\n", __func__);
@@ -2108,6 +2120,73 @@ dpaa2_ni_set_mac_addr(device_t dev, struct dpaa2_cmd *cmd, uint16_t rc_token,
 	return (0);
 }
 
+static void
+dpaa2_ni_miibus_statchg(device_t dev)
+{
+	struct dpaa2_ni_softc *sc;
+	device_t child;
+	struct dpaa2_mac_link_state mac_link = { 0 };
+	uint16_t mac_token;
+	int error, link_state;
+
+	sc = device_get_softc(dev);
+	child = sc->dev;
+
+	/*
+	 * Note: ifp link state will only be changed AFTER we are called so we
+	 * cannot rely on ifp->if_linkstate here.
+	 */
+	if (sc->mii->mii_media_status & IFM_AVALID) {
+		if (sc->mii->mii_media_status & IFM_ACTIVE)
+			link_state = LINK_STATE_UP;
+		else
+			link_state = LINK_STATE_DOWN;
+	} else
+		link_state = LINK_STATE_UNKNOWN;
+
+	if (link_state != sc->link_state) {
+		sc->link_state = link_state;
+
+		error = DPAA2_CMD_MAC_OPEN(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
+		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
+		if (error) {
+			device_printf(sc->dev, "%s: failed to open DPMAC: "
+			    "id=%d, error=%d\n", __func__, sc->mac.dpmac_id,
+			    error);
+			return;
+		}
+
+		if (link_state == LINK_STATE_UP ||
+		    link_state == LINK_STATE_DOWN) {
+			/* Update DPMAC link state. */
+			mac_link.supported = sc->mii->mii_media.ifm_media;
+			mac_link.advert = sc->mii->mii_media.ifm_media;
+			mac_link.rate = 1000; /* TODO: Where to get from? */	/* ifmedia_baudrate? */
+			mac_link.options =
+			    DPAA2_MAC_LINK_OPT_AUTONEG |
+			    DPAA2_MAC_LINK_OPT_PAUSE;
+			mac_link.up = (link_state == LINK_STATE_UP) ? true : false;
+			mac_link.state_valid = true;
+
+			/* Inform DPMAC about link state. */
+			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, child,
+			    sc->cmd, &mac_link);
+			if (error) {
+				device_printf(sc->dev, "%s: failed to set DPMAC "
+				    "link state: id=%d, error=%d\n", __func__,
+				    sc->mac.dpmac_id, error);
+				goto err_close_mac;
+			}
+		}
+		DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
+		    mac_token));
+	}
+	return;
+
+err_close_mac:
+	DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd, mac_token));
+}
+
 /**
  * @brief Callback function to process media change request.
  */
@@ -2136,11 +2215,6 @@ static void
 dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct dpaa2_ni_softc *sc = ifp->if_softc;
-	struct dpaa2_mac_link_state mac_link = {0};
-	device_t child = sc->dev;
-	uint16_t mac_token;
-	int link_state = ifp->if_link_state;
-	int error;
 
 	DPNI_LOCK(sc);
 	if (sc->mii) {
@@ -2149,50 +2223,6 @@ dpaa2_ni_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 		ifmr->ifm_status = sc->mii->mii_media_status;
 	}
 	DPNI_UNLOCK(sc);
-
-	if (link_state != sc->link_state) {
-		sc->link_state = link_state;
-
-		error = DPAA2_CMD_MAC_OPEN(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
-		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
-		if (error) {
-			device_printf(sc->dev, "%s: failed to open DPMAC: "
-			    "id=%d, error=%d\n", __func__, sc->mac.dpmac_id,
-			    error);
-			goto err_exit;
-		}
-
-		if (link_state == LINK_STATE_UP ||
-		    link_state == LINK_STATE_DOWN) {
-			/* Update DPMAC link state. */
-			mac_link.supported = sc->mii->mii_media.ifm_media;
-			mac_link.advert = sc->mii->mii_media.ifm_media;
-			mac_link.rate = 1000; /* TODO: Where to get from? */
-			mac_link.options =
-			    DPAA2_MAC_LINK_OPT_AUTONEG |
-			    DPAA2_MAC_LINK_OPT_PAUSE;
-			mac_link.up = link_state == LINK_STATE_UP ? true : false;
-			mac_link.state_valid = true;
-
-			/* Inform DPMAC about link state. */
-			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, child,
-			    sc->cmd, &mac_link);
-			if (error) {
-				device_printf(sc->dev, "%s: failed to set DPMAC "
-				    "link state: id=%d, error=%d\n", __func__,
-				    sc->mac.dpmac_id, error);
-				goto err_close_mac;
-			}
-		}
-		DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
-		    mac_token));
-	}
-	return;
-
- err_close_mac:
-	DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd, mac_token));
- err_exit:
-	return;
 }
 
 /**
@@ -2247,6 +2277,9 @@ dpaa2_ni_init(void *arg)
 	ifp->if_drv_flags |= IFF_DRV_RUNNING;
 	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 	DPNI_UNLOCK(sc);
+
+	/* Force link-state update to initilize things. */
+	dpaa2_ni_miibus_statchg(dev);
 
 	return;
 }
@@ -3409,6 +3442,9 @@ static device_method_t dpaa2_ni_methods[] = {
 	DEVMETHOD(device_attach,	dpaa2_ni_attach),
 	DEVMETHOD(device_detach,	dpaa2_ni_detach),
 
+	/* mii via memac_mdio */
+	DEVMETHOD(miibus_statchg,	dpaa2_ni_miibus_statchg),
+
 	DEVMETHOD_END
 };
 
@@ -3422,3 +3458,4 @@ DRIVER_MODULE(miibus, dpaa2_ni, miibus_driver, 0, 0);
 DRIVER_MODULE(dpaa2_ni, dpaa2_rc, dpaa2_ni_driver, 0, 0);
 
 MODULE_DEPEND(dpaa2_ni, miibus, 1, 1, 1);
+MODULE_DEPEND(dpaa2_ni, memac_mdio, 1, 1, 1);
