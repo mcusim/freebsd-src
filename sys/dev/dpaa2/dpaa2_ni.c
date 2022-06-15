@@ -2340,14 +2340,6 @@ dpaa2_ni_transmit(struct ifnet *ifp, struct mbuf *m)
 	/* TODO: Select Tx ring based on traffic class. */
 	tx = DPAA2_TX_RING(sc, chan, 0);
 
-	/* Reserve headroom for SW and HW annotations. */
-	M_PREPEND(m, sc->tx_data_off, M_NOWAIT);
-	if (m == NULL) {
-		device_printf(sc->dev, "%s: can't reserve Tx headroom\n",
-		    __func__);
-		return (ENOBUFS);
-	}
-
 	/* Enqueue and schedule taskqueue. */
 	error = drbr_enqueue(ifp, tx->mbuf_br, m);
 	if (__predict_false(error != 0)) {
@@ -2679,9 +2671,8 @@ dpaa2_ni_tx_task(void *arg, int count)
 		}
 
 		bus_dmamap_sync(sc->tx_dmat, txb->dmap, BUS_DMASYNC_PREWRITE);
-		if (txb->sgt_paddr != 0)
-			bus_dmamap_sync(sc->sgt_dmat, txb->sgt_dmap,
-			    BUS_DMASYNC_PREWRITE);
+		bus_dmamap_sync(sc->sgt_dmat, txb->sgt_dmap,
+		    BUS_DMASYNC_PREWRITE);
 
 		if (rc != 1) {
 			fq->chan->tx_dropped++;
@@ -3178,9 +3169,8 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 {
 	struct dpaa2_ni_channel	*chan = tx->fq->chan;
 	struct dpaa2_sg_entry *sgt;
-	uint64_t segs_len = 0u;
 	uint16_t offset_fmt_sl;
-	int i, j, error;
+	int i, error;
 
 	KASSERT(txnsegs <= DPAA2_TX_SEGLIMIT, ("%s: too many segments, "
 	    "txnsegs (%d) > %d", __func__, txnsegs, DPAA2_TX_SEGLIMIT));
@@ -3190,38 +3180,14 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 	/* Reset frame descriptor fields. */
 	memset(fd, 0, sizeof(*fd));
 
-	if (txnsegs == 1) {
-		/* Build single buffer frame. */
-		txb->paddr = txsegs[0].ds_addr;
-		txb->vaddr = txb->m->m_data;
-		offset_fmt_sl = sc->tx_data_off;
-		txb->sgt_paddr = 0; /* to use later in tx_conf() */
-		sc->tx_single_buf_frames++;
-	} else if (txnsegs <= DPAA2_TX_SEGLIMIT) {
-		/* Build S/G frame. */
-
+	if (__predict_true(txnsegs <= DPAA2_TX_SEGLIMIT)) {
 		/* Populate SGT. */
 		sgt = (struct dpaa2_sg_entry *) txb->sgt_vaddr + sc->tx_data_off;
-		for (i = j = 0; i < txnsegs; i++) {
-			segs_len += txsegs[i].ds_len;
-			if (segs_len > sc->tx_data_off) {
-				sgt[j].addr = (uint64_t) txsegs[i].ds_addr;
-				sgt[j].len = (uint32_t) txsegs[i].ds_len;
-				sgt[j].bpid = 0; /* unused */
-				if (j == 0) {
-					/*
-					 * Offset to the frame data in the
-					 * first segment in SGT.
-					 */
-					sgt[j].offset_fmt = (txsegs[i].ds_len -
-					    (segs_len - sc->tx_data_off))
-					    & 0xFFFu;
-				} else
-					sgt[j].offset_fmt = 0;
-				j++;
-			}
+		for (i = 0; i < txnsegs; i++) {
+			sgt[i].addr = (uint64_t) txsegs[i].ds_addr;
+			sgt[i].len = (uint32_t) txsegs[i].ds_len;
 		}
-		sgt[j-1].offset_fmt |= 0x8000u; /* set final entry flag */
+		sgt[i-1].offset_fmt |= 0x8000u; /* set final entry flag */
 
 		/* Load SGT. */
 		error = bus_dmamap_load(sc->sgt_dmat, txb->sgt_dmap,
@@ -3234,8 +3200,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		}
 		txb->paddr = txb->sgt_paddr;
 		txb->vaddr = txb->sgt_vaddr;
-		offset_fmt_sl = 0x2000u | sc->tx_data_off;
-		sc->tx_sg_frames++;
+		sc->tx_sg_frames++; /* for sysctl(9) */
 	} else {
 		return (EINVAL);
 	}
@@ -3249,9 +3214,10 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		DPAA2_NI_TXBUF_IDX_SHIFT) |
 	    (txb->paddr & DPAA2_NI_BUF_ADDR_MASK);
 
-	fd->data_length = (uint32_t)(txb->m->m_pkthdr.len - sc->tx_data_off);
+	fd->data_length = (uint32_t) txb->m->m_pkthdr.len;
+	/* TODO: Set IVP to use 14-bit of BPID as you wish. */
 	fd->bpid_ivp_bmt = 0;
-	fd->offset_fmt_sl = offset_fmt_sl;
+	fd->offset_fmt_sl = 0x2000u | sc->tx_data_off;
 	fd->ctrl = 0x00800000u;
 
 	return (0);
