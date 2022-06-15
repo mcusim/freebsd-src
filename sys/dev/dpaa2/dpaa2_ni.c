@@ -3185,6 +3185,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		for (i = 0; i < txnsegs; i++) {
 			sgt[i].addr = (uint64_t) txsegs[i].ds_addr;
 			sgt[i].len = (uint32_t) txsegs[i].ds_len;
+			sgt[i].offset_fmt = 0u;
 		}
 		sgt[i-1].offset_fmt |= 0x8000u; /* set final entry flag */
 
