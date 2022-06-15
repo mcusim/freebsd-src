@@ -2166,6 +2166,9 @@ dpaa2_ni_miibus_statchg(device_t dev)
 	sc = device_get_softc(dev);
 	child = sc->dev;
 
+	if (sc->fixed_link)
+		return;
+
 	/*
 	 * Note: ifp link state will only be changed AFTER we are called so we
 	 * cannot rely on ifp->if_linkstate here.
