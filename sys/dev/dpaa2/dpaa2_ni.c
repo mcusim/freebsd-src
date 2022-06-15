@@ -3169,7 +3169,6 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 {
 	struct dpaa2_ni_channel	*chan = tx->fq->chan;
 	struct dpaa2_sg_entry *sgt;
-	uint16_t offset_fmt_sl;
 	int i, error;
 
 	KASSERT(txnsegs <= DPAA2_TX_SEGLIMIT, ("%s: too many segments, "
