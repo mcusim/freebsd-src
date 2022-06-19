@@ -61,7 +61,7 @@
 #define DPAA2_NI_MAX_POOLS	8  /* buffer pools per DPNI */
 
 /* Maximum number of buffers allocated per channel. */
-#define DPAA2_NI_BUFS_PER_CHAN	(50u * DPAA2_SWP_BUFS_PER_CMD)
+#define DPAA2_NI_BUFS_PER_CHAN	(2048u)
 #define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
 
 /* Maximum number of buffers allocated per Tx ring. */

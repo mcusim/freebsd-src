@@ -3009,8 +3009,8 @@ dpaa2_ni_seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 	bpsc = device_get_softc(bp_dev);
 
 	KASSERT(DPAA2_NI_BUFS_PER_CHAN <= DPAA2_NI_MAX_BPC,
-	    ("maximum buffers per channel must be <= %d: buffers=%d",
-	    DPAA2_NI_MAX_BPC, DPAA2_NI_BUFS_PER_CHAN));
+	    ("%s: too many buffers (%d) per channel: max=%d", __func__,
+	    DPAA2_NI_BUFS_PER_CHAN, DPAA2_NI_MAX_BPC));
 
 	chan_bufn = 0;
 
@@ -3019,6 +3019,12 @@ dpaa2_ni_seed_buf_pool(struct dpaa2_ni_softc *sc, struct dpaa2_ni_channel *chan)
 		/* Allocate enough buffers to release in one QBMan command. */
 		for (j = 0; j < DPAA2_SWP_BUFS_PER_CMD; j++) {
 			buf_idx = i + j;
+			if (buf_idx >= DPAA2_NI_BUFS_PER_CHAN) {
+				/* Release the last buffers to the pool. */
+				stop = true;
+				break;
+			}
+
 			buf = &chan->buf[buf_idx];
 			buf->dmap = NULL;
 			buf->m = NULL;
