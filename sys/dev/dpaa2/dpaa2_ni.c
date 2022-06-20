@@ -1351,11 +1351,11 @@ dpaa2_ni_setup_tx_flow(device_t dev, struct dpaa2_cmd *cmd,
 	con_info = device_get_ivars(fq->chan->con_dev);
 
 	KASSERT(sc->attr.num.tx_tcs <= DPAA2_NI_MAX_TCS,
-	    ("%s: too many Tx traffic classes: tx_tcs=%d\n",
+	    ("%s: too many Tx traffic classes: tx_tcs=%d\n", __func__,
 	    sc->attr.num.tx_tcs));
 	KASSERT(DPAA2_NI_BUFS_PER_TX <= DPAA2_NI_MAX_BPTX,
-	    ("%s: too many Tx buffers (%d): max=%d\n", DPAA2_NI_BUFS_PER_TX,
-	    DPAA2_NI_MAX_BPTX));
+	    ("%s: too many Tx buffers (%d): max=%d\n", __func__,
+	    DPAA2_NI_BUFS_PER_TX, DPAA2_NI_MAX_BPTX));
 
 	/* Setup Tx rings. */
 	for (int i = 0; i < sc->attr.num.tx_tcs; i++) {
