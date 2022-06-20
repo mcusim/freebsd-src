@@ -65,8 +65,8 @@
 #define DPAA2_NI_MAX_BPC	(2048u) /* 11 bits for buffer index max. */
 
 /* Maximum number of buffers allocated per Tx ring. */
-#define DPAA2_NI_BUFS_PER_TX	(128u)
-#define DPAA2_NI_MAX_BPTX	(256u) /* 8 bits for buffer index max. */
+#define DPAA2_NI_BUFS_PER_TX	(2048u)
+#define DPAA2_NI_MAX_BPTX	(16384u) /* 14-bits for buffer index max. */
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u
@@ -231,9 +231,8 @@ struct dpaa2_ni_sbuf {
  *
  * fq:		Parent (TxConf) frame queue.
  * fqid:	ID of the logical Tx queue.
- * br:		Ring buffer for mbufs to transmit.
- * br_lock:	Lock for the ring buffer.
- * txb:		The latest transmitted, but not yet confirmed mbuf.
+ * mbuf_br:	Ring buffer for mbufs to transmit.
+ * mbuf_lock:	Lock for the ring buffer.
  */
 struct dpaa2_ni_tx_ring {
 	struct dpaa2_ni_fq	*fq;
