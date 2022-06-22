@@ -65,7 +65,6 @@ struct dpaa2_mac_dev_softc {
 	char			phy_conn_type[64];
 	char			phy_mode[64];
 	ACPI_HANDLE		phy_channel;
-	device_t		phy_dev;
 };
 
 static int
@@ -142,19 +141,15 @@ dpaa2_mac_dev_attach(device_t dev)
 			device_printf(dev, "Cannot get 'phy-handle' reference handle ph is NULL\n");
 			goto out;
 		}
-
-		sc->phy_dev = acpi_get_device(sc->phy_channel);
 	}
 out:
 	if (bootverbose)
 		device_printf(dev, "UID %#04x reg %#04jx managed '%s' "
-		    "phy-connection-type '%s' phy-mode '%s' "
-		    "phy-handle '%s' on '%s'\n",
+		    "phy-connection-type '%s' phy-mode '%s' phy-handle '%s'\n",
 		    sc->uid, sc->reg, sc->managed[0] != '\0' ? sc->managed : "",
 		    sc->phy_conn_type[0] != '\0' ? sc->phy_conn_type : "",
 		    sc->phy_mode[0] != '\0' ? sc->phy_mode : "",
-		    sc->phy_channel != NULL ? acpi_name(sc->phy_channel) : "",
-		    sc->phy_dev != NULL ? device_get_nameunit(sc->phy_dev) : "");
+		    sc->phy_channel != NULL ? acpi_name(sc->phy_channel) : "");
 
 	return (0);
 }
@@ -183,7 +178,10 @@ dpaa2_mac_dev_get_phy_dev(device_t dev)
 		return (NULL);
 
 	sc = device_get_softc(dev);
-	return (sc->phy_dev);
+	if (sc->phy_channel == NULL)
+		return (NULL);
+
+	return (acpi_get_device(sc->phy_channel));
 }
 
 static device_method_t dpaa2_mac_dev_methods[] = {
@@ -296,7 +294,7 @@ dpaa2_mc_acpi_attach(device_t dev)
 }
 
 /*
- * ACPI compar layer.
+ * ACPI compat layer.
  */
 
 static device_t
@@ -337,13 +335,15 @@ dpaa2_mc_acpi_get_phy_dev(device_t dev, device_t *phy_dev, uint32_t id)
 
 	mdev = dpaa2_mc_acpi_find_dpaa2_mac_dev(dev, id);
 	if (mdev == NULL) {
-		printf("%s: error stage 1\n", __func__);
+		device_printf(dev, "%s: error finding dpmac device with id=%u\n",
+		    __func__, id);
 		return (ENXIO);
 	}
 
 	pdev = dpaa2_mac_dev_get_phy_dev(mdev);
 	if (pdev == NULL) {
-		printf("%s: error stage 2\n", __func__);
+		device_printf(dev, "%s: error getting MDIO device for dpamc %s "
+		    "(id=%u)\n", __func__, device_get_nameunit(mdev), id);
 		return (ENXIO);
 	}
 
