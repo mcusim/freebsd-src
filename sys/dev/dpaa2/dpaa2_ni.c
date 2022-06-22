@@ -2170,10 +2170,10 @@ dpaa2_ni_miibus_statchg(device_t dev)
 	int error, link_state;
 
 	sc = device_get_softc(dev);
-	child = sc->dev;
-
-	if (sc->fixed_link)
+	if (sc->fixed_link || sc->mii == NULL)
 		return;
+
+	child = sc->dev;
 
 	/*
 	 * Note: ifp link state will only be changed AFTER we are called so we
