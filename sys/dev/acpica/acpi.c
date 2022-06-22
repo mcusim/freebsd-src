@@ -2308,10 +2308,6 @@ acpi_probe_order(ACPI_HANDLE handle, int *order)
 		*order = 3;
 	else if (acpi_MatchHid(handle, "PNP0C0F"))
 		*order = 4;
-
-	/* Make the MDIO bus probe/attach before the driver. */
-	if (acpi_MatchHid(handle, "NXP0006"))
-		*order -= 1;
 }
 
 /*
