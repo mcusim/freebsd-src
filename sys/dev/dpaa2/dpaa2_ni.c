@@ -62,6 +62,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <machine/atomic.h>
 
 #include <net/ethernet.h>
 #include <net/bpf.h>
@@ -109,6 +110,9 @@ __FBSDID("$FreeBSD$");
 
 #define DPAA2_TX_RING(sc, chan, tc)			\
 (&(sc)->channels[(chan)]->txc_queue.tx_rings[(tc)])
+
+/* Handy wrapper over an atomic operation. */
+#define ATOMIC_XCHG(a, val)	(atomic_swap_int(&(a)->counter, (val)))
 
 #define DPNI_IRQ_INDEX		0 /* Index of the only DPNI IRQ. */
 #define DPNI_IRQ_LINK_CHANGED	1 /* Link state changed */
@@ -3484,7 +3488,7 @@ dpaa2_ni_chan_storage_next(struct dpaa2_ni_channel *chan, struct dpaa2_dq **dq)
 		/* Reset token. */
 		msg->fdr.desc.tok = 0;
 		/* Make VDQ command available again. */
-		atomic_xchg(&swp->vdq.avail, 1);
+		ATOMIC_XCHG(&swp->vdq.avail, 1);
 	} else {
 		return (rc); /* DQ response is not available yet. */
 	}
