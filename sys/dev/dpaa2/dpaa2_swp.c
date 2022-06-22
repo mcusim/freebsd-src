@@ -112,7 +112,7 @@ __FBSDID("$FreeBSD$");
 
 /* Handy wrappers over atomic operations. */
 #define ATOMIC_XCHG(a, val)		(atomic_swap_int(&(a)->counter, (val)))
-#define ATOMIC_READ(a)			(atomic_load_acq_int(&a->counter))
+#define ATOMIC_READ(a)			(atomic_load_acq_int(&(a)->counter))
 
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
