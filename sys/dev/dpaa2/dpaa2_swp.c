@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2021 Dmitry Salychev <dsl@mcusim.org>
+ * Copyright (c) 2021-2022 Dmitry Salychev <dsl@mcusim.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 __FBSDID("$FreeBSD$");
 
 /*
- * QBMan software portal helper routines.
+ * DPAA2 QBMan software portal.
  */
 
 #include <sys/param.h>
@@ -109,6 +109,10 @@ __FBSDID("$FreeBSD$");
 #define RAR_IDX(rar)			((rar) & 0x7u)
 #define RAR_VB(rar)			((rar) & 0x80u)
 #define RAR_SUCCESS(rar)		((rar) & 0x100u)
+
+/* Handy wrappers over atomic operations. */
+#define ATOMIC_XCHG(a, val)		(atomic_swap_int(&(a)->counter, (val)))
+#define ATOMIC_READ(a)			(atomic_load_acq_int(&a->counter))
 
 MALLOC_DEFINE(M_DPAA2_SWP, "dpaa2_swp", "DPAA2 QBMan Software Portal");
 
@@ -191,7 +195,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	p->sdq |= DPAA2_SWP_SDQCR_TOKEN << QB_SDQCR_TOK_SHIFT;
 
 	/* Volatile Dequeue Command configuration. */
-	atomic_xchg(&p->vdq.avail, 1);
+	ATOMIC_XCHG(&p->vdq.avail, 1);
 	p->vdq.valid_bit = DPAA2_SWP_VALID_BIT;
 
 	/* Dequeue Response Ring configuration */
@@ -738,10 +742,6 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, bus_addr_t buf,
 	return (error);
 }
 
-/*
- * Internal functions.
- */
-
 /**
  * @brief Issue a command to enqueue a frame using one enqueue descriptor.
  *
@@ -875,9 +875,6 @@ dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
 	return (num_enq);
 }
 
-/**
- * @internal
- */
 static int
 dpaa2_swp_cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
 {
@@ -887,7 +884,6 @@ dpaa2_swp_cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
 }
 
 /**
- * @internal
  * @brief Execute Buffer Release Command (BRC).
  */
 static int
@@ -950,7 +946,6 @@ dpaa2_swp_exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 }
 
 /**
- * @internal
  * @brief Execute Volatile Dequeue Command (VDC).
  *
  * This command will be executed by QBMan only once in order to deliver requested
@@ -977,10 +972,10 @@ dpaa2_swp_exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
 	if (!swp || !cmd)
 		return (EINVAL);
 
-	if (atomic_read(&swp->vdq.avail) == 0)
+	if (ATOMIC_READ(&swp->vdq.avail) == 0)
 		return (EBUSY);
 	else
-		atomic_xchg(&swp->vdq.avail, 0);
+		ATOMIC_XCHG(&swp->vdq.avail, 0);
 
 	dpaa2_swp_lock(swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
@@ -1021,7 +1016,6 @@ dpaa2_swp_exec_vdc_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd)
 }
 
 /**
- * @internal
  * @brief Execute a QBMan management command.
  */
 static int
@@ -1069,9 +1063,6 @@ dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 	return (0);
 }
 
-/**
- * @internal
- */
 static int
 dpaa2_swp_send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     uint8_t cmdid)
@@ -1105,9 +1096,6 @@ dpaa2_swp_send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 	return (0);
 }
 
-/**
- * @internal
- */
 static int
 dpaa2_swp_wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 {

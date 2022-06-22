@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2021 Dmitry Salychev <dsl@mcusim.org>
+ * Copyright (c) 2021-2022 Dmitry Salychev <dsl@mcusim.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,10 +30,8 @@
 
 #include <sys/bus.h>
 
-#include <machine/atomic.h>
-
 /*
- * QBMan software portal helper routines.
+ * DPAA2 QBMan software portal.
  */
 
 /* All QBMan commands and result structures use this "valid bit" encoding. */
@@ -205,9 +203,9 @@ enum dpaa2_fd_format {
 	DPAA2_FD_SG
 };
 
-typedef struct {
+struct dpaa2_atomic {
 	volatile int	counter;
-} atomic_t;
+};
 
 /**
  * @brief Enqueue command descriptor.
@@ -381,7 +379,7 @@ struct dpaa2_swp_rsp {
 };
 
 /**
- * @brief Helper object to interact with the QBMan software portal.
+ * @brief QBMan software portal.
  *
  * res:		Unmapped cache-enabled and cache-inhibited parts of the portal.
  * map:		Mapped cache-enabled and cache-inhibited parts of the portal.
@@ -414,7 +412,7 @@ struct dpaa2_swp {
 
 	/* Volatile Dequeue Command (to obtain frames). */
 	struct {
-		atomic_t	 avail;
+		struct dpaa2_atomic avail;
 		uint32_t	 valid_bit; /* 0x00 or 0x80 */
 	} vdq;
 
@@ -454,7 +452,6 @@ struct dpaa2_swp {
 };
 
 /* Management routines. */
-
 int dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
     uint16_t flags, bool atomic);
 void dpaa2_swp_free_portal(struct dpaa2_swp *swp);
@@ -465,12 +462,10 @@ uint32_t dpaa2_swp_set_cfg(uint8_t max_fill, uint8_t wn, uint8_t est,
     int de, int ep);
 
 /* Read/write registers of a software portal. */
-
 void dpaa2_swp_write_reg(struct dpaa2_swp *swp, uint32_t o, uint32_t v);
 uint32_t dpaa2_swp_read_reg(struct dpaa2_swp *swp, uint32_t o);
 
 /* Helper routines. */
-
 void dpaa2_swp_set_ed_norp(struct dpaa2_eq_desc *ed, bool resp_always);
 void dpaa2_swp_set_ed_fq(struct dpaa2_eq_desc *ed, uint32_t fqid);
 void dpaa2_swp_set_intr_trigger(struct dpaa2_swp *swp, uint32_t mask);
@@ -483,7 +478,6 @@ int dpaa2_swp_set_irq_coalescing(struct dpaa2_swp *swp, uint32_t threshold,
     uint32_t holdoff);
 
 /* Software portal commands. */
-
 int dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
     uint8_t we_mask, bool cdan_en, uint64_t ctx);
 int dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf,
@@ -496,61 +490,5 @@ int dpaa2_swp_enq(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
     struct dpaa2_fd *fd);
 int dpaa2_swp_enq_mult(struct dpaa2_swp *swp, struct dpaa2_eq_desc *ed,
     struct dpaa2_fd *fd, uint32_t *flags, int frames_n);
-
-/* Atomic access routines. */
-
-/**
- * @internal
- */
-static inline int
-atomic_add_return(int i, atomic_t *v)
-{
-	return (i + atomic_fetchadd_int(&v->counter, i));
-}
-
-/**
- * @internal
- */
-static inline int
-atomic_sub_return(int i, atomic_t *v)
-{
-	return (atomic_fetchadd_int(&v->counter, -i) - i);
-}
-
-/**
- * @internal
- */
-static inline int
-atomic_xchg(atomic_t *v, int i)
-{
-	return (atomic_swap_int(&v->counter, i));
-}
-
-/**
- * @internal
- */
-static inline int
-atomic_inc(atomic_t *v)
-{
-	return (atomic_fetchadd_int(&v->counter, 1) + 1);
-}
-
-/**
- * @internal
- */
-static inline int
-atomic_dec(atomic_t *v)
-{
-	return (atomic_fetchadd_int(&v->counter, -1) - 1);
-}
-
-/**
- * @internal
- */
-static inline int
-atomic_read(atomic_t *v)
-{
-	return (atomic_load_acq_int(&v->counter));
-}
 
 #endif /* _DPAA2_SWP_H */
