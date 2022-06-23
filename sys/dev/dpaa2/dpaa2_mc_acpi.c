@@ -415,8 +415,5 @@ static device_method_t dpaa2_mc_acpi_methods[] = {
 DEFINE_CLASS_1(dpaa2_mc, dpaa2_mc_acpi_driver, dpaa2_mc_acpi_methods,
     sizeof(struct dpaa2_mc_softc), dpaa2_mc_driver);
 
-/* Make sure miibus gets procesed first. */
-DRIVER_MODULE_ORDERED(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, NULL, NULL,
-    SI_ORDER_ANY);
-
+DRIVER_MODULE(dpaa2_mc, acpi, dpaa2_mc_acpi_driver, NULL, NULL);
 MODULE_DEPEND(dpaa2_mc, memac_mdio, 1, 1, 1);
