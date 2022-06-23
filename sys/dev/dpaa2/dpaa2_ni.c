@@ -2173,8 +2173,6 @@ dpaa2_ni_miibus_statchg(device_t dev)
 	if (sc->fixed_link || sc->mii == NULL)
 		return;
 
-	child = sc->dev;
-
 	/*
 	 * Note: ifp link state will only be changed AFTER we are called so we
 	 * cannot rely on ifp->if_linkstate here.
@@ -2188,8 +2186,10 @@ dpaa2_ni_miibus_statchg(device_t dev)
 		link_state = LINK_STATE_UNKNOWN;
 
 	if (link_state != sc->link_state) {
+
 		sc->link_state = link_state;
 
+		child = sc->dev;
 		error = DPAA2_CMD_MAC_OPEN(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
 		    sc->rc_token), sc->mac.dpmac_id, &mac_token);
 		if (error) {
@@ -2214,20 +2214,14 @@ dpaa2_ni_miibus_statchg(device_t dev)
 			/* Inform DPMAC about link state. */
 			error = DPAA2_CMD_MAC_SET_LINK_STATE(sc->dev, child,
 			    sc->cmd, &mac_link);
-			if (error) {
+			if (error)
 				device_printf(sc->dev, "%s: failed to set DPMAC "
 				    "link state: id=%d, error=%d\n", __func__,
 				    sc->mac.dpmac_id, error);
-				goto err_close_mac;
-			}
 		}
 		DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd,
 		    mac_token));
 	}
-	return;
-
-err_close_mac:
-	DPAA2_CMD_MAC_CLOSE(sc->dev, child, dpaa2_mcp_tk(sc->cmd, mac_token));
 }
 
 /**
