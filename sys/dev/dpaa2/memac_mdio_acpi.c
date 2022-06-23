@@ -435,7 +435,7 @@ static int
 memac_mdio_acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 {
 
-	return (acpi_read_ivar(dev, child, index, result));
+	return (BUS_READ_IVAR(device_get_parent(dev), dev, index, result));
 }
 
 static device_method_t memac_mdio_acpi_methods[] = {

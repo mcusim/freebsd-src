@@ -365,7 +365,14 @@ static int
 dpaa2_mc_acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 {
 
-	return (acpi_read_ivar(dev, child, index, result));
+	/*
+	 * This is special in that it passes "child" as second argument rather
+	 * than "dev".  acpi_get_handle() in dpaa2_mac_dev_attach() calls the
+	 * read on parent(dev), dev and gets us here not to ACPI.  Hence we
+	 * need to keep child as-is and pass it to our parent which is ACPI.
+	 * Only that gives the desired result.
+	 */
+	return (BUS_READ_IVAR(device_get_parent(dev), child, index, result));
 }
 
 static device_method_t dpaa2_mc_acpi_methods[] = {

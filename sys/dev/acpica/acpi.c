@@ -124,6 +124,8 @@ static int	acpi_print_child(device_t bus, device_t child);
 static void	acpi_probe_nomatch(device_t bus, device_t child);
 static void	acpi_driver_added(device_t dev, driver_t *driver);
 static void	acpi_child_deleted(device_t dev, device_t child);
+static int	acpi_read_ivar(device_t dev, device_t child, int index,
+			uintptr_t *result);
 static int	acpi_write_ivar(device_t dev, device_t child, int index,
 			uintptr_t value);
 static struct resource_list *acpi_get_rlist(device_t dev, device_t child);
@@ -1018,7 +1020,7 @@ acpi_child_deleted(device_t dev, device_t child)
 /*
  * Handle per-device ivars
  */
-int
+static int
 acpi_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 {
     struct acpi_device	*ad;
