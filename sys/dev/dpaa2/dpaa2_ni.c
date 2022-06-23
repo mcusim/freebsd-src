@@ -459,12 +459,9 @@ static void dpaa2_ni_miibus_statchg(device_t);
 static int  dpaa2_ni_media_change(struct ifnet *);
 static void dpaa2_ni_media_status(struct ifnet *, struct ifmediareq *);
 static void dpaa2_ni_media_tick(void *);
-static void dpaa2_ni_mii_tick(void *);
 
 /* DMA mapping callback */
 static void dpaa2_ni_dmamap_cb(void *, bus_dma_segment_t *, int, int);
-static void dpaa2_ni_dmamap_cb2(void *, bus_dma_segment_t *, int, bus_size_t,
-    int);
 
 /* Tx/Rx tasks. */
 static void dpaa2_ni_poll_task(void *, int);
@@ -2536,19 +2533,6 @@ dpaa2_ni_intr(void *arg)
  */
 static void
 dpaa2_ni_dmamap_cb(void *arg, bus_dma_segment_t *segs, int nseg, int error)
-{
-	if (error == 0) {
-		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
-		*(bus_addr_t *) arg = segs[0].ds_addr;
-	}
-}
-
-/**
- * @brief Callback to obtain a physical address of the only DMA segment mapped.
- */
-static void
-dpaa2_ni_dmamap_cb2(void *arg, bus_dma_segment_t *segs, int nseg,
-    bus_size_t mapsz __unused, int error)
 {
 	if (error == 0) {
 		KASSERT(nseg == 1, ("too many segments: nseg=%d\n", nseg));
