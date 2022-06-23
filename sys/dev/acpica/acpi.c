@@ -144,6 +144,8 @@ static void	acpi_delete_resource(device_t bus, device_t child, int type,
 		    int rid);
 static uint32_t	acpi_isa_get_logicalid(device_t dev);
 static int	acpi_isa_get_compatid(device_t dev, uint32_t *cids, int count);
+static ssize_t	acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
+		    void *propvalue, size_t size, device_property_type_t type);
 static int	acpi_device_id_probe(device_t bus, device_t dev, char **ids, char **match);
 static ACPI_STATUS acpi_device_eval_obj(device_t bus, device_t dev,
 		    ACPI_STRING pathname, ACPI_OBJECT_LIST *parameters,
@@ -1921,7 +1923,7 @@ acpi_find_dsd(struct acpi_device *ad)
 	return (AE_NOT_FOUND);
 }
 
-ssize_t
+static ssize_t
 acpi_bus_get_prop(device_t bus, device_t child, const char *propname,
     void *propvalue, size_t size, device_property_type_t type)
 {

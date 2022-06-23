@@ -358,7 +358,7 @@ dpaa2_mc_acpi_get_property(device_t dev, device_t child, const char *propname,
     void *propvalue, size_t size, device_property_type_t type)
 {
 
-	return (acpi_bus_get_prop(dev, child, propname, propvalue, size, type));
+	return (bus_generic_get_property(dev, child, propname, propvalue, size, type));
 }
 
 static int
