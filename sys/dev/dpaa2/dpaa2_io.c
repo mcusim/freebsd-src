@@ -189,14 +189,17 @@ dpaa2_io_attach(device_t dev)
 	int error;
 
 	sc->dev = dev;
+	sc->swp = NULL;
 	sc->cmd = NULL;
+	sc->intr = NULL;
+	sc->irq_resource = NULL;
 
 	/* Allocate resources. */
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
 	if (error) {
 		device_printf(dev, "%s: failed to allocate resources: "
 		    "error=%d\n", __func__, error);
-		goto err_exit;
+		return (ENXIO);
 	}
 
 	/* Set allocated MC portal up. */
@@ -261,7 +264,7 @@ dpaa2_io_attach(device_t dev)
 		goto err_exit;
 	}
 
-	/* Prepare helper object to work with the QBMan software portal. */
+	/* Prepare descriptor of the QBMan software portal. */
 	sc->swp_desc.dpio_dev = dev;
 	sc->swp_desc.swp_version = sc->attr.swp_version;
 	sc->swp_desc.swp_clk = sc->attr.swp_clk;
@@ -280,7 +283,7 @@ dpaa2_io_attach(device_t dev)
 	sc->swp_desc.swp_cycles_ratio = 256000 /
 	    (sc->swp_desc.swp_clk / 1000000);
 
-	/* Initialize helper object to work with the QBMan software portal. */
+	/* Initialize QBMan software portal. */
 	error = dpaa2_swp_init_portal(&sc->swp, &sc->swp_desc, DPAA2_SWP_DEF,
 	    true);
 	if (error) {
@@ -418,10 +421,14 @@ dpaa2_io_release_irqs(device_t dev)
 	if (sc->swp_desc.has_notif)
 		dpaa2_swp_set_push_dequeue(sc->swp, 0, false);
 
-	/* Release IRQs. */
-	bus_teardown_intr(dev, sc->irq_resource, &sc->intr);
-	bus_release_resource(dev, SYS_RES_IRQ, sc->irq_rid[0], sc->irq_resource);
-	dpaa2_io_release_msi(device_get_softc(dev));
+	/* Release IRQ resources. */
+	if (sc->intr != NULL)
+		bus_teardown_intr(dev, sc->irq_resource, &sc->intr);
+	if (sc->irq_resource != NULL)
+		bus_release_resource(dev, SYS_RES_IRQ, sc->irq_rid[0],
+		    sc->irq_resource);
+
+	(void)dpaa2_io_release_msi(device_get_softc(dev));
 
 	/* Configure software portal to stop generating interrupts. */
 	dpaa2_swp_set_intr_trigger(sc->swp, 0);
