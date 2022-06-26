@@ -2942,7 +2942,7 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	txb = &tx->buf[buf_idx];
 
 	KASSERT(paddr == txb->paddr, ("%s: unexpected frame buffer: "
-	    "fd_addr(%#jx) != txb_paddr(%#jx)", __func__, paddr, txb->paddr));
+	    "fd_addr(%#jx) != txb_paddr(%#jx)", __func__, fd->addr, txb->paddr));
 	if (paddr != txb->paddr) {
 		sc->rx_anomaly_frames++;
 		return (0);
@@ -3170,7 +3170,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 	memset(fd, 0, sizeof(*fd));
 
 	if (__predict_true(txnsegs <= DPAA2_TX_SEGLIMIT)) {
-		/* Populate SGT. */
+		/* Populate S/G table. */
 		sgt = (struct dpaa2_sg_entry *) txb->sgt_vaddr + sc->tx_data_off;
 		for (i = 0; i < txnsegs; i++) {
 			sgt[i].addr = (uint64_t) txsegs[i].ds_addr;
@@ -3179,7 +3179,7 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		}
 		sgt[i-1].offset_fmt |= 0x8000u; /* set final entry flag */
 
-		/* Load SGT. */
+		/* Load S/G table. */
 		error = bus_dmamap_load(sc->sgt_dmat, txb->sgt_dmap,
 		    txb->sgt_vaddr, DPAA2_TX_SGT_SZ, dpaa2_ni_dmamap_cb,
 		    &txb->sgt_paddr, BUS_DMA_NOWAIT);
