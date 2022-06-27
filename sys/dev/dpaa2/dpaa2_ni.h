@@ -66,7 +66,7 @@
 
 /* Maximum number of buffers allocated per Tx ring. */
 #define DPAA2_NI_BUFS_PER_TX	(128u)
-#define DPAA2_NI_MAX_BPTX	(16384u) /* 14-bits for buffer index max. */
+#define DPAA2_NI_MAX_BPTX	(256u) /* 8-bits for buffer index max. */
 
 /* Number of the DPNI statistics counters. */
 #define DPAA2_NI_STAT_COUNTERS	7u

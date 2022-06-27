@@ -135,7 +135,7 @@ __FBSDID("$FreeBSD$");
 #define	BUF_MAXADDR_49BIT	0x1FFFFFFFFFFFFul
 #define	BUF_MAXADDR		(BUS_SPACE_MAXADDR)
 
-#define DPAA2_TX_BUFRING_SZ	(2 * DPAA2_NI_BUFS_PER_TX)
+#define DPAA2_TX_BUFRING_SZ	(4096u)
 #define DPAA2_TX_SEGLIMIT	(16u)
 #define DPAA2_TX_SEG_SZ		(4096u)
 #define DPAA2_TX_SEGS_MAXSZ	(DPAA2_TX_SEGLIMIT * DPAA2_TX_SEG_SZ)
@@ -168,7 +168,8 @@ __FBSDID("$FreeBSD$");
 #define DPAA2_NI_BUF_IDX_SHIFT	(49)
 #define DPAA2_NI_TX_IDX_MASK	(0x7u)
 #define DPAA2_NI_TX_IDX_SHIFT	(57)
-#define DPAA2_NI_TXBUF_IDX_MASK	(0x3FFFu)
+#define DPAA2_NI_TXBUF_IDX_MASK	(0xFFu)
+#define DPAA2_NI_TXBUF_IDX_SHIFT (49)
 
 #define DPAA2_NI_FD_FMT_MASK	(0x3u)
 #define DPAA2_NI_FD_FMT_SHIFT	(12)
@@ -2926,7 +2927,7 @@ dpaa2_ni_tx_conf(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	/*
 	 * Get channel, Tx ring and buffer indexes from the ADDR_TOK bits
-	 * (not used by QBMan) of the physical address and BPID.
+	 * (not used by QBMan) of the physical address.
 	 */
 	chan_idx = dpaa2_ni_fd_chan_idx(fd);
 	tx_idx = dpaa2_ni_fd_tx_idx(fd);
@@ -3200,11 +3201,12 @@ dpaa2_ni_build_fd(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		DPAA2_NI_BUF_CHAN_SHIFT) |
 	    ((uint64_t)(tx->txid & DPAA2_NI_TX_IDX_MASK) <<
 		DPAA2_NI_TX_IDX_SHIFT) |
+	    ((uint64_t)(txb->idx & DPAA2_NI_TXBUF_IDX_MASK) <<
+		DPAA2_NI_TXBUF_IDX_SHIFT) |
 	    (txb->paddr & DPAA2_NI_BUF_ADDR_MASK);
 
 	fd->data_length = (uint32_t) txb->m->m_pkthdr.len;
-	/* NOTE: 14-bits of BPID used to denote a Tx buffer index. */
-	fd->bpid_ivp_bmt = 0x4000u | (txb->idx & DPAA2_NI_TXBUF_IDX_MASK);
+	fd->bpid_ivp_bmt = 0;
 	fd->offset_fmt_sl = 0x2000u | sc->tx_data_off;
 	fd->ctrl = 0x00800000u;
 
@@ -3250,7 +3252,8 @@ dpaa2_ni_fd_tx_idx(struct dpaa2_fd *fd)
 static int
 dpaa2_ni_fd_txbuf_idx(struct dpaa2_fd *fd)
 {
-	return (fd->bpid_ivp_bmt & DPAA2_NI_TXBUF_IDX_MASK);
+	return ((((bus_addr_t) fd->addr) >> DPAA2_NI_TXBUF_IDX_SHIFT) &
+	    DPAA2_NI_TXBUF_IDX_MASK);
 }
 
 static int
