@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <machine/atomic.h>
+#include <machine/vmparam.h>
 
 #include <net/ethernet.h>
 #include <net/bpf.h>
@@ -2763,6 +2764,12 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf_idx = dpaa2_ni_fd_buf_idx(fd);
 	buf_chan = sc->channels[chan_idx];
 	buf = &buf_chan->buf[buf_idx];
+
+	/* For debug purposes only! */
+	device_printf(sc->dev, "%s: buf=%#jx, PHYS_TO_DMAP(%#jx)=%#jx",
+	    __func__, (bus_addr_t) buf,
+	    (bus_addr_t)(fd->addr & BUF_MAXADDR_49BIT),
+	    (bus_addr_t)(PHYS_TO_DMAP(fd->addr & BUF_MAXADDR_49BIT)));
 
 	KASSERT(paddr == buf->paddr, ("%s: unexpected frame buffer: "
 	    "fd_addr(%#jx) != buf_paddr(%#jx)", __func__, paddr, buf->paddr));
