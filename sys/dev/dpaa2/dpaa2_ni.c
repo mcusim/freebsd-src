@@ -2766,8 +2766,8 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf = &buf_chan->buf[buf_idx];
 
 	/* For debug purposes only! */
-	device_printf(sc->dev, "%s: buf=%#jx, PHYS_TO_DMAP(%#jx)=%#jx",
-	    __func__, (bus_addr_t) buf,
+	device_printf(sc->dev, "%s: buf->vaddr=%#jx, PHYS_TO_DMAP(%#jx)=%#jx",
+	    __func__, (bus_addr_t) buf->vaddr,
 	    (bus_addr_t)(fd->addr & BUF_MAXADDR_49BIT),
 	    (bus_addr_t)(PHYS_TO_DMAP(fd->addr & BUF_MAXADDR_49BIT)));
 
