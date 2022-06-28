@@ -3144,11 +3144,6 @@ dpaa2_ni_seed_chan_storage(struct dpaa2_ni_softc *sc,
 		return (error);
 	}
 
-	/* For debug purposes only! */
-	device_printf(sc->dev, "%s: store->vaddr=%#jx, PHYS_TO_DMAP(%#jx)=%#jx\n",
-	    __func__, (bus_addr_t) store->vaddr, store->paddr,
-	    (bus_addr_t) PHYS_TO_DMAP(store->paddr));
-
 	chan->store_sz = ETH_STORE_FRAMES;
 	chan->store_idx = 0;
 
