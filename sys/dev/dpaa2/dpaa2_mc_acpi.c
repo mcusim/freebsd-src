@@ -199,7 +199,6 @@ DEFINE_CLASS_0(dpaa2_mac_dev, dpaa2_mac_dev_driver, dpaa2_mac_dev_methods,
 DRIVER_MODULE(dpaa2_mac_dev, dpaa2_mc, dpaa2_mac_dev_driver, 0, 0);
 
 MODULE_DEPEND(dpaa2_mac_dev, memac_mdio, 1, 1, 1);
-MODULE_DEPEND(dpaa2_mac_dev, miibus, 1, 1, 1);
 
 /*
  * Device interface.

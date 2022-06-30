@@ -832,7 +832,8 @@ dpaa2_ni_setup(device_t dev)
 			error = DPAA2_CMD_MAC_OPEN(sc->dev, child,
 			    dpaa2_mcp_tk(sc->cmd, sc->rc_token),
 			    sc->mac.dpmac_id, &mac_token);
-			/* Under VFIO, the DPMAC might be sitting in another
+			/*
+			 * Under VFIO, the DPMAC might be sitting in another
 			 * container (DPRC) we don't have access to.
 			 * Assume DPAA2_MAC_LINK_TYPE_FIXED if this is
 			 * the case.
@@ -841,7 +842,7 @@ dpaa2_ni_setup(device_t dev)
 				device_printf(dev, "%s: failed to open "
 				    "connected DPMAC: %d (assuming in other DPRC)\n", __func__,
 				    sc->mac.dpmac_id);
-					link_type = DPAA2_MAC_LINK_TYPE_FIXED;
+				link_type = DPAA2_MAC_LINK_TYPE_FIXED;
 			} else {
 				error = DPAA2_CMD_MAC_GET_ATTRIBUTES(dev, child,
 				    sc->cmd, &attr);
@@ -877,11 +878,24 @@ dpaa2_ni_setup(device_t dev)
 						    sc->mac.phy_dev), error);
 				}
 				if (error == 0) {
+					error = MEMAC_MDIO_GET_PHY_LOC(
+					    sc->mac.phy_dev, &sc->mac.phy_loc);
+					if (error == ENODEV)
+						error = 0;
+					if (error != 0)
+						device_printf(dev, "%s: failed "
+						    "to get phy location from "
+						    "memac mdio dev %s: error=%d\n",
+						    __func__, device_get_nameunit(
+						    sc->mac.phy_dev), error);
+				}
+				if (error == 0) {
 					error = mii_attach(sc->mac.phy_dev,
 					    &sc->miibus, sc->ifp,
 					    dpaa2_ni_media_change,
 					    dpaa2_ni_media_status,
-					    BMSR_DEFCAPMASK, MII_PHY_ANY, 0, 0);
+					    BMSR_DEFCAPMASK, sc->mac.phy_loc,
+					    MII_OFFSET_ANY, 0);
 					if (error != 0)
 						device_printf(dev, "%s: failed "
 						    "to attach to miibus: "

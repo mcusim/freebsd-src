@@ -35,3 +35,8 @@ METHOD int set_ni_dev {
 	device_t		 dev;
 	device_t		 nidev;
 };
+
+METHOD int get_phy_loc {
+	device_t		 dev;
+	int			*phy_loc;
+};

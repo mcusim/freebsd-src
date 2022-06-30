@@ -337,8 +337,8 @@ dev/dpaa2/dpaa2_mac.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_con.c				optional SOC_NXP_LS dpaa2
 dev/dpaa2/dpaa2_mc_acpi.c			optional SOC_NXP_LS dpaa2 acpi
 dev/dpaa2/dpaa2_mc_fdt.c			optional SOC_NXP_LS dpaa2 fdt
+dev/dpaa2/memac_mdio.c				optional SOC_NXP_LS dpaa2 acpi | SOC_NXP_LS dpaa2 fdt
 dev/dpaa2/memac_mdio_if.m			optional SOC_NXP_LS dpaa2 acpi | SOC_NXP_LS dpaa2 fdt
-dev/dpaa2/memac_mdio_acpi.c			optional SOC_NXP_LS dpaa2 acpi
 
 ##
 ## SoC Support
