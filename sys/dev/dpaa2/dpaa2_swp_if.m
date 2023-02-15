@@ -68,7 +68,7 @@ METHOD int conf_wq_channel {
 };
 
 /**
- * @brief Release one or more buffer pointers to a QBMan buffer pool.
+ * @brief Release one or more buffer pointers to the QBMan buffer pool.
  *
  * dev:		DPIO device.
  * bpid:	Buffer pool ID.
@@ -80,6 +80,22 @@ METHOD int release_bufs {
 	uint16_t		 bpid;
 	bus_addr_t		*buf;
 	uint32_t		 buf_num;
+};
+
+/**
+ * @brief Acquires one or more buffers from the QBMan buffer pool.
+ *
+ * dev:		DPIO device.
+ * bpid:	Buffer pool ID.
+ * buf:		Array of buffer pointers to populate.
+ * buf_num:	Number of the buffer pointers to acquire. Actual number of
+ *		acquired buffers will be written after command execution.
+ */
+METHOD int acquire_bufs {
+	device_t		 dev;
+	uint16_t		 bpid;
+	bus_addr_t		**buf;
+	uint32_t		*buf_num;
 };
 
 /**

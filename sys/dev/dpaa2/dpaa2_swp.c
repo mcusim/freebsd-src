@@ -165,18 +165,16 @@ enum qbman_sdqcr_fc {
 };
 
 /* Routines to execute software portal commands. */
-static int dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *,
-    struct dpaa2_swp_cmd *, struct dpaa2_swp_rsp *, uint8_t);
-static int dpaa2_swp_exec_br_command(struct dpaa2_swp *, struct dpaa2_swp_cmd *,
+static int dpaa2_swp_exec_mgmt(struct dpaa2_swp *, struct dpaa2_swp_cmd *,
+    struct dpaa2_swp_rsp *, uint8_t);
+static int dpaa2_swp_exec_br(struct dpaa2_swp *, struct dpaa2_swp_cmd *,
     uint32_t);
-static int dpaa2_swp_exec_vdc_command_locked(struct dpaa2_swp *,
-    struct dpaa2_swp_cmd *);
+static int dpaa2_swp_exec_vdc_locked(struct dpaa2_swp *, struct dpaa2_swp_cmd *);
 
 /* Management Commands helpers. */
-static int dpaa2_swp_send_mgmt_command(struct dpaa2_swp *,
-    struct dpaa2_swp_cmd *, uint8_t);
-static int dpaa2_swp_wait_for_mgmt_response(struct dpaa2_swp *,
-    struct dpaa2_swp_rsp *);
+static int dpaa2_swp_send_mgmt(struct dpaa2_swp *, struct dpaa2_swp_cmd *,
+    uint8_t);
+static int dpaa2_swp_wait_for_mgmt(struct dpaa2_swp *, struct dpaa2_swp_rsp *);
 
 /* Helper subroutines. */
 static int dpaa2_swp_cyc_diff(uint8_t, uint8_t, uint8_t);
@@ -539,7 +537,7 @@ dpaa2_swp_conf_wq_channel(struct dpaa2_swp *swp, uint16_t chan_id,
 	cmd.ctrl = cdan_en ? 1u : 0u;
 	cmd.ctx = ctx;	
 
-	error = dpaa2_swp_exec_mgmt_command(swp, (struct dpaa2_swp_cmd *) &cmd,
+	error = dpaa2_swp_exec_mgmt(swp, (struct dpaa2_swp_cmd *) &cmd,
 	    (struct dpaa2_swp_rsp *) &rsp, CMDID_SWP_WQCHAN_CONFIGURE);
 	if (error)
 		return (error);
@@ -585,7 +583,7 @@ dpaa2_swp_query_bp(struct dpaa2_swp *swp, uint16_t bpid,
 
 	cmd.bpid = bpid;
 
-	error = dpaa2_swp_exec_mgmt_command(swp, (struct dpaa2_swp_cmd *) &cmd,
+	error = dpaa2_swp_exec_mgmt(swp, (struct dpaa2_swp_cmd *) &cmd,
 	    (struct dpaa2_swp_rsp *) &rsp, CMDID_SWP_BP_QUERY);
 	if (error)
 		return (error);
@@ -626,13 +624,61 @@ dpaa2_swp_release_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf,
 	cmd.bpid = bpid;
 	cmd.verb |= 1 << 5; /* Switch release buffer command to valid. */
 
-	error = dpaa2_swp_exec_br_command(swp, (struct dpaa2_swp_cmd *) &cmd,
+	error = dpaa2_swp_exec_br(swp, (struct dpaa2_swp_cmd *) &cmd,
 	    buf_num);
 	if (error) {
 		device_printf(swp->desc->dpio_dev, "buffers release command "
 		    "failed\n");
 		return (error);
 	}
+
+	return (0);
+}
+
+int
+dpaa2_swp_acquire_bufs(struct dpaa2_swp *swp, uint16_t bpid, bus_addr_t *buf[],
+    uint32_t *buf_num)
+{
+	struct __packed {
+		uint8_t		verb;
+		uint8_t		_reserved1;
+		uint16_t	bpid;
+		uint8_t		buf_num;
+		uint8_t		_reserved2[59];
+	} cmd = {0};
+	struct __packed {
+		uint8_t		verb;
+		uint8_t		result;
+		uint16_t	_reserved1;
+		uint8_t		buf_num;
+		uint8_t		_reserved2[3];
+		uint64_t	buf[7];
+	} rsp = {0};
+	uint32_t bn;
+	int error;
+
+	KASSERT(swp != NULL && buf != NULL && buf_num != NULL &&
+	    *buf_num > 0u && *buf_num <= DPAA2_SWP_BUFS_PER_CMD,
+	    ("%s:%d: failed", __func__, __LINE__));
+
+	cmd.bpid = bpid;
+	cmd.buf_num = bn = *buf_num;
+
+	error = dpaa2_swp_exec_mgmt(swp, (struct dpaa2_swp_cmd *) &cmd,
+	    (struct dpaa2_swp_rsp *) &rsp, CMDID_SWP_MC_ACQUIRE);
+	if (error) {
+		return (error);
+	} else if (rsp.result != QBMAN_CMD_RC_OK) {
+		device_printf(swp->desc->dpio_dev, "%s: buffer acquire command "
+		    "error: result=0x%02x\n", __func__, rsp.result);
+		return (EIO);
+	}
+
+	bn = bn < rsp.buf_num ? bn : rsp.buf_num;
+	for (uint32_t i = 0; i < bn; i++) {
+		buf[i] = (bus_addr_t *) rsp.buf[i];
+	}
+	*buf_num = bn;
 
 	return (0);
 }
@@ -757,8 +803,7 @@ dpaa2_swp_pull(struct dpaa2_swp *swp, uint16_t chan_id, struct dpaa2_buf *buf,
 		return (ENOENT);
 	}
 
-	error = dpaa2_swp_exec_vdc_command_locked(swp,
-	    (struct dpaa2_swp_cmd *) &cmd);
+	error = dpaa2_swp_exec_vdc_locked(swp, (struct dpaa2_swp_cmd *) &cmd);
 	if (error != 0) {
 		DPAA2_SWP_UNLOCK(swp);
 		return (error);
@@ -935,7 +980,7 @@ dpaa2_swp_cyc_diff(uint8_t ringsize, uint8_t first, uint8_t last)
  * @brief Execute Buffer Release Command (BRC).
  */
 static int
-dpaa2_swp_exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_exec_br(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     uint32_t buf_num)
 {
 	struct __packed with_verb {
@@ -1005,7 +1050,7 @@ dpaa2_swp_exec_br_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
  *	 command is present in the SDQCR register.
  */
 static int
-dpaa2_swp_exec_vdc_command_locked(struct dpaa2_swp *swp,
+dpaa2_swp_exec_vdc_locked(struct dpaa2_swp *swp,
     struct dpaa2_swp_cmd *cmd)
 {
 	struct __packed with_verb {
@@ -1049,7 +1094,7 @@ dpaa2_swp_exec_vdc_command_locked(struct dpaa2_swp *swp,
  * @brief Execute a QBMan management command.
  */
 static int
-dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_exec_mgmt(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     struct dpaa2_swp_rsp *rsp, uint8_t cmdid)
 {
 #if (defined(_KERNEL) && defined(INVARIANTS))
@@ -1075,8 +1120,8 @@ dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 	 * Send a command to QBMan using Management Command register and wait
 	 * for response from the Management Response registers.
 	 */
-	dpaa2_swp_send_mgmt_command(swp, cmd, cmdid);
-	error = dpaa2_swp_wait_for_mgmt_response(swp, rsp);
+	dpaa2_swp_send_mgmt(swp, cmd, cmdid);
+	error = dpaa2_swp_wait_for_mgmt(swp, rsp);
 	if (error) {
 		DPAA2_SWP_UNLOCK(swp);
 		return (error);
@@ -1094,7 +1139,7 @@ dpaa2_swp_exec_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 }
 
 static int
-dpaa2_swp_send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
+dpaa2_swp_send_mgmt(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
     uint8_t cmdid)
 {
 	const uint8_t *cmd_pdat8 = (const uint8_t *) cmd->params;
@@ -1127,7 +1172,7 @@ dpaa2_swp_send_mgmt_command(struct dpaa2_swp *swp, struct dpaa2_swp_cmd *cmd,
 }
 
 static int
-dpaa2_swp_wait_for_mgmt_response(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
+dpaa2_swp_wait_for_mgmt(struct dpaa2_swp *swp, struct dpaa2_swp_rsp *rsp)
 {
 	struct resource_map *map = swp->cfg.mem_backed
 	    ? swp->cena_map : swp->cinh_map;
