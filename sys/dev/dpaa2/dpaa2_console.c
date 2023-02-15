@@ -329,12 +329,6 @@ dpaa2_cons_create_dev(device_t dev, bus_addr_t pa, size_t size,
 	size_t len;
 	int error;
 
-	if (bootverbose) {
-		device_printf(dev, "%s: creating character device: pa=%#jx, "
-		    "offset=%zu, size=%zu\n", __func__, (uintmax_t)pa, offset,
-		    size);
-	}
-
 	sc = device_get_softc(dev);
 
 	error = bus_space_map(sc->bst, pa, size, 0, &cd->bsh);
