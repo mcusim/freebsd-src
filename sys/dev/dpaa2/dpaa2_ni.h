@@ -269,10 +269,12 @@ struct dpaa2_ni_channel {
 	device_t		 con_dev;
 	uint16_t		 id;
 	uint16_t		 flowid;
+	bool			 ready;
 
-	/* For debug purposes only! */
+#ifdef DPAA2_DEBUG
 	uint64_t		 tx_frames;
 	uint64_t		 tx_dropped;
+#endif /* DPAA2_DEBUG */
 
 	/* Context to configure CDAN. */
 	struct dpaa2_io_notif_ctx ctx;
@@ -534,7 +536,7 @@ struct dpaa2_ni_softc {
 	uint16_t		 buf_align;
 	uint16_t		 buf_sz;
 
-	/* For debug purposes only! */
+#ifdef DPAA2_DEBUG
 	uint64_t		 rx_anomaly_frames;
 	uint64_t		 rx_single_buf_frames;
 	uint64_t		 rx_sg_buf_frames;
@@ -542,14 +544,10 @@ struct dpaa2_ni_softc {
 	uint64_t		 rx_ieoi_err_frames;
 	uint64_t		 tx_single_buf_frames;
 	uint64_t		 tx_sg_frames;
+#endif
 
 	/* Attributes of the DPAA2 network interface. */
 	struct dpaa2_ni_attr	 attr;
-
-	/* Helps to send commands to MC. */
-	struct dpaa2_cmd	*cmd;
-	uint16_t		 rc_token;
-	uint16_t		 ni_token;
 
 	/* For network interface and miibus. */
 	struct ifnet		*ifp;
