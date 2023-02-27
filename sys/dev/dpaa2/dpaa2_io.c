@@ -564,13 +564,13 @@ dpaa2_io_intr(void *arg)
 	}
 
 	if (DPAA2_SWP_TRYLOCK(sc->swp) == 0) {
-		return;
+		goto enable_irq;
 	}
 	flags = sc->swp->flags;
 	if (flags & DPAA2_SWP_DESTROYED) {
 		/* Terminate operation if portal is destroyed. */
 		DPAA2_SWP_UNLOCK(sc->swp);
-		return;
+		goto enable_irq;
 	}
 
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
@@ -578,12 +578,9 @@ dpaa2_io_intr(void *arg)
 		if (rc) {
 			break;
 		}
-
 		if ((dq.common.verb & DPAA2_DQRR_RESULT_MASK) ==
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx[cdan_n++] = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
-		} else {
-			/* TODO: Report unknown DQRR entry. */
 		}
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx);
 	}
@@ -594,6 +591,7 @@ dpaa2_io_intr(void *arg)
 		taskqueue_enqueue(chan->taskq, &chan->poll_task);
 	}
 
+enable_irq:
 	/* Enable software portal interrupts back */
 	dpaa2_swp_clear_intr_status(sc->swp, status);
 	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
