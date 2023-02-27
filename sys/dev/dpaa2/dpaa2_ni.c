@@ -1132,7 +1132,7 @@ free_channels:
 			continue;
 		}
 
-		while (taskqueue_cancel(&sc->channels[i]->taskq,
+		while (taskqueue_cancel(sc->channels[i]->taskq,
 		    &sc->channels[i]->poll_task, NULL) != 0) {
 			taskqueue_drain(sc->channels[i]->taskq,
 			    &sc->channels[i]->poll_task);
@@ -1159,7 +1159,6 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 {
 	device_t io_dev, con_dev, child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
-	struct dpaa2_io_softc *iosc;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(device_get_parent(dev));
 	struct dpaa2_devinfo *io_info, *con_info;
 	struct dpaa2_con_softc *consc;
@@ -1171,12 +1170,14 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 	uint16_t rc_token, con_token;
 	int error;
 	char tq_name[32];
+#ifdef RSS
+	struct dpaa2_io_softc *iosc;
+#endif
 
 	DPAA2_CMD_INIT(&cmd);
 
 	io_dev = (device_t) rman_get_start(sc->res[IO_RID(chidx)]);
 	io_info = device_get_ivars(io_dev);
-	iosc = device_get_softc(io_dev);
 	con_dev = (device_t) rman_get_start(sc->res[CON_RID(chidx)]);
 	consc = device_get_softc(con_dev);
 	con_info = device_get_ivars(con_dev);
@@ -1241,6 +1242,7 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 		goto free_chan;
 	}
 #ifdef RSS
+	iosc = device_get_softc(io_dev);
 	taskqueue_start_threads_cpuset(&channel->taskq, 1, PI_NET,
 	    &iosc->cpu_mask, "%s", tq_name);
 #else
