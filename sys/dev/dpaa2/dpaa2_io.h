@@ -32,6 +32,10 @@
 #include <sys/bus.h>
 #include <sys/queue.h>
 
+#ifdef RSS
+#include <net/rss_config.h>
+#endif
+
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
 
@@ -98,6 +102,11 @@ struct dpaa2_io_softc {
 	int			 irq_rid[DPAA2_IO_MSI_COUNT];
 	struct resource		*irq_resource;
 	void			*intr; /* interrupt handle */
+
+#ifdef RSS
+	int			 cpu;
+	cpuset_t		 cpu_mask;
+#endif
 };
 
 extern struct resource_spec dpaa2_io_spec[];

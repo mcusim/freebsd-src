@@ -484,6 +484,7 @@ static void dpaa2_ni_poll(void *);
 static void dpaa2_ni_tx_locked(struct dpaa2_ni_softc *,
     struct dpaa2_ni_tx_ring *, struct mbuf *);
 static void dpaa2_ni_bp_task(void *, int);
+static void dpaa2_ni_poll_task(void *, int);
 
 /* Tx/Rx subroutines */
 static int  dpaa2_ni_consume_frames(struct dpaa2_ni_channel *,
@@ -1130,6 +1131,15 @@ free_channels:
 		if (!sc->channels[i]->ready) {
 			continue;
 		}
+
+		while (taskqueue_cancel(&sc->channels[i]->taskq,
+		    &sc->channels[i]->poll_task, NULL) != 0) {
+			taskqueue_drain(sc->channels[i]->taskq,
+			    &sc->channels[i]->poll_task);
+		}
+		taskqueue_free(sc->channels[i]->taskq);
+		sc->channels[i]->taskq = NULL;
+
 		buf = &sc->channels[i]->store;
 		bus_dmamap_unload(buf->store.dmat, buf->store.dmap);
 		bus_dmamem_free(buf->store.dmat, buf->store.vaddr,
@@ -1149,6 +1159,7 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 {
 	device_t io_dev, con_dev, child = dev;
 	struct dpaa2_ni_softc *sc = device_get_softc(dev);
+	struct dpaa2_io_softc *iosc;
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(device_get_parent(dev));
 	struct dpaa2_devinfo *io_info, *con_info;
 	struct dpaa2_con_softc *consc;
@@ -1159,11 +1170,13 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 	struct dpaa2_cmd cmd;
 	uint16_t rc_token, con_token;
 	int error;
+	char tq_name[32];
 
 	DPAA2_CMD_INIT(&cmd);
 
 	io_dev = (device_t) rman_get_start(sc->res[IO_RID(chidx)]);
 	io_info = device_get_ivars(io_dev);
+	iosc = device_get_softc(io_dev);
 	con_dev = (device_t) rman_get_start(sc->res[CON_RID(chidx)]);
 	consc = device_get_softc(con_dev);
 	con_info = device_get_ivars(con_dev);
@@ -1201,6 +1214,7 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 	channel->con_dev = con_dev;
 	channel->recycled_n = 0;
 	channel->ready = false;
+	channel->taskq = NULL;
 
 	buf = &channel->store;
 	buf->type = DPAA2_BUF_STORE;
@@ -1212,6 +1226,25 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 #ifdef DPAA2_DEBUG
 	channel->tx_frames = 0;
 	channel->tx_dropped = 0;
+#endif
+
+	TASK_INIT(&channel->poll_task, 0, dpaa2_ni_poll_task, channel);
+	bzero(tq_name, sizeof (tq_name));
+	snprintf(tq_name, sizeof (tq_name), "%s_tqch%d",
+	    device_get_nameunit(dev), channel->id);
+
+	channel->taskq = taskqueue_create(tq_name, M_WAITOK,
+	    taskqueue_thread_enqueue, &channel->taskq);
+	if (channel->taskq == NULL) {
+		device_printf(dev, "%s: failed to allocate taskqueue: %s\n",
+		    __func__, tq_name);
+		goto free_chan;
+	}
+#ifdef RSS
+	taskqueue_start_threads_cpuset(&channel->taskq, 1, PI_NET,
+	    &iosc->cpu_mask, "%s", tq_name);
+#else
+	taskqueue_start_threads(&channel->taskq, 1, PI_NET, "%s", tq_name);
 #endif
 
 	/* None of the frame queues for this channel configured yet. */
@@ -1231,7 +1264,7 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 	if (error) {
 		device_printf(dev, "%s: failed to register notification "
 		    "context\n", __func__);
-		goto free_chan;
+		goto free_taskq;
 	}
 
 	/* Register DPCON notification with MC */
@@ -1243,7 +1276,7 @@ dpaa2_ni_setup_channel(device_t dev, const uint32_t chidx)
 		device_printf(dev, "%s: failed to set DPCON "
 		    "notification: dpcon_id=%d, chan_id=%d\n", __func__,
 		    con_info->id, consc->attr.chan_id);
-		goto free_chan;
+		goto free_taskq;
 	}
 
 	/* Allocate initial # of Rx buffers and a channel storage */
@@ -1298,6 +1331,12 @@ drain_bp:
 	/*
 	 * XXX-DSL: Acquire all of released buffers from the pool.
 	 */
+free_taskq:
+	while (taskqueue_cancel(channel->taskq, &channel->poll_task, NULL) != 0) {
+		taskqueue_drain(channel->taskq, &channel->poll_task);
+	}
+	taskqueue_free(channel->taskq);
+	channel->taskq = NULL;
 free_chan:
 	KASSERT(channel != NULL, ("%s:%d: failed", __func__, __LINE__));
 	free(channel, M_DPAA2_NI);
@@ -3048,6 +3087,12 @@ dpaa2_ni_bp_task(void *arg, int count)
 		    sc->channels[0]->io_dev);
 		DPAA2_ATOMIC_XCHG(&sc->buf_free, bp_conf.free_bufn);
 	}
+}
+
+static void
+dpaa2_ni_poll_task(void *arg, int count)
+{
+	(void)dpaa2_ni_poll(arg);
 }
 
 /**

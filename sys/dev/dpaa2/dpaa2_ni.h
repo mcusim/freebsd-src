@@ -292,6 +292,9 @@ struct dpaa2_ni_channel {
 	uint32_t		 rxq_n;
 	struct dpaa2_ni_fq	 rx_queues[DPAA2_NI_MAX_TCS];
 	struct dpaa2_ni_fq	 txc_queue;
+
+	struct taskqueue	*taskq;
+	struct task		 poll_task;
 };
 
 /**

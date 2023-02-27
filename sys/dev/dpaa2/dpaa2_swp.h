@@ -213,6 +213,8 @@
 	mtx_unlock(&(__swp)->lock);		\
 } while (0)
 
+#define DPAA2_SWP_TRYLOCK(__swp)	mtx_trylock(&(__swp)->lock)
+
 enum dpaa2_fd_format {
 	DPAA2_FD_SINGLE = 0,
 	DPAA2_FD_LIST,
