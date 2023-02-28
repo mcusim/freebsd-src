@@ -28,6 +28,8 @@
 #ifndef	_DPAA2_IO_H
 #define	_DPAA2_IO_H
 
+#include "opt_rss.h"
+
 #include <sys/rman.h>
 #include <sys/bus.h>
 #include <sys/queue.h>

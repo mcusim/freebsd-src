@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
  * using QBMan.
  */
 
+#include "opt_rss.h"
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>

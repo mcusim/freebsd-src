@@ -41,6 +41,8 @@ __FBSDID("$FreeBSD$");
  * functions are provided for standard network protocols (L2, L3, L4, etc.).
  */
 
+#include "opt_rss.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
