@@ -299,7 +299,7 @@ dpaa2_swp_init_portal(struct dpaa2_swp **swp, struct dpaa2_swp_desc *desc,
 	p->eqcr.available = p->eqcr.pi_ring_size;
 
 	/* Initialize the portal with an IRQ threshold and timeout of 0us. */
-	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 0);
+	dpaa2_swp_set_irq_coalescing(p, p->dqrr.ring_size - 1, 500);
 
 	*swp = p;
 

@@ -3367,7 +3367,7 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 	buf_data = (uint8_t *)buf->rx.vaddr + dpaa2_ni_fd_offset(fd);
 
 	/* Prefetch mbuf data. */
-	//__builtin_prefetch(buf_data);
+	__builtin_prefetch(buf_data);
 
 	/* Write value to mbuf (avoid reading). */
 	m->m_flags |= M_PKTHDR;
