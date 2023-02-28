@@ -97,6 +97,7 @@ struct dpaa2_io_softc {
 	struct dpaa2_swp_desc	 swp_desc;
 	struct dpaa2_swp	*swp;
 	struct dpaa2_io_attr	 attr;
+	struct dpaa2_atomic	 busy;
 
 	struct resource 	*res[DPAA2_IO_MAX_RESOURCES];
 	struct resource_map	 map[DPAA2_IO_MAX_RESOURCES];

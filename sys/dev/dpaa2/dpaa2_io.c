@@ -216,6 +216,7 @@ dpaa2_io_attach(device_t dev)
 	sc->swp = NULL;
 	sc->intr = NULL;
 	sc->irq_resource = NULL;
+	DPAA2_ATOMIC_XCHG(&sc->busy, 0);
 	for (int i = 0; i < MEM_RES_NUM; i++)
 		sc->res[MEM_RID(i)] = NULL;
 
@@ -564,12 +565,10 @@ dpaa2_io_intr(void *arg)
 	if (status == 0) {
 		return;
 	}
-
 	DPAA2_SWP_LOCK(sc->swp, &flags);
 	if (flags & DPAA2_SWP_DESTROYED) {
-		/* Terminate operation if portal is destroyed. */
 		DPAA2_SWP_UNLOCK(sc->swp);
-		goto enable_irq;
+		return;
 	}
 
 	for (int i = 0; i < DPIO_POLL_MAX; i++) {
@@ -584,19 +583,20 @@ dpaa2_io_intr(void *arg)
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx);
 	}
 	DPAA2_SWP_UNLOCK(sc->swp);
+	DPAA2_ATOMIC_ADD(&sc->busy, cdan_n);
 
 	for (int i = 0; i < cdan_n; i++) {
 		chan = (struct dpaa2_ni_channel *) ctx[i]->channel;
-		KASSERT(chan->io_dev == sc->dev, ("%s:%d: intr dpio (%#jx) != "
-		    "chan dpio (%#jx)", __func__, __LINE__, (uintmax_t)sc->dev,
+		KASSERT(chan->io_dev == sc->dev, ("%s: intr dpio (%#jx) != "
+		    "chan dpio (%#jx)", __func__, (uintmax_t)sc->dev,
 		    (uintmax_t)chan->io_dev));
-		taskqueue_enqueue(chan->taskq, &chan->poll_task);
-	}
 
-enable_irq:
-	/* Enable software portal interrupts back */
-	dpaa2_swp_clear_intr_status(sc->swp, status);
-	dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_IIR, 0);
+		rc = taskqueue_enqueue(chan->taskq, &chan->poll_task);
+		if (rc != 0) {
+			/* Poll frames in the context of ithread. */
+			(void)ctx[i]->poll(ctx[i]->channel);
+		}
+	}
 }
 
 static device_method_t dpaa2_io_methods[] = {

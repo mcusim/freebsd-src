@@ -3142,7 +3142,14 @@ dpaa2_ni_poll(void *arg)
 		}
 	} while (true);
 
-	/* Re-arm channel to generate CDAN. */
+	if (DPAA2_ATOMIC_READ(&iosc->busy) == 1) {
+		DPAA2_ATOMIC_ADD(&iosc->busy, -1);
+		/* Enable software portal interrupts back */
+		dpaa2_swp_clear_intr_status(swp, 0xFFFFFFFFu);
+		dpaa2_swp_write_reg(swp, DPAA2_SWP_CINH_IIR, 0);
+	}
+
+	/* Re-arm channel to generate CDAN */
 	error = DPAA2_SWP_CONF_WQ_CHANNEL(chan->io_dev, &chan->ctx);
 	if (error) {
 		device_printf(chan->ni_dev, "%s: failed to rearm: chan_id=%d, "
