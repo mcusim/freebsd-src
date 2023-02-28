@@ -587,6 +587,9 @@ dpaa2_io_intr(void *arg)
 
 	for (int i = 0; i < cdan_n; i++) {
 		chan = (struct dpaa2_ni_channel *) ctx[i]->channel;
+		KASSERT(chan->io_dev == sc->dev, ("%s:%d: intr dpio (%#jx) != "
+		    "chan dpio (%#jx)", __func__, __LINE__, (uintmax_t)sc->dev,
+		    (uintmax_t)chan->io_dev));
 		taskqueue_enqueue(chan->taskq, &chan->poll_task);
 	}
 
