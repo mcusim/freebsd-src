@@ -3229,10 +3229,10 @@ dpaa2_ni_tx_locked(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		}
 	}
 
-	/* bus_dmamap_sync(buf->tx.dmat, buf->tx.dmap, */
-	/*     BUS_DMASYNC_PREWRITE); */
-	/* bus_dmamap_sync(buf->tx.sgt_dmat, buf->tx.sgt_dmap, */
-	/*     BUS_DMASYNC_PREWRITE); */
+	bus_dmamap_sync(buf->tx.dmat, buf->tx.dmap,
+	    BUS_DMASYNC_PREWRITE);
+	bus_dmamap_sync(buf->tx.sgt_dmat, buf->tx.sgt_dmap,
+	    BUS_DMASYNC_PREWRITE);
 
 	if (rc != 1) {
 #ifdef DPAA2_DEBUG
