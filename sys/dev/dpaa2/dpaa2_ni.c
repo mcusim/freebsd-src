@@ -3229,10 +3229,10 @@ dpaa2_ni_tx_locked(struct dpaa2_ni_softc *sc, struct dpaa2_ni_tx_ring *tx,
 		}
 	}
 
-	bus_dmamap_sync(buf->tx.dmat, buf->tx.dmap,
-	    BUS_DMASYNC_PREWRITE);
-	bus_dmamap_sync(buf->tx.sgt_dmat, buf->tx.sgt_dmap,
-	    BUS_DMASYNC_PREWRITE);
+	/* bus_dmamap_sync(buf->tx.dmat, buf->tx.dmap, */
+	/*     BUS_DMASYNC_PREWRITE); */
+	/* bus_dmamap_sync(buf->tx.sgt_dmat, buf->tx.sgt_dmap, */
+	/*     BUS_DMASYNC_PREWRITE); */
 
 	if (rc != 1) {
 #ifdef DPAA2_DEBUG
@@ -3360,15 +3360,14 @@ dpaa2_ni_rx(struct dpaa2_ni_channel *chan, struct dpaa2_ni_fq *fq,
 
 	m = buf->rx.m;
 	buf->rx.m = NULL;
-	bus_dmamap_sync(buf->rx.dmat, buf->rx.dmap,
-	    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+	bus_dmamap_sync(buf->rx.dmat, buf->rx.dmap, BUS_DMASYNC_POSTREAD);
 	bus_dmamap_unload(buf->rx.dmat, buf->rx.dmap);
 
 	buf_len = dpaa2_ni_fd_data_len(fd);
 	buf_data = (uint8_t *)buf->rx.vaddr + dpaa2_ni_fd_offset(fd);
 
 	/* Prefetch mbuf data. */
-	__builtin_prefetch(buf_data);
+	//__builtin_prefetch(buf_data);
 
 	/* Write value to mbuf (avoid reading). */
 	m->m_flags |= M_PKTHDR;
