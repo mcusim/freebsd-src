@@ -2961,7 +2961,6 @@ dpaa2_ni_add_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
 	struct dpaa2_ni_softc *sc = if_getsoftc(ctx->ifp);
 	device_t dev = sc->dev;
 	device_t child = dev;
-	struct dpaa2_ni_softc *sc = ctx->ifp->if_softc;
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(dinfo->pdev);
 	struct dpaa2_cmd cmd;
