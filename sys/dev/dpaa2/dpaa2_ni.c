@@ -2645,7 +2645,6 @@ dpaa2_ni_init(void *arg)
 	struct dpaa2_devinfo *dinfo = device_get_ivars(dev);
 	struct dpaa2_devinfo *rcinfo = device_get_ivars(dinfo->pdev);
 	struct dpaa2_cmd cmd;
-	struct ifnet *ifp = sc->ifp;
 	uint16_t rc_token, ni_token;
 	int error;
 
