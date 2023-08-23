@@ -40,16 +40,21 @@
 
 #include "sff_if.h"
 
+/*
+ * NOTE: Some SFPs will disable their EEPROM when "tx_disable" is active.
+ *       Use the "mod_abs" to determine the status of the SFP cage rather
+ *       than scanning the I2C bus.
+ */
 struct sfp_fdt_softc {
 	phandle_t	ofw_node;
 	phandle_t	i2c_bus;
 
-	phandle_t	mod_def;
-	phandle_t	los;
-	phandle_t	tx_fault;
-	phandle_t	tx_disable;
-	phandle_t	rx_rate;
-	phandle_t	tx_rate;
+	phandle_t	mod_abs_gpio; /* module not/present (high/low) */
+	phandle_t	los_gpio;
+	phandle_t	tx_fault_gpio;
+	phandle_t	tx_disable_gpio;
+	phandle_t	rxrate_sel_gpio;
+	phandle_t	txrate_sel_gpio;
 	uint32_t	max_power; /* in mW */
 };
 
@@ -66,8 +71,8 @@ sfp_fdt_probe(device_t dev)
 	s = device_get_property(dev, "i2c-bus", &node, sizeof(node),
 	    DEVICE_PROP_HANDLE);
 	if (s == -1) {
-		device_printf(dev, "%s: '%s' has no 'i2c-bus' property, s %zd\n",
-		    __func__, ofw_bus_get_name(dev), s);
+		device_printf(dev, "%s: '%s' has no 'i2c-bus' property\n",
+		    __func__, ofw_bus_get_name(dev));
 		return (ENXIO);
 	}
 
@@ -88,31 +93,31 @@ sfp_fdt_attach(device_t dev)
 	s = device_get_property(dev, "i2c-bus", &sc->i2c_bus,
 	    sizeof(sc->i2c_bus), DEVICE_PROP_HANDLE);
 	if (s == -1) {
-		device_printf(dev, "%s: cannot find 'i2c-bus' property: %zd\n",
-		    __func__, s);
+		device_printf(dev, "%s: cannot find 'i2c-bus' property\n",
+		    __func__);
 		return (ENXIO);
 	}
 
 	/* Optional properties */
-	(void)device_get_property(dev, "mod-def0-gpios", &sc->mod_def,
-	    sizeof(sc->mod_def), DEVICE_PROP_HANDLE);
-	(void)device_get_property(dev, "los-gpios", &sc->los, sizeof(sc->los),
-	    DEVICE_PROP_HANDLE);
-	(void)device_get_property(dev, "tx-fault-gpios", &sc->tx_fault,
-	    sizeof(sc->tx_fault), DEVICE_PROP_HANDLE);
-	(void)device_get_property(dev, "tx-disable-gpios", &sc->tx_disable,
-	    sizeof(sc->tx_disable), DEVICE_PROP_HANDLE);
-	(void)device_get_property(dev, "rate-select0-gpios", &sc->rx_rate,
-	    sizeof(sc->rx_rate), DEVICE_PROP_HANDLE);
-	(void)device_get_property(dev, "rate-select1-gpios", &sc->tx_rate,
-	    sizeof(sc->tx_rate), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "mod-def0-gpios", &sc->mod_abs_gpio,
+	    sizeof(sc->mod_abs_gpio), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "los-gpios", &sc->los_gpio,
+	    sizeof(sc->los_gpio), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "tx-fault-gpios", &sc->tx_fault_gpio,
+	    sizeof(sc->tx_fault_gpio), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "tx-disable-gpios", &sc->tx_disable_gpio,
+	    sizeof(sc->tx_disable_gpio), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "rate-select0-gpios", &sc->rxrate_sel_gpio,
+	    sizeof(sc->rxrate_sel_gpio), DEVICE_PROP_HANDLE);
+	(void)device_get_property(dev, "rate-select1-gpios", &sc->txrate_sel_gpio,
+	    sizeof(sc->txrate_sel_gpio), DEVICE_PROP_HANDLE);
 	(void)device_get_property(dev, "maximum-power-milliwatt", &sc->max_power,
 	    sizeof(sc->max_power), DEVICE_PROP_UINT32);
 
 	error = OF_device_register_xref(OF_xref_from_node(sc->ofw_node), dev);
 	if (error != 0)
-		device_printf(dev, "%s: failed to register xref %#x\n",
-		    __func__, OF_xref_from_node(sc->ofw_node));
+		device_printf(dev, "%s: failed to register xref %#x: %d\n",
+		    __func__, OF_xref_from_node(sc->ofw_node), error);
 
 	return (error);
 }
