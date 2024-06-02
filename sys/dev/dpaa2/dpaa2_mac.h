@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2022 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,14 +28,33 @@
 #ifndef	_DPAA2_MAC_H
 #define	_DPAA2_MAC_H
 
+#include "opt_acpi.h"
+#include "opt_platform.h"
+
 #include <sys/rman.h>
 #include <sys/bus.h>
 #include <sys/queue.h>
+#include <sys/param.h>
+#include <sys/kobj.h>
+#include <sys/systm.h>
 
 #include <net/ethernet.h>
 
+#ifdef FDT
+#include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/ofw_pci.h>
+#endif
+
+#ifdef DEV_ACPI
+#include <contrib/dev/acpica/include/acpi.h>
+#include <dev/acpica/acpivar.h>
+#endif
+
 #include "dpaa2_types.h"
 #include "dpaa2_mcp.h"
+#include "dpaa2_mc.h"
 
 #define DPAA2_MAC_MAX_RESOURCES	1  /* Maximum resources per DPMAC: 1 DPMCP. */
 #define DPAA2_MAC_MSI_COUNT	1  /* MSIs per DPMAC */
@@ -96,6 +115,24 @@ struct dpaa2_mac_link_state {
 };
 
 /**
+ * @struct dpaa2_macinfo
+ * @brief Instance variables of a DPMAC device.
+ *
+ * Structure to track instance variables specific to the DPAA2 MAC device.
+ */
+struct dpaa2_macinfo {
+	struct dpaa2_devinfo	 dinfo; /* Must stay first. */
+#ifdef FDT
+	phandle_t		 node; /* fsl,qoriq-mc-dpmac compatible */
+#endif
+#ifdef DEV_ACPI
+	ACPI_HANDLE		 handle; /* _SB.MCEx.PRxx */
+#endif
+	bool			 valid;
+};
+CTASSERT(sizeof(struct dpaa2_macinfo) >= sizeof(struct dpaa2_devinfo));
+
+/**
  * @brief Software context for the DPAA2 MAC driver.
  *
  * dev:		Device associated with this software context.
@@ -114,5 +151,10 @@ struct dpaa2_mac_softc {
 };
 
 extern struct resource_spec dpaa2_mac_spec[];
+
+DECLARE_CLASS(dpaa2_mac_driver);
+
+int dpaa2_mac_probe(device_t dev);
+int dpaa2_mac_attach(device_t dev);
 
 #endif /* _DPAA2_MAC_H */

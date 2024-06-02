@@ -97,15 +97,6 @@ CODE {
 				dpaa2_dev, devtype));
 		return (ENXIO);
 	}
-
-	static int
-	bypass_get_phy_dev(device_t dev, device_t *phy_dev, uint32_t id)
-	{
-		if (device_get_parent(dev) != NULL)
-			return (DPAA2_MC_GET_PHY_DEV(device_get_parent(dev),
-			    phy_dev, id));
-		return (ENXIO);
-	}
 }
 
 METHOD int manage_dev {
@@ -144,9 +135,3 @@ METHOD int release_dev {
 	device_t	 dpaa2_dev;
 	enum dpaa2_dev_type devtype;
 } DEFAULT bypass_release_dev;
-
-METHOD int get_phy_dev {
-	device_t	 dev;
-	device_t	 *phy_dev;
-	uint32_t	 id;
-} DEFAULT bypass_get_phy_dev;
