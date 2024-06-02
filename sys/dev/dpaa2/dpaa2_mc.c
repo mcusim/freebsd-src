@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2022 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,6 +68,7 @@
 #include "pci_if.h"
 
 #include "dpaa2_mc.h"
+#include "dpaa2_mac.h"
 
 /* Macros to read/write MC registers */
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
