@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2022 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -68,6 +68,7 @@
 #include "pci_if.h"
 
 #include "dpaa2_mc.h"
+#include "dpaa2_mac.h"
 
 /* Macros to read/write MC registers */
 #define	mcreg_read_4(_sc, _r)		bus_read_4(&(_sc)->map[1], (_r))
@@ -120,6 +121,8 @@ static int dpaa2_mc_alloc_msi_impl(device_t, device_t, int, int, int *);
 static int dpaa2_mc_release_msi_impl(device_t, device_t, int, int *);
 static int dpaa2_mc_map_msi_impl(device_t, device_t, int, uint64_t *,
     uint32_t *);
+
+static void dpaa2_mc_manage_macdev(device_t mcdev, device_t dev, uint32_t flags);
 
 /*
  * For device interface.
@@ -484,6 +487,15 @@ dpaa2_mc_manage_dev(device_t mcdev, device_t dpaa2_dev, uint32_t flags)
 		    (rman_res_t) dpaa2_dev);
 		if (error)
 			return (error);
+	}
+
+	/* Perform a type-specific management routine. */
+	switch (dinfo->dtype) {
+	case DPAA2_DEV_MAC:
+		dpaa2_mc_manage_macdev(mcdev, dpaa2_dev, flags);
+		break;
+	default:
+		break;
 	}
 
 	return (0);
@@ -877,6 +889,48 @@ dpaa2_mc_map_msi_impl(device_t mcdev, device_t child, int irq, uint64_t *addr,
 }
 
 #endif /* defined(INTRNG) && !defined(IOMMU) */
+
+static void
+dpaa2_mc_manage_macdev(device_t mcdev, device_t dev, uint32_t flags)
+#if defined(FDT)
+{
+	struct dpaa2_mc_softc *sc;
+	struct dpaa2_devinfo *dinfo;
+	struct dpaa2_macinfo *macinfo;
+	phandle_t node, child;
+	uint32_t reg;
+
+	sc = device_get_softc(mcdev);
+	macinfo = device_get_ivars(dev);
+	dinfo = (struct dpaa2_devinfo *)macinfo;
+
+	macinfo->node = 0;
+	macinfo->valid = false;
+
+	/* Find corresponding dpmac node: fsl-mc -> dpmacs -> dpmac */
+	node = OF_child(sc->ofw_node);
+	child = ofw_bus_find_compatible(node, "fsl,qoriq-mc-dpmac");
+	for (; child > 0; child = OF_peer(child)) {
+		if (!ofw_bus_node_is_compatible(child, "fsl,qoriq-mc-dpmac"))
+			continue;
+		if (!OF_hasprop(child, "reg"))
+			continue;
+		/* XXX-DSL: How to use simplebus_get_property here? */
+		if (OF_getencprop(child, "reg", &reg, sizeof(reg)) == -1)
+			continue;
+
+		if (reg == dinfo->id) {
+			macinfo->node = child;
+			macinfo->valid = true;
+			break;
+		}
+	}
+}
+#elif defined(DEV_ACPI)
+{
+	/* TBD */
+}
+#endif /* !FDT && !DEV_ACPI */
 
 static device_method_t dpaa2_mc_methods[] = {
 	DEVMETHOD_END
