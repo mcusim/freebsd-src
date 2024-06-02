@@ -407,6 +407,8 @@ static int dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_if_flags(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_sysctls(struct dpaa2_ni_softc *);
 static int dpaa2_ni_setup_dma(struct dpaa2_ni_softc *);
+static void dpaa2_ni_setup_fixed_link(struct dpaa2_ni_softc *);
+static int dpaa2_ni_setup_mii(struct dpaa2_ni_softc *);
 
 /* Tx/Rx flow configuration */
 static int dpaa2_ni_setup_rx_flow(device_t, struct dpaa2_ni_fq *);
@@ -688,6 +690,65 @@ dpaa2_ni_setup_fixed_link(struct dpaa2_ni_softc *sc)
 	ifmedia_set(&sc->fixed_ifmedia, IFM_ETHER | IFM_1000_T);
 }
 
+/**
+ * @brief Attaches miibus to the PHY associated with the DPMAC device.
+ *
+ * @pre DPMAC ID should be available in the DPNI softc.
+ */
+static int
+dpaa2_ni_setup_mii(struct dpaa2_ni_softc *sc)
+{
+	device_t dev, macdev, phydev;
+	int error;
+
+	dev = sc->dev;
+
+	error = DPAA2_MC_GET_DEV(dev, &macdev, DPAA2_DEV_MAC, sc->mac.dpmac_id);
+	if (error == 0) {
+		error = MEMAC_MDIO_SET_NI_DEV(sc->mac.phy_dev, dev);
+		if (error != 0) {
+			device_printf(dev, "%s: failed "
+			    "to set dpni dev on memac "
+			    "mdio dev %s: error=%d\n",
+			    __func__,
+			    device_get_nameunit(
+			    sc->mac.phy_dev), error);
+		}
+	}
+	if (error == 0) {
+		error = MEMAC_MDIO_GET_PHY_LOC(sc->mac.phy_dev, &sc->mac.phy_loc);
+		if (error == ENODEV) {
+			error = 0;
+		}
+		if (error != 0) {
+			device_printf(dev, "%s: failed "
+			    "to get phy location from "
+			    "memac mdio dev %s: error=%d\n",
+			    __func__, device_get_nameunit(
+			    sc->mac.phy_dev), error);
+		}
+	}
+	if (error == 0) {
+		error = mii_attach(sc->mac.phy_dev,
+		    &sc->miibus, sc->ifp,
+		    dpaa2_ni_media_change,
+		    dpaa2_ni_media_status,
+		    BMSR_DEFCAPMASK, sc->mac.phy_loc,
+		    MII_OFFSET_ANY, 0);
+		if (error != 0) {
+			device_printf(dev, "%s: failed "
+			    "to attach to miibus: "
+			    "error=%d\n",
+			    __func__, error);
+		}
+	}
+	if (error == 0) {
+		sc->mii = device_get_softc(sc->miibus);
+	}
+
+	return (error);
+}
+
 static int
 dpaa2_ni_detach(device_t dev)
 {
@@ -859,51 +920,10 @@ dpaa2_ni_setup(device_t dev)
 			} else if (link_type == DPAA2_MAC_LINK_TYPE_PHY) {
 				device_printf(dev, "connected DPMAC is in PHY "
 				    "mode\n");
-				error = DPAA2_MC_GET_PHY_DEV(dev,
-				    &sc->mac.phy_dev, sc->mac.dpmac_id);
-				if (error == 0) {
-					error = MEMAC_MDIO_SET_NI_DEV(
-					    sc->mac.phy_dev, dev);
-					if (error != 0) {
-						device_printf(dev, "%s: failed "
-						    "to set dpni dev on memac "
-						    "mdio dev %s: error=%d\n",
-						    __func__,
-						    device_get_nameunit(
-						    sc->mac.phy_dev), error);
-					}
-				}
-				if (error == 0) {
-					error = MEMAC_MDIO_GET_PHY_LOC(
-					    sc->mac.phy_dev, &sc->mac.phy_loc);
-					if (error == ENODEV) {
-						error = 0;
-					}
-					if (error != 0) {
-						device_printf(dev, "%s: failed "
-						    "to get phy location from "
-						    "memac mdio dev %s: error=%d\n",
-						    __func__, device_get_nameunit(
-						    sc->mac.phy_dev), error);
-					}
-				}
-				if (error == 0) {
-					error = mii_attach(sc->mac.phy_dev,
-					    &sc->miibus, sc->ifp,
-					    dpaa2_ni_media_change,
-					    dpaa2_ni_media_status,
-					    BMSR_DEFCAPMASK, sc->mac.phy_loc,
-					    MII_OFFSET_ANY, 0);
-					if (error != 0) {
-						device_printf(dev, "%s: failed "
-						    "to attach to miibus: "
-						    "error=%d\n",
-						    __func__, error);
-					}
-				}
-				if (error == 0) {
-					sc->mii = device_get_softc(sc->miibus);
-				}
+				error = dpaa2_ni_setup_mii(sc);
+				if (error != 0)
+					device_printf(dev, "%s: failed to setup "
+					    "MII: error=%d\n", __func__, error);
 			} else {
 				device_printf(dev, "%s: DPMAC link type is not "
 				    "supported\n", __func__);

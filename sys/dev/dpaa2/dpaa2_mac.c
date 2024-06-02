@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2022 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,9 +26,8 @@
  */
 
 #include <sys/cdefs.h>
+
 /*
- * The DPAA2 MAC driver.
- *
  * For every DPAA2 MAC, there is an MC object named DPMAC, for MDIO and link
  * state updates. The DPMAC virtualizes the MDIO interface, so each PHY driver
  * may see a private interface (removing the need for synchronization in GPP on
@@ -98,15 +97,14 @@ static const char *dpaa2_mac_link_type_to_str(enum dpaa2_mac_link_type);
 /* Interrupt handlers */
 static void dpaa2_mac_intr(void *arg);
 
-static int
+int
 dpaa2_mac_probe(device_t dev)
 {
-	/* DPIO device will be added by a parent resource container itself. */
 	device_set_desc(dev, "DPAA2 MAC");
 	return (BUS_PROBE_DEFAULT);
 }
 
-static int
+int
 dpaa2_mac_attach(device_t dev)
 {
 	device_t pdev = device_get_parent(dev);
@@ -403,10 +401,5 @@ static device_method_t dpaa2_mac_methods[] = {
 	DEVMETHOD_END
 };
 
-static driver_t dpaa2_mac_driver = {
-	"dpaa2_mac",
-	dpaa2_mac_methods,
-	sizeof(struct dpaa2_mac_softc),
-};
-
-DRIVER_MODULE(dpaa2_mac, dpaa2_rc, dpaa2_mac_driver, 0, 0);
+DEFINE_CLASS_0(dpaa2_mac, dpaa2_mac_driver, dpaa2_mac_methods,
+    sizeof(struct dpaa2_mac_softc));

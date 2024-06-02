@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2023 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,9 @@
 #include <sys/param.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/types.h>
+#include <sys/rman.h>
+#include <sys/bus.h>
 
 #include <machine/atomic.h>
 #include <machine/bus.h>
@@ -119,6 +122,54 @@ struct dpaa2_ni_fq {
 	struct dpaa2_ni_tx_ring	 tx_rings[DPAA2_MAX_TCS];
 	uint32_t		 tx_qdbin;
 } __aligned(CACHE_LINE_SIZE);
+
+/**
+ * @brief Information about MSI messages supported by the DPAA2 object.
+ *
+ * msi_msgnum:	 Number of MSI messages supported by the DPAA2 object.
+ * msi_alloc:	 Number of MSI messages allocated for the DPAA2 object.
+ * msi_handlers: Number of MSI message handlers configured.
+ */
+struct dpaa2_msinfo {
+	uint8_t			 msi_msgnum;
+	uint8_t			 msi_alloc;
+	uint32_t		 msi_handlers;
+};
+
+/**
+ * @brief Information about DPAA2 device.
+ *
+ * pdev:	Parent device.
+ * dev:		Device this devinfo is associated with.
+ *
+ * id:		ID of a logical DPAA2 object resource.
+ * portal_id:	ID of the MC portal which belongs to the object's container.
+ * icid:	Isolation context ID of the DPAA2 object. It is shared
+ *		between a resource container and all of its children.
+ *
+ * dtype:	Type of the DPAA2 object.
+ * resources:	Resources available for this DPAA2 device.
+ * msi:		Information about MSI messages supported by the DPAA2 object.
+ */
+struct dpaa2_devinfo {
+	device_t		 pdev;
+	device_t		 dev;
+
+	uint32_t		 id;
+	uint32_t		 portal_id;
+	uint32_t		 icid;
+
+	enum dpaa2_dev_type	 dtype;
+	struct resource_list	 resources;
+	struct dpaa2_msinfo	 msi;
+
+	/*
+	 * DPAA2 object might or might not have its own portal allocated to
+	 * execute MC commands. If the portal has been allocated, it takes
+	 * precedence over the portal owned by the resource container.
+	 */
+	struct dpaa2_mcp	*portal;
+};
 
 /* Handy wrappers over atomic operations. */
 #define DPAA2_ATOMIC_XCHG(a, val) \

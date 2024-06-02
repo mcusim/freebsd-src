@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright © 2021-2022 Dmitry Salychev
+ * Copyright © 2021-2024 Dmitry Salychev
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -2994,10 +2994,12 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 	uint64_t start, end, count;
 	uint32_t flags = 0;
 	int rid, error;
+	size_t dinfo_sz;
 
 	rcdev = sc->dev;
 	child = sc->dev;
 	rcinfo = device_get_ivars(rcdev);
+	dinfo_sz = sizeof(struct dpaa2_devinfo);
 
 	switch (obj->type) {
 	case DPAA2_DEV_IO:
@@ -3019,6 +3021,7 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		devclass = "dpaa2_mac";
 		res_spec = dpaa2_mac_spec;
 		flags = DPAA2_MC_DEV_ASSOCIATED;
+		dinfo_sz = sizeof(struct dpaa2_macinfo);
 		break;
 	case DPAA2_DEV_MCP:
 		devclass = "dpaa2_mcp";
@@ -3039,9 +3042,11 @@ dpaa2_rc_add_managed_child(struct dpaa2_rc_softc *sc, struct dpaa2_cmd *cmd,
 		return (ENXIO);
 	}
 
+	KASSERT(dinfo_sz >= sizeof(struct dpaa2_devinfo),
+	    ("%s: dinfo_sz(%zu) is too small", __func__, dinfo_sz));
+
 	/* Allocate devinfo for the child. */
-	dinfo = malloc(sizeof(struct dpaa2_devinfo), M_DPAA2_RC,
-	    M_WAITOK | M_ZERO);
+	dinfo = malloc(dinfo_sz, M_DPAA2_RC, M_WAITOK | M_ZERO);
 	if (!dinfo) {
 		device_printf(rcdev, "%s: failed to allocate dpaa2_devinfo "
 		    "for: type=%s, id=%u\n", __func__, dpaa2_ttos(obj->type),
