@@ -26,25 +26,51 @@
 #
 
 #include <machine/bus.h>
-
 #include <dev/maclink/maclink.h>
 
-INTERFACE maclink;
+/**
+ * @brief Interface of a maclink device which is supposed to be observed by a
+ *        maclink adapter.
+ */
+INTERFACE maclink_dev;
 
 /**
- * @brief Request the maclink device to report to the given maclink adapter.
+ * @brief Registers a new maclink adapter for the maclink device.
  *
- * The maclink adapter is expected to discover devices (PCS, PHY, SFP, etc.)
- * which constitute a connection between a network interface (or MAC) the
- * adapter is connected to and a physical media. Adapter should register itself
- * for each of the interested devices.
- *
- * @param dev The maclink device.
- * @param adapter The maclink adapter.
+ * @param dev[in] The maclink device.
+ * @param adp[in] The maclink adapter.
  *
  * @return 0 on success or a standard errno value.
  */
 METHOD int register {
-	device_t		 dev;
-	device_t		 adapter;
+	device_t dev;
+	device_t adp;
+};
+
+/**
+ * @brief Removes previously registered maclink adapter.
+ *
+ * @param dev[in] The maclink device.
+ * @param adp[in] The maclink adapter.
+ *
+ * @return 0 on success or a standard errno value.
+ */
+METHOD int unregister {
+	device_t dev;
+	device_t adp;
+};
+
+/**
+ * @brief Requests a maclink interface data.
+ *
+ * It allows maclink devices to decide where to keep the maclink interface data.
+ *
+ * @param dev[in]   The maclink device.
+ * @param data[out] Interface between maclink devices.
+ *
+ * @return 0 on success or a standard errno value.
+ */
+METHOD int get_data {
+	device_t dev;
+	struct maclink_data **data;
 };
