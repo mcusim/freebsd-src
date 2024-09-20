@@ -26,25 +26,114 @@
 #
 
 #include <machine/bus.h>
-
 #include <dev/maclink/maclink.h>
 
 INTERFACE maclink;
 
+CODE {
+	static int
+	bypass_validate(device_t bus, struct maclink_conf *conf)
+	{
+		if (maclink_get_parent(bus) != NULL)
+			return (MACLINK_VALIDATE(maclink_get_parent(bus), conf));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_statchg(device_t bus, struct maclink_state *state)
+	{
+		if (maclink_get_parent(bus) != NULL)
+			return (MACLINK_STATCHG(maclink_get_parent(bus), state));
+		return (ENXIO);
+	}
+
+	static int
+	bypass_linkchg(device_t bus, struct maclink_link_state *state)
+	{
+		if (maclink_get_parent(bus) != NULL)
+			return (MACLINK_LINKCHG(maclink_get_parent(bus), state));
+		return (ENXIO);
+	}
+}
+
 /**
- * @brief Request the maclink device to report to the given maclink adapter.
+ * @brief Requests the maclink bus to register a new maclink device.
  *
- * The maclink adapter is expected to discover devices (PCS, PHY, SFP, etc.)
- * which constitute a connection between a network interface (or MAC) the
- * adapter is connected to and a physical media. Adapter should register itself
- * for each of the interested devices.
- *
- * @param dev The maclink device.
- * @param adapter The maclink adapter.
+ * @param bus[in] The maclink bus device.
+ * @param dev[in] The maclink device.
  *
  * @return 0 on success or a standard errno value.
  */
 METHOD int register {
+	device_t		 bus;
 	device_t		 dev;
-	device_t		 adapter;
 };
+
+/**
+ * @brief Requests a maclink interface data.
+ *
+ * It allows maclink devices to decide where to keep the maclink interface data.
+ *
+ * @param dev[in]   The maclink device.
+ * @param data[out] Interface between maclink devices.
+ *
+ * @return 0 on success or a standard errno value.
+ */
+METHOD int get_data {
+	device_t		 dev;
+	struct maclink_data    **data;
+};
+
+/**
+ * @brief Requests the maclink bus to validate a configuration suggested by
+ *        the maclink device.
+ *
+ * The bus itself can provide a hint about the supported options via the
+ * suggested configuration back to the device in case of a validation error.
+ * It is recommended to save the correctly validated options in the bus driver
+ * softc till the next validation request.
+ *
+ * @param bus[in]      The maclink bus device.
+ * @param conf[in,out] Configuration options to validate.
+ *
+ * @return 0 on success or a standard errno value.
+ */
+METHOD int validate {
+	device_t		 bus;
+	struct maclink_conf	*conf;
+} DEFAULT bypass_validate;
+
+/**
+ * @brief Notifies the maclink bus about the state change.
+ *
+ * The new state (e.g. PCS sync, SFP module present, PHY auto-neg, etc.) doesn't
+ * always mean a link up/down event and is merely needed to let the maclink bus
+ * know that something is going on.
+ *
+ * @param bus[in]   The maclink bus device.
+ * @param state[in] New state provided by the maclink device.
+ *
+ * @return void.
+ */
+METHOD void statchg {
+	device_t		 bus;
+	struct maclink_state	*state;
+} DEFAULT bypass_statchg;
+
+/**
+ * @brief Notifies the maclink bus about the link state change.
+ *
+ * There are several devices which participate in the link up sequence usually.
+ * The maclink bus will be notified by the last device in the sequence which
+ * caused a link up event, or by the first device which caused a link down
+ * event. The new link state will be provided by the state argument.
+ *
+ * @param bus[in]   The maclink bus device.
+ * @param state[in] New link state.
+ *
+ * @return void.
+ */
+METHOD void linkchg {
+	device_t		   bus;
+	struct maclink_link_state *state;
+} DEFAULT bypass_linkchg;

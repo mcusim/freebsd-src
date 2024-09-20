@@ -29,61 +29,33 @@
 #define	_MACLINK_H
 
 #include <sys/param.h>
-#include <sys/kobj.h>
-
-struct maclink_conf {
-};
-
-struct maclink_state {
-};
-
-struct maclink_link_state {
-};
-
-
-/**
- * @brief Information about a maclink bus device.
- */
-struct maclink_bus_ivars {
-};
-
-/**
- * @brief Software context for the maclink bus.
- */
-struct maclink_bus_softc {
-};
-
-
-/**
- * @brief Used to attach a maclink adapter to the bus.
- */
-struct maclink_ivars {
-};
-
-/**
- * @brief Each maclink adapter driver's softc has one of these as the first
- *        member.
- */
-struct maclink_softc {
-};
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/queue.h>
 
 DECLARE_CLASS(maclink_bus_driver);
-DECLARE_CLASS(maclink_phy_driver);
-DECLARE_CLASS(maclink_sfp_driver);
 
 /**
- * @brief Requests the maclink adapter to report to the given maclink device.
- *
- * The maclink adapter is expected to discover devices (PCS, PHY, SFP, etc.)
- * which constitute a connection between a network interface (or MAC) the
- * adapter is connected to and a physical media.
- *
- * @param dev The maclink device (e.g. network interface or MAC)
- * @param adapter The maclink adapter.
- * @param data Interface from the maclink device to the maclink adapter.
- *
- * @return 0 on success or a standard errno value.
+ * @struct maclink_devinfo
+ * @brief Structure to describe a maclink device.
  */
-int maclink_register(device_t dev, device_t adapter, struct maclink_data *data);
+struct maclink_devinfo {
+	SLIST_ENTRY(maclink_devinfo) link;
+};
+
+/**
+ * @struct maclink_data
+ * @brief Interface between the maclink devices.
+ */
+struct maclink_data {
+	device_t pdev;	/**< Parent maclink device */
+	device_t dev;	/**< Maclink device this interface is associated with */
+	SLIST_HEAD(, maclink_devinfo) mldevs; /**< Registered maclink devices */
+	struct mtx lock; /**< Used to protect the whole structure */
+};
+
+int maclink_attach(device_t dev, device_t *mlbus);
+int maclink_register(device_t mlbus, device_t mldev);
+device_t maclink_get_parent(device_t mldev);
 
 #endif /* _MACLINK_H */

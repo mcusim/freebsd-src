@@ -155,6 +155,13 @@ static device_method_t dpaa2_mac_fdt_methods[] = {
 	DEVMETHOD(device_probe,		dpaa2_mac_fdt_probe),
 	DEVMETHOD(device_attach,	dpaa2_mac_fdt_attach),
 
+	/* maclink interface */
+	DEVMETHOD(maclink_register,	maclink_register),
+	DEVMETHOD(maclink_get_data,	dpaa2_mac_fdt_get_data),
+	DEVMETHOD(maclink_validate,	dpaa2_mac_fdt_validate),
+	DEVMETHOD(maclink_statchg,	dpaa2_mac_fdt_statchg),
+	DEVMETHOD(maclink_linkchg,	dpaa2_mac_fdt_linkchg),
+
 	DEVMETHOD_END
 };
 

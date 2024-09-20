@@ -30,9 +30,20 @@
 /*
  * The maclink layer.
  *
- * It implements a loose coupling between the network interfaces and maclink
- * adapters hiding a complex set of devices (PCSs, SFP/SFF) which constitute a
+ * It implements a loose coupling between a network interface and a maclink
+ * adapter hiding a complex set of devices (PCSs, SFP/SFF) which constitute a
  * connection between MAC and a physical media.
+ *
+ * Topology example:
+ *
+ *                                            /-- maclink_device0 (PCS)
+ * IF/MAC -- maclink_bus -- maclink_adapter ----- maclink_device1 (bus) -- (PHY)
+ *                                            \-- maclink_deviceN (SFP)
+ *
+ * The maclink adapter is expected to discover devices (PCS, PHY, SFP, etc.)
+ * which constitute a connection between a network interface (or MAC) the
+ * adapter is connected to and a physical media. Adapter should register
+ * each of the interesting devices.
  */
 
 #include <sys/param.h>
@@ -43,73 +54,17 @@
 #include <sys/bus.h>
 #include <sys/sbuf.h>
 
-#include "maclink_bus_if.h"
-
+#include "maclink_if.h"
 #include "maclink.h"
 
-/* for device interface */
-
-static int
-maclink_bus_probe(device_t dev)
-{
-	device_set_desc(dev, "MACLINK bus");
-
-	return (BUS_PROBE_SPECIFIC);
-}
-
-static int
-maclink_bus_attach(device_t dev)
-{
-	return (0);
-}
-
-static int
-maclink_bus_detach(device_t dev)
-{
-	return (0);
-}
-
-/* for maclink bus interface */
-
-static int
-maclink_bus_validate(device_t dev, struct maclink_conf *conf)
-{
-	device_t parent;
-
-	parent = device_get_parent(dev);
-	return (MACLINK_BUS_VALIDATE(parent, conf));
-}
-
-static void
-maclink_bus_statchg(device_t dev, struct maclink_state *state)
-{
-	device_t parent;
-
-	parent = device_get_parent(dev);
-	return (MACLINK_BUS_STATCHG(parent, state));
-}
-
-static void
-maclink_bus_linkchg(device_t dev, struct maclink_link_state *state)
-{
-	device_t parent;
-
-	parent = device_get_parent(dev);
-	return (MACLINK_BUS_LINKCHG(parent, state));
-}
-
-/* helper routines */
-
 /**
- * @brief Helper function used to attach maclink bus to the network interface
- *        driver.
+ * @brief Attaches the maclink bus to the network interface or MAC.
  *
- * @param dev Parent device (e.g. network interface) for the maclink bus.
- * @param bus The maclink bus device to attach.
- * @param args Used to probe and attach an adapter to the maclink bus.
+ * @param dev[in] Parent device (e.g. network interface) for the maclink bus.
+ * @param mlbus[out] The attached maclink bus.
  */
 int
-maclink_attach(device_t dev, device_t *bus, const struct maclink_ivars *args)
+maclink_attach(device_t dev, device_t *mlbus)
 {
 	struct maclink_bus_ivars *ivars;
 	struct maclink_ivars *adp_ivars;
@@ -123,7 +78,7 @@ maclink_attach(device_t dev, device_t *bus, const struct maclink_ivars *args)
 		if (ivars == NULL)
 			return (ENOMEM);
 
-		*bus = device_add_child(dev, "maclink_bus", -1);
+		*bus = device_add_child(dev, "maclink_bus", DEVICE_UNIT_ANY);
 		if (*bus == NULL) {
 			rc = ENXIO;
 			goto fail;
@@ -247,6 +202,12 @@ fail:
 	return (rv);
 }
 
+int
+maclink_register(device_t mlbus, device_t mldev)
+{
+	return (0);
+}
+
 static device_method_t maclink_bus_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_probe,		maclink_bus_probe),
@@ -254,15 +215,23 @@ static device_method_t maclink_bus_methods[] = {
 	DEVMETHOD(device_detach,	maclink_bus_detach),
 	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
 
-	/* maclink bus interface */
-	DEVMETHOD(maclink_bus_validate,	maclink_bus_validate),
-	DEVMETHOD(maclink_bus_statchg,	maclink_bus_statchg),
-	DEVMETHOD(maclink_bus_linkchg,	maclink_bus_linkchg),
+	/* bus interface */
+	DEVMETHOD(bus_print_child,	maclink_bus_print_child),
+	DEVMETHOD(bus_read_ivar,	maclink_bus_read_ivar),
+	DEVMETHOD(bus_child_detached,	maclink_bus_child_detached),
+	DEVMETHOD(bus_child_pnpinfo,	maclink_bus_child_pnpinfo),
+	DEVMETHOD(bus_child_location,	maclink_bus_child_location),
+	DEVMETHOD(bus_hinted_child,	maclink_bus_hinted_child),
+
+	/* maclink interface */
+	DEVMETHOD(maclink_register,	maclink_bus_register),
+	DEVMETHOD(maclink_get_data,	maclink_bus_get_data),
+	DEVMETHOD(maclink_validate,	maclink_bus_validate),
+	DEVMETHOD(maclink_statchg,	maclink_bus_statchg),
+	DEVMETHOD(maclink_linkchg,	maclink_bus_linkchg),
 
 	DEVMETHOD_END
 };
 
 DEFINE_CLASS_0(maclink_bus, maclink_bus_driver, maclink_bus_methods,
-    sizeof(struct maclink_bus_softc));
-
-MODULE_VERSION(maclink_bus, 1);
+    sizeof(struct maclink_data));
