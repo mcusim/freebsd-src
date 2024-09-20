@@ -38,27 +38,53 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/sbuf.h>
+#include <sys/kernel.h>
 
-#include "maclink_if.h"
+#include <dev/maclink/maclink.h>
 
-#include "maclink.h"
+#include "maclink_bus_if.h"
+#include "maclink_dev_if.h"
+
+struct maclink_phy_softc {
+	int placeholder;
+};
 
 /* for device interface */
 
-/* for maclink interface */
-/* ... */
+static int
+maclink_phy_probe(device_t dev)
+{
+	device_set_desc(dev, "MACLINK PHY adapter");
+
+	return (BUS_PROBE_DEFAULT);
+}
+
+static int
+maclink_phy_attach(device_t dev)
+{
+	/* XXX-DSL: to be done. */
+
+	return (0);
+}
 
 static device_method_t maclink_phy_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_probe,		maclink_phy_probe),
 	DEVMETHOD(device_attach,	maclink_phy_attach),
-	DEVMETHOD(device_detach,	maclink_phy_detach),
 
-	/* maclink interface */
-	/* ... */
+	/* maclink bus interface */
+	DEVMETHOD(maclink_bus_validate,	maclink_bus_validate),
+	DEVMETHOD(maclink_bus_statchg,	maclink_bus_statchg),
+	DEVMETHOD(maclink_bus_linkchg,	maclink_bus_linkchg),
 
 	DEVMETHOD_END
 };
 
-DEFINE_CLASS_1(maclink, maclink_phy_driver, maclink_phy_methods,
-    sizeof(struct maclink_softc), maclink_driver);
+static driver_t maclink_phy_driver = {
+	"maclink_phy",
+	maclink_phy_methods,
+	sizeof(struct maclink_phy_softc),
+};
+
+DRIVER_MODULE(maclink_phy, maclink_bus, maclink_phy_driver, 0, 0);
+

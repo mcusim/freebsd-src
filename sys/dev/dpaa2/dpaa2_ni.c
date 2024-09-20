@@ -698,7 +698,7 @@ dpaa2_ni_setup_fixed_link(struct dpaa2_ni_softc *sc)
 static int
 dpaa2_ni_setup_mii(struct dpaa2_ni_softc *sc)
 {
-	device_t dev, macdev, phydev;
+	device_t dev, macdev;
 	int error;
 
 	dev = sc->dev;

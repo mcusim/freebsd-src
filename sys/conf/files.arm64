@@ -400,6 +400,12 @@ dev/ipmi/ipmi_smbus.c				optional ipmi smbus
 dev/ipmi/ipmi_smic.c				optional ipmi
 dev/ipmi/ipmi_ssif.c				optional ipmi smbus
 
+dev/maclink/adapters/fdt/maclink_phy.c		optional maclink fdt
+dev/maclink/adapters/fdt/maclink_sfp.c		optional maclink fdt
+dev/maclink/maclink.c				optional maclink
+dev/maclink/maclink_bus_if.m			optional maclink
+dev/maclink/maclink_dev_if.m			optional maclink
+
 dev/mailbox/arm/arm_doorbell.c			optional fdt arm_doorbell
 dev/mbox/mbox_if.m				optional soc_brcm_bcm2837
 
