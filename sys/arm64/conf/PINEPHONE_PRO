@@ -1,0 +1,11 @@
+include ROCKCHIP
+ident PINEPHONE_PRO
+
+# LCD backlight driver
+device backlight
+device pwm_backlight
+
+# flash driver
+device mx25l
+
+

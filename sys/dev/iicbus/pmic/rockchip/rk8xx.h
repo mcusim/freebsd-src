@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  *
  * Copyright (c) 2021 Emmanuel Vadot <manu@FreeBSD.org>
+ * Copyright (c) 2024 Toby Kurien <toby@tobykurien.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +39,7 @@ enum rk_pmic_type {
 	RK808,
 	RK809,
 	RK817,
+  RK818,
 };
 
 struct rk8xx_regdef {

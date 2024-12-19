@@ -44,8 +44,8 @@ static int rk8xx_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
     int max_uvolt, int *udelay);
 static int rk8xx_regnode_get_voltage(struct regnode *regnode, int *uvolt);
 
-/* #define	dprintf(sc, format, arg...)	device_printf(sc->base_dev, "%s: " format, __func__, arg) */
-#define	dprintf(sc, format, arg...) (sc = sc)
+#define	dprintf(sc, format, arg...)	if (bootverbose) device_printf(sc->base_dev, "%s: " format, __func__, arg) 
+//#define	dprintf(sc, format, arg...) (sc = sc)
 
 static int
 rk8xx_regnode_init(struct regnode *regnode)
