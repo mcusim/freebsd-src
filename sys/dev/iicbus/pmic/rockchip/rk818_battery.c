@@ -356,7 +356,6 @@ rk818_battery_attach(device_t pmic_dev)
 {
   phandle_t rnode, tmpnode, bnode;
 	int len;
-	int data32;
   struct sysctl_oid *sysctl_node;
 
   rnode = ofw_bus_find_child(ofw_bus_get_node(pmic_dev), "charger");
