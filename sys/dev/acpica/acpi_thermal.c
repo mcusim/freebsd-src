@@ -64,7 +64,7 @@ ACPI_MODULE_NAME("THERMAL")
 #define TZ_POLLRATE	10
 
 /* Make sure the reported temperature is valid for this number of polls. */
-#define TZ_VALIDCHECKS	3
+#define TZ_VALIDCHECKS	30
 
 /* Notify the user we will be shutting down in one more poll cycle. */
 #define TZ_NOTIFYCOUNT	(TZ_VALIDCHECKS - 1)
