@@ -166,7 +166,7 @@ maclink_bus_attach(device_t dev)
 {
 	/* XXX-DSL: to be done. */
 
-	return (bus_generic_attach(dev));
+	return (bus_attach_children(dev));
 }
 
 int
