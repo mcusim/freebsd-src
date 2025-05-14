@@ -164,9 +164,11 @@ maclink_bus_probe(device_t dev)
 static int
 maclink_bus_attach(device_t dev)
 {
-	/* XXX-DSL: to be done. */
+	/* XXX-DSL: to be implemented. */
+	bus_identify_children(dev);
+	bus_attach_children(dev);
 
-	return (bus_attach_children(dev));
+	return (0);
 }
 
 int
