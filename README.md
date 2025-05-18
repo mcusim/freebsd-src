@@ -1,3 +1,11 @@
+HoneyComb LX2 notes:
+--------------------
+
+See HONEYCOMB for a list of configurations steps done in order to fix problems
+and properly support HoneyComb LX2 from SolidRun with AMD Radeon RX 460 GPU.
+
+====================
+
 FreeBSD Source:
 ---------------
 This is the top level of the FreeBSD source directory.
