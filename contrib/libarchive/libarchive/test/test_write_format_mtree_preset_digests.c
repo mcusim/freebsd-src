@@ -28,10 +28,6 @@
 #define __LIBARCHIVE_BUILD 1
 #include "archive_digest_private.h"
 
-#ifdef memcpy
-#undef memcpy /* FORTIFY_SOURCE */
-#endif
-
 struct expected_digests {
 	unsigned char md5[16];
 	unsigned char rmd160[20];

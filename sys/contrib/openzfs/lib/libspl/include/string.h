@@ -30,11 +30,11 @@
 
 #include_next <string.h>
 
-#if !defined(HAVE_STRLCAT) && !defined(strlcat)
+#ifndef HAVE_STRLCAT
 extern size_t strlcat(char *dst, const char *src, size_t dstsize);
 #endif
 
-#if !defined(HAVE_STRLCPY) && !defined(strlcpy)
+#ifndef HAVE_STRLCPY
 extern size_t strlcpy(char *dst, const char *src, size_t len);
 #endif
 
