@@ -100,6 +100,10 @@ struct dpaa2_io_softc {
 
 	int			 cpu;
 	cpuset_t		 cpu_mask;
+
+	/* counters for sysctl(9) */
+	uint64_t		 unknown_dqrr_entry;
+	uint64_t		 cleanup_task_enqueues;
 };
 
 extern struct resource_spec dpaa2_io_spec[];

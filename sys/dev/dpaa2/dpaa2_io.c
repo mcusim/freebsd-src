@@ -52,6 +52,7 @@
 #include <sys/cpuset.h>
 #include <sys/taskqueue.h>
 #include <sys/smp.h>
+#include <sys/sysctl.h>
 
 #include <vm/vm.h>
 
@@ -115,8 +116,9 @@ struct resource_spec dpaa2_io_spec[] = {
 /* Configuration routines. */
 static int dpaa2_io_setup_irqs(device_t dev);
 static int dpaa2_io_release_irqs(device_t dev);
-static int dpaa2_io_setup_msi(struct dpaa2_io_softc *sc);
-static int dpaa2_io_release_msi(struct dpaa2_io_softc *sc);
+static int dpaa2_io_setup_msi(struct dpaa2_io_softc *);
+static int dpaa2_io_release_msi(struct dpaa2_io_softc *);
+static int dpaa2_io_setup_sysctls(struct dpaa2_io_softc *);
 
 /* Interrupt handlers */
 static void dpaa2_io_intr(void *arg);
@@ -224,6 +226,8 @@ dpaa2_io_attach(device_t dev)
 	sc->intr = NULL;
 	sc->irq_resource = NULL;
 
+	sc->unknown_dqrr_entry = 0;
+
 	/* Allocate resources. */
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
 	if (error) {
@@ -319,6 +323,13 @@ dpaa2_io_attach(device_t dev)
 	error = dpaa2_io_setup_irqs(dev);
 	if (error) {
 		device_printf(dev, "%s: failed to setup IRQs: error=%d\n",
+		    __func__, error);
+		goto err_exit;
+	}
+
+	error = dpaa2_io_setup_sysctls(sc);
+	if (error) {
+		device_printf(dev, "%s: failed to setup sysctls: error=%d\n",
 		    __func__, error);
 		goto err_exit;
 	}
@@ -525,6 +536,31 @@ dpaa2_io_release_msi(struct dpaa2_io_softc *sc)
 	return (0);
 }
 
+static int
+dpaa2_io_setup_sysctls(struct dpaa2_io_softc *sc)
+{
+	struct sysctl_ctx_list *ctx;
+	struct sysctl_oid *node;
+	struct sysctl_oid_list *parent;
+
+	ctx = device_get_sysctl_ctx(sc->dev);
+	parent = SYSCTL_CHILDREN(device_get_sysctl_tree(sc->dev));
+
+	/* Add DPIO statistics */
+	node = SYSCTL_ADD_NODE(ctx, parent, OID_AUTO, "stats",
+	    CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, "DPIO Statistics");
+	parent = SYSCTL_CHILDREN(node);
+
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "unknown_dqrr_entry",
+	    CTLFLAG_RD, &sc->unknown_dqrr_entry,
+	    "Number of the unknown Dequeue Response Ring entries");
+	SYSCTL_ADD_UQUAD(ctx, parent, OID_AUTO, "cleanup_task_enqueues",
+	    CTLFLAG_RD, &sc->cleanup_task_enqueues,
+	    "How many times channels cleanup tasks were enqueued");
+
+	return (0);
+}
+
 /**
  * @brief DPAA2 I/O interrupt handler.
  */
@@ -562,7 +598,7 @@ dpaa2_io_intr(void *arg)
 		    DPAA2_DQRR_RESULT_CDAN) {
 			ctx[cdan_n++] = (struct dpaa2_io_notif_ctx *) dq.scn.ctx;
 		} else {
-			/* TODO: Report unknown DQRR entry. */
+			sc->unknown_dqrr_entry++; /* for sysctl(9) */
 		}
 		dpaa2_swp_write_reg(sc->swp, DPAA2_SWP_CINH_DCAP, idx);
 	}
@@ -572,6 +608,7 @@ dpaa2_io_intr(void *arg)
 		chan = (struct dpaa2_channel *)ctx[i]->channel;
 		/* nisc = device_get_softc(chan->ni_dev); */
 		taskqueue_enqueue(chan->cleanup_tq, &chan->cleanup_task);
+		sc->cleanup_task_enqueues++; /* for sysctl(9) */
 	}
 
 	/* Enable software portal interrupts back */
