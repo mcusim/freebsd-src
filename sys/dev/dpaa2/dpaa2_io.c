@@ -227,6 +227,7 @@ dpaa2_io_attach(device_t dev)
 	sc->irq_resource = NULL;
 
 	sc->unknown_dqrr_entry = 0;
+	sc->cleanup_task_enqueues = 0;
 
 	/* Allocate resources. */
 	error = bus_alloc_resources(sc->dev, dpaa2_io_spec, sc->res);
