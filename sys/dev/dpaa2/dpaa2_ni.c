@@ -627,6 +627,12 @@ dpaa2_ni_attach(device_t dev)
 		    __func__, error);
 		goto close_ni;
 	}
+	error = dpaa2_ni_setup_if_caps(sc);
+	if (error) {
+		device_printf(dev, "%s: failed to setup interface capabilities: "
+		    "error=%d\n", __func__, error);
+		goto close_ni;
+	}
 
 	ether_ifattach(sc->ifp, sc->mac.addr);
 	callout_init(&sc->mii_callout, 0);
@@ -1625,6 +1631,13 @@ dpaa2_ni_setup_if_caps(struct dpaa2_ni_softc *sc)
 		device_printf(dev, "%s: failed to %s L4 checksum generation\n",
 		    __func__, en_txcsum ? "enable" : "disable");
 		goto close_ni;
+	}
+
+	if (bootverbose) {
+		device_printf(dev, "%s: L3/L4 checksum validation %s\n",
+		    __func__, en_rxcsum ? "enabled" : "disabled");
+		device_printf(dev, "%s: L3/L4 checksum generation %s\n",
+		    __func__, en_txcsum ? "enabled" : "disabled");
 	}
 
 	(void)DPAA2_CMD_NI_CLOSE(dev, child, &cmd);
